@@ -15,7 +15,7 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [username, setUsername] = useState<string | null>(null);
-  const [loading, setLoading] = useState(Boolean(getAuthToken()));
+  const [loading, setLoading] = useState(() => Boolean(getAuthToken()));
 
   useEffect(() => {
     const t = getAuthToken();

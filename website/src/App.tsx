@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
 import LoginPage from './pages/LoginPage';
@@ -40,6 +40,7 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

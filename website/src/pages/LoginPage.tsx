@@ -14,7 +14,15 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!authLoading && token) {
+  if (authLoading && token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <p className="text-sm text-[var(--muted)]">Checking session…</p>
+      </div>
+    );
+  }
+
+  if (token) {
     return <Navigate to={from} replace />;
   }
 
