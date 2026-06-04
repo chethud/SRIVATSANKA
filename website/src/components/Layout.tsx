@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
   HardHat, FileText, BarChart3, Bot, Settings, MessageCircle,
-  PanelLeftClose, PanelLeft, Moon, Sun,
+  PanelLeftClose, PanelLeft, Moon, Sun, LogOut,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { CreateActionProvider } from '../context/CreateActionContext';
 import { LayoutProvider, useLayout } from '../context/LayoutContext';
@@ -38,6 +40,13 @@ function DashboardLayoutInner() {
   const { theme, toggleTheme } = useTheme();
   const { sidebarCollapsed, toggleSidebar, sidebarWidth } = useLayout();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, username } = useAuth();
+
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
 
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
@@ -90,6 +99,22 @@ function DashboardLayoutInner() {
         </nav>
 
         <div className="shrink-0 p-2 border-t border-[var(--sidebar-border)] space-y-1">
+          {!sidebarCollapsed && username && (
+            <p className="px-3 py-1 text-[10px] text-[var(--sidebar-muted)] truncate" title={username}>
+              Signed in as {username}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] transition-colors ${
+              sidebarCollapsed ? 'justify-center' : ''
+            }`}
+            title="Sign out"
+          >
+            <LogOut size={18} />
+            {!sidebarCollapsed && <span>Sign out</span>}
+          </button>
           <button
             type="button"
             onClick={toggleTheme}

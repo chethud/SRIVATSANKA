@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import SessionLocal, init_db
-from app.routers import api, dev, orders, resources, webhook
+from app.middleware.auth import AuthMiddleware
+from app.routers import api, auth, dev, orders, resources, webhook
 from app.services.scheduler import start_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -47,7 +48,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthMiddleware)
 
+app.include_router(auth.router)
 app.include_router(webhook.router)
 app.include_router(api.router)
 app.include_router(orders.router)

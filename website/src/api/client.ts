@@ -5,6 +5,65 @@ const API_BASE =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? DEFAULT_LIVE_API : '');
 
+const AUTH_STORAGE_KEY = 'kannans_auth_token';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(AUTH_STORAGE_KEY, token);
+    else localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = getAuthToken();
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (extra instanceof Headers) {
+    extra.forEach((v, k) => {
+      h[k] = v;
+    });
+  } else if (Array.isArray(extra)) {
+    for (const [k, v] of extra) h[k] = v;
+  } else if (extra && typeof extra === 'object') {
+    Object.assign(h, extra as Record<string, string>);
+  }
+  return h;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  username: string;
+}
+
+export interface AuthMe {
+  username: string;
+}
+
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) throw new Error(await apiErrorMessage(res, '/api/auth/login'));
+  return res.json();
+}
+
+export async function verifySession(): Promise<AuthMe> {
+  return apiFetch<AuthMe>('/api/auth/me');
+}
+
 export interface DashboardStats {
   new_enquiries: number;
   total_enquiries: number;
@@ -167,7 +226,16 @@ async function apiErrorMessage(res: Response, path: string): Promise<string> {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, options);
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: authHeaders(options?.headers),
+  });
+  if (res.status === 401 && path !== '/api/auth/me') {
+    setAuthToken(null);
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.assign('/login');
+    }
+  }
   if (!res.ok) throw new Error(await apiErrorMessage(res, path));
   return res.json();
 }
@@ -277,7 +345,11 @@ export interface InvoiceUploadResult extends InvoiceUpload {
 export async function recognizeExpenseInvoice(file: File): Promise<InvoiceRecognizePreview> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`${API_BASE}/api/invoices/recognize`, { method: 'POST', body: fd });
+  const res = await fetch(`${API_BASE}/api/invoices/recognize`, {
+    method: 'POST',
+    body: fd,
+    headers: authHeaders(),
+  });
   if (!res.ok) throw new Error('Recognize failed');
   return res.json();
 }

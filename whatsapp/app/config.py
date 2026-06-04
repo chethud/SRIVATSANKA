@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     seed_demo_on_startup: bool = False
     dev_seed_token: str = ""  # optional X-Dev-Seed-Token header when set
 
+    # Owner dashboard login (JWT — multiple members can sign in at once)
+    dashboard_username: str = "Admin"
+    dashboard_password: str = "Admin@123"
+    jwt_secret: str = "kannans-change-this-secret-in-production"
+    jwt_expire_hours: int = 168  # 7 days per session
+
 
 def _load_settings() -> Settings:
     s = Settings()
