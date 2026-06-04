@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingDown, Upload } from 'lucide-react';
+import { TrendingDown } from 'lucide-react';
 import { PageHeader, StatCard, Card } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, LoadingScreen } from '../components/ui';
@@ -36,16 +36,10 @@ export default function AnalyticsPage() {
               {formatCurrency(profit)}
             </p>
             <p className="text-sm text-[var(--muted)] mt-2">
-              Order revenue + expense invoices uploaded on{' '}
-              <Link to="/invoices" className="text-[var(--primary)] hover:underline">Invoices</Link>
+              Order revenue + expense bills confirmed on the{' '}
+              <Link to="/invoices" className="text-[var(--primary)] hover:underline">Invoices</Link> page.
             </p>
           </div>
-          <Link
-            to="/invoices"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm hover:bg-[var(--primary-hover)]"
-          >
-            <Upload size={16} /> Upload expense invoice
-          </Link>
         </div>
         <NetProfitGauge profit={profit} revenue={revenue} expenses={expenses} />
       </Card>

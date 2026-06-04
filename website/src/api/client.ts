@@ -236,16 +236,44 @@ export async function deleteOrderDish(enquiryId: string, dishItemId: string) {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/dishes/${dishItemId}`, { method: 'DELETE' });
 }
 
+export interface InvoiceRecognizePreview {
+  pendingId: string;
+  fileName: string;
+  description: string | null;
+  expenseDate: string | null;
+  amount: number | null;
+  purpose: string | null;
+  recognized: boolean;
+}
+
 export interface InvoiceUploadResult extends InvoiceUpload {
   recognized: boolean;
 }
 
-export async function uploadExpenseInvoice(file: File): Promise<InvoiceUploadResult> {
+export async function recognizeExpenseInvoice(file: File): Promise<InvoiceRecognizePreview> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`${API_BASE}/api/invoices/upload`, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error('Upload failed');
+  const res = await fetch(`${API_BASE}/api/invoices/recognize`, { method: 'POST', body: fd });
+  if (!res.ok) throw new Error('Recognize failed');
   return res.json();
+}
+
+export async function confirmExpenseInvoice(data: {
+  pendingId: string;
+  description?: string;
+  expenseDate?: string;
+  amount?: number;
+  purpose?: string;
+}) {
+  return apiFetch<InvoiceUploadResult>('/api/invoices/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function cancelPendingInvoice(pendingId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/invoices/pending/${pendingId}`, { method: 'DELETE' });
 }
 
 export async function createVendor(data: Omit<Vendor, 'id' | 'createdAt'>) {

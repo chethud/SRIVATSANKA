@@ -1,4 +1,5 @@
 import shutil
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -16,6 +17,8 @@ from app.schemas import (
     DishOut,
     EnquiryDishOut,
     EnquiryOut,
+    InvoiceConfirmIn,
+    InvoiceRecognizeOut,
     InvoiceUploadOut,
     OrderDishIn,
     OrderDishUpdate,
@@ -164,42 +167,126 @@ async def delete_order_dish(
     return _enquiry_out(enquiry)
 
 
+def _parse_expense_date(value: str | None) -> datetime | None:
+    if not value or not str(value).strip():
+        return None
+    raw = str(value).strip()[:10]
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _save_uploaded_file(file: UploadFile, *, subdir: str = "") -> tuple[str, Path]:
+    ext = Path(file.filename or "file").suffix.lower() or ".jpg"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"):
+        raise HTTPException(400, "Upload an image (JPG/PNG) or PDF")
+    pending_id = uuid4().hex
+    folder = UPLOAD_DIR / subdir if subdir else UPLOAD_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / f"{pending_id}{ext}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return pending_id, dest
+
+
+def _invoice_upload_out(upload: InvoiceUpload, *, recognized: bool = True) -> InvoiceUploadOut:
+    return InvoiceUploadOut(
+        id=upload.id,
+        enquiryId=upload.enquiryId,
+        docType=upload.docType,
+        fileName=upload.fileName,
+        amount=upload.amount,
+        notes=upload.notes,
+        purpose=upload.purpose,
+        expenseDate=upload.expenseDate,
+        createdAt=upload.createdAt,
+        recognized=recognized,
+    )
+
+
+@router.post("/invoices/recognize", response_model=InvoiceRecognizeOut)
+async def recognize_expense_invoice(file: UploadFile = File(...)) -> InvoiceRecognizeOut:
+    """Upload bill, run AI, return fields for owner review before saving."""
+    pending_id, dest = _save_uploaded_file(file, subdir="pending")
+    recognized = await recognize_bill(dest, expense_only=True)
+    return InvoiceRecognizeOut(
+        pendingId=pending_id,
+        fileName=file.filename or dest.name,
+        description=recognized.get("description") or recognized.get("notes"),
+        expenseDate=recognized.get("expense_date"),
+        amount=recognized.get("amount"),
+        purpose=recognized.get("purpose"),
+        recognized=bool(recognized.get("recognized")),
+    )
+
+
+@router.post("/invoices/confirm", response_model=InvoiceUploadOut)
+async def confirm_expense_invoice(
+    payload: InvoiceConfirmIn,
+    db: AsyncSession = Depends(get_db),
+) -> InvoiceUploadOut:
+    """Save invoice after owner confirms or corrects recognized details."""
+    pending_dir = UPLOAD_DIR / "pending"
+    matches = list(pending_dir.glob(f"{payload.pendingId}.*")) if pending_dir.exists() else []
+    if not matches:
+        raise HTTPException(404, "Upload session expired — please upload the bill again")
+    src = matches[0]
+    ext = src.suffix
+    final_name = f"expense_{uuid4().hex[:8]}{ext}"
+    dest = UPLOAD_DIR / final_name
+    shutil.move(str(src), str(dest))
+
+    amount = payload.amount
+    if amount is not None:
+        try:
+            amount = max(0.0, float(amount))
+        except (TypeError, ValueError):
+            amount = None
+
+    upload = InvoiceUpload(
+        enquiryId=None,
+        docType="expense",
+        fileName=src.name,
+        filePath=str(dest),
+        amount=amount,
+        notes=(payload.description or "").strip() or None,
+        purpose=(payload.purpose or "").strip() or None,
+        expenseDate=_parse_expense_date(payload.expenseDate),
+    )
+    db.add(upload)
+    await db.commit()
+    await db.refresh(upload)
+    return _invoice_upload_out(upload)
+
+
+@router.delete("/invoices/pending/{pending_id}")
+async def cancel_pending_invoice(pending_id: str) -> dict:
+    pending_dir = UPLOAD_DIR / "pending"
+    if pending_dir.exists():
+        for path in pending_dir.glob(f"{pending_id}.*"):
+            path.unlink(missing_ok=True)
+    return {"ok": True}
+
+
 @router.post("/invoices/upload", response_model=InvoiceUploadOut)
 async def upload_expense_invoice(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ) -> InvoiceUploadOut:
-    """Upload expense invoice — auto-recognized, feeds Analytics only (no order link)."""
-    ext = Path(file.filename or "file").suffix.lower() or ".jpg"
-    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"):
-        raise HTTPException(400, "Upload an image (JPG/PNG) or PDF")
-
-    safe_name = f"expense_{uuid4().hex[:8]}{ext}"
-    dest = UPLOAD_DIR / safe_name
-    with dest.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    recognized = await recognize_bill(dest, expense_only=True)
-    upload = InvoiceUpload(
-        enquiryId=None,
-        docType="expense",
-        fileName=file.filename or safe_name,
-        filePath=str(dest),
-        amount=recognized.get("amount"),
-        notes=recognized.get("notes"),
-    )
-    db.add(upload)
-    await db.commit()
-    await db.refresh(upload)
-    return InvoiceUploadOut(
-        id=upload.id,
-        enquiryId=None,
-        docType=upload.docType,
-        fileName=upload.fileName,
-        amount=upload.amount,
-        notes=upload.notes,
-        createdAt=upload.createdAt,
-        recognized=bool(recognized.get("recognized")),
+    """Legacy: recognize then save immediately (prefer /recognize + /confirm)."""
+    preview = await recognize_expense_invoice(file)
+    return await confirm_expense_invoice(
+        InvoiceConfirmIn(
+            pendingId=preview.pendingId,
+            description=preview.description,
+            expenseDate=preview.expenseDate,
+            amount=preview.amount,
+            purpose=preview.purpose,
+        ),
+        db=db,
     )
 
 

@@ -46,9 +46,11 @@ def _recognize_sync(file_path: Path, *, expense_only: bool = False) -> dict:
 Return ONLY valid JSON:
 - doc_type: always "expense"
 - amount: total as a number (no ₹ symbol), or null if unclear
-- notes: one short line — WHAT is this expense? (e.g. vegetables, transport, gas, supplies, wages)
+- description: short title of the bill (vendor name or bill heading)
+- expense_date: date printed on the bill as YYYY-MM-DD, or null if unclear
+- purpose: why money was spent (e.g. vegetables, transport, gas, supplies, wages, packaging)
 
-Example: {"doc_type": "expense", "amount": 4500, "notes": "Weekly vegetable purchase"}"""
+Example: {"doc_type": "expense", "amount": 4500, "description": "Fresh Greens Mart", "expense_date": "2026-05-28", "purpose": "Weekly vegetable purchase"}"""
     else:
         prompt = """You are reading a catering business bill (India, INR).
 Return ONLY valid JSON:
@@ -90,11 +92,23 @@ Example: {"doc_type": "expense", "amount": 4500, "notes": "Vegetable supplier"}"
         except (TypeError, ValueError):
             amount = None
 
+    description = (
+        str(parsed.get("description") or parsed.get("notes") or "").strip()[:500] or None
+    )
+    purpose = str(parsed.get("purpose") or "").strip()[:500] or None
+    expense_date_raw = parsed.get("expense_date") or parsed.get("date")
+    expense_date: str | None = None
+    if expense_date_raw:
+        expense_date = str(expense_date_raw).strip()[:10]
+
     return {
         "doc_type": doc_type,
         "amount": amount,
-        "notes": str(parsed.get("notes", ""))[:500] or None,
-        "recognized": amount is not None,
+        "description": description,
+        "expense_date": expense_date,
+        "purpose": purpose,
+        "notes": description,
+        "recognized": amount is not None and bool(description or purpose),
     }
 
 

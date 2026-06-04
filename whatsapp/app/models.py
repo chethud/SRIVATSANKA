@@ -95,6 +95,8 @@ class InvoiceUpload(Base):
     filePath: Mapped[str] = mapped_column(String)
     amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    purpose: Mapped[str | None] = mapped_column(String, nullable=True)
+    expenseDate: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     enquiry: Mapped["Enquiry | None"] = relationship(back_populates="uploads")

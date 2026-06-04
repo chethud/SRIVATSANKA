@@ -59,9 +59,10 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
 
     for u in uploads:
         amt = u.amount or 0
-        mk = _month_key(u.createdAt)
-        label = (u.notes or u.fileName)[:40]
-        date_str = u.createdAt.strftime("%d %b %Y")
+        bill_dt = u.expenseDate or u.createdAt
+        mk = _month_key(bill_dt)
+        label = (u.notes or u.purpose or u.fileName)[:40]
+        date_str = bill_dt.strftime("%d %b %Y")
         if u.docType == "profit":
             uploaded_revenue += amt
             monthly_profit_upload[mk] += amt

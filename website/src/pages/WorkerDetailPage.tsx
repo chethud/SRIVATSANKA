@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, ClipboardList, IndianRupee, Phone, User } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, ClipboardList, IndianRupee, Phone, User, Wallet } from 'lucide-react';
 import { PageHeader, Card, Button, EmptyState } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import {
@@ -80,7 +80,7 @@ export default function WorkerDetailPage() {
   }
 
   async function completePayment(assignmentId: string) {
-    if (!workerId || !confirm('Mark this wage as paid? It will be removed from open duties and pending wages.')) return;
+    if (!workerId || !confirm('Make payment for this wage? It will be removed from open duties and wages due.')) return;
     setPayingId(assignmentId);
     setError('');
     try {
@@ -266,18 +266,18 @@ export default function WorkerDetailPage() {
                     <td className="p-3 font-medium tabular-nums">{formatCurrency(a.wage)}</td>
                     <td className="p-3">
                       {a.paymentCompleted ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)]">
-                          <CheckCircle2 size={14} /> Paid
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-[var(--primary-light)] text-[var(--primary)]">
+                          <CheckCircle2 size={14} /> Payment completed
                         </span>
                       ) : (
                         <button
                           type="button"
                           disabled={payingId === a.id}
                           onClick={() => completePayment(a.id)}
-                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors disabled:opacity-50"
                         >
-                          <CheckCircle2 size={14} />
-                          {payingId === a.id ? 'Saving…' : 'Payment completed'}
+                          <Wallet size={14} />
+                          {payingId === a.id ? 'Processing…' : 'Make payment'}
                         </button>
                       )}
                     </td>

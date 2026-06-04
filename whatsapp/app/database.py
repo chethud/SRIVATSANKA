@@ -47,6 +47,12 @@ async def _migrate_sqlite_columns() -> None:
                     alters.append("ALTER TABLE WorkerAssignment ADD COLUMN wage FLOAT DEFAULT 0")
                 if "paymentCompleted" not in acols:
                     alters.append("ALTER TABLE WorkerAssignment ADD COLUMN paymentCompleted BOOLEAN DEFAULT 0")
+            if "InvoiceUpload" in tables:
+                icols = {c["name"] for c in insp.get_columns("InvoiceUpload")}
+                if "purpose" not in icols:
+                    alters.append("ALTER TABLE InvoiceUpload ADD COLUMN purpose VARCHAR")
+                if "expenseDate" not in icols:
+                    alters.append("ALTER TABLE InvoiceUpload ADD COLUMN expenseDate DATETIME")
             elif "Worker" in tables:
                 connection.execute(
                     sa.text(

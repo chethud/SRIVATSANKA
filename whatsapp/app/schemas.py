@@ -65,13 +65,33 @@ class DishIn(BaseModel):
     description: str | None = None
 
 
+class InvoiceRecognizeOut(BaseModel):
+    pendingId: str
+    fileName: str
+    description: str | None = None
+    expenseDate: str | None = None
+    amount: float | None = None
+    purpose: str | None = None
+    recognized: bool = False
+
+
+class InvoiceConfirmIn(BaseModel):
+    pendingId: str
+    description: str | None = None
+    expenseDate: str | None = None
+    amount: float | None = None
+    purpose: str | None = None
+
+
 class InvoiceUploadOut(BaseModel):
     id: str
     enquiryId: str | None = None
     docType: str
     fileName: str
     amount: float | None
-    notes: str | None
+    notes: str | None = None
+    purpose: str | None = None
+    expenseDate: datetime | None = None
     createdAt: datetime
     recognized: bool = False
 
