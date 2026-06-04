@@ -73,7 +73,7 @@ export default function AIAssistantPage() {
             key={q}
             type="button"
             onClick={() => setQuery(q)}
-            className="px-3 py-1.5 text-sm bg-[var(--card)] border border-[var(--border)] rounded-full hover:border-[var(--primary)] transition-colors"
+            className="px-3 py-1.5 text-sm bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] rounded-full hover:border-[var(--primary)] transition-colors"
           >
             {q}
           </button>
@@ -113,7 +113,7 @@ export default function AIAssistantPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask a question..."
             disabled={loading}
-            className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg outline-none focus:border-[var(--primary)] disabled:opacity-50"
+            className="form-input flex-1 px-4 py-2 rounded-lg outline-none focus:border-[var(--primary)] disabled:opacity-50"
           />
           <button
             type="submit"

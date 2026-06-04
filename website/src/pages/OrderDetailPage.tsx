@@ -114,7 +114,7 @@ export default function OrderDetailPage() {
               min={1}
               value={quantity}
               onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm"
+              className="form-input w-full px-3 py-2.5 rounded-lg text-sm"
             />
           </div>
           <div className="lg:col-span-3">
@@ -122,7 +122,7 @@ export default function OrderDetailPage() {
             <select
               value={customization}
               onChange={(e) => setCustomization(e.target.value)}
-              className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm"
+              className="form-select w-full px-3 py-2.5 rounded-lg text-sm"
             >
               {CUSTOMIZATION_OPTIONS.map((c) => (
                 <option key={c || 'none'} value={c}>{c || 'None'}</option>
@@ -137,7 +137,7 @@ export default function OrderDetailPage() {
               value={unitPrice}
               onChange={(e) => setUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
               placeholder="Auto"
-              className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm"
+              className="form-input w-full px-3 py-2.5 rounded-lg text-sm"
             />
           </div>
           <div className="lg:col-span-1">

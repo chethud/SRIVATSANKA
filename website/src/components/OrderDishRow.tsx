@@ -60,7 +60,7 @@ export function OrderDishRow({
           </div>
           <div className="col-span-2">
             <label className="text-xs text-[var(--muted)]">Customization</label>
-            <select value={custom} onChange={(e) => setCustom(e.target.value)} className="w-full mt-1 px-2 py-1.5 border rounded-lg">
+            <select value={custom} onChange={(e) => setCustom(e.target.value)} className="form-select w-full mt-1 px-2 py-1.5 rounded-lg">
               <option value="">None</option>
               {CUSTOMIZATION_OPTIONS.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -76,7 +76,7 @@ export function OrderDishRow({
           <Button type="button" onClick={saveEdit} disabled={saving} className="!py-1.5 !px-3 text-xs">
             <Check size={14} className="inline mr-1" /> Save
           </Button>
-          <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs border rounded-lg hover:bg-white">
+          <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--foreground)]">
             <X size={14} className="inline mr-1" /> Cancel
           </button>
         </div>

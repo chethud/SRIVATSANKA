@@ -24,7 +24,7 @@ export function TopNav() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search enquiries, orders, dishes…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted)]"
+            className="form-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
           />
         </div>
 

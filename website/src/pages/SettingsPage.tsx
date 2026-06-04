@@ -64,12 +64,12 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm text-[var(--muted)]">Business Name</label>
-              <input type="text" defaultValue="SRIVATSANKA" className="w-full mt-1 px-4 py-2 border border-[var(--border)] rounded-lg" readOnly />
+              <input type="text" defaultValue="SRIVATSANKA" className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
               <p className="text-xs text-[var(--muted)] mt-1">Pure Veg Catering Services for all Occasions</p>
             </div>
             <div>
               <label className="text-sm text-[var(--muted)]">Owner Phone (WhatsApp alerts)</label>
-              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 7899102165'} className="w-full mt-1 px-4 py-2 border border-[var(--border)] rounded-lg" readOnly />
+              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 7899102165'} className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
             </div>
           </div>
         </Card>

@@ -80,7 +80,7 @@ export default function BotTesterPage() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type as a customer..."
             disabled={loading}
-            className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg outline-none focus:border-[var(--primary)] disabled:opacity-50"
+            className="form-input flex-1 px-4 py-2 rounded-lg outline-none focus:border-[var(--primary)] disabled:opacity-50"
           />
           <button
             type="submit"

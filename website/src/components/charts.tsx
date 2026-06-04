@@ -27,7 +27,7 @@ const BLUE = '#004d28';
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; name: string; color?: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg px-3 py-2 text-sm">
+    <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg px-3 py-2 text-sm text-[var(--foreground)]">
       {label && <p className="font-medium text-[var(--foreground)] mb-1">{label}</p>}
       {payload.map((p) => (
         <p key={p.name} style={{ color: p.color || GREEN }}>
@@ -245,7 +245,7 @@ export function MonthlyCostTrendChart({ analytics }: { analytics: Analytics }) {
           cursor={{ fill: 'rgba(201, 166, 107, 0.12)' }}
           content={({ active, payload, label }) =>
             active && payload?.[0] ? (
-              <div className="bg-white border border-[var(--dash-border)] rounded-lg px-3 py-2 text-sm shadow-md">
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] shadow-md">
                 <p className="font-medium text-[var(--dash-heading)]">{label}</p>
                 <p className="text-[var(--dash-icon)]">{formatCurrency(Number(payload[0].value))}</p>
               </div>

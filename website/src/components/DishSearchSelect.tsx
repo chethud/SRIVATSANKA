@@ -56,7 +56,7 @@ export function DishSearchSelect({
             setQuery(selected ? selected.name : '');
           }}
           placeholder="Search menu..."
-          className="w-full pl-9 pr-8 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white"
+          className="form-input w-full pl-9 pr-8 py-2.5 rounded-lg text-sm"
         />
         {selected && !open && (
           <button
@@ -75,7 +75,7 @@ export function DishSearchSelect({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-[var(--border)] rounded-lg shadow-lg text-sm">
+          <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-sm text-[var(--foreground)]">
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-[var(--muted)]">No dishes found</li>
             ) : (
@@ -83,7 +83,7 @@ export function DishSearchSelect({
                 <li key={d.id}>
                   <button
                     type="button"
-                    className="w-full text-left px-3 py-2 hover:bg-[var(--primary-light)]"
+                    className="w-full text-left px-3 py-2 text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
                     onClick={() => pick(d)}
                   >
                     <span className="font-medium">{d.name}</span>

@@ -88,7 +88,7 @@ export default function EnquiriesPage() {
                       <select
                         value={e.status}
                         onChange={(ev) => changeStatus(e.id, ev.target.value)}
-                        className="text-xs px-2 py-1 rounded-lg border"
+                        className="form-select text-xs px-2 py-1 rounded-lg"
                       >
                         {STATUS_FILTERS.filter((s) => s.id !== 'ALL').map((s) => (
                           <option key={s.id} value={s.id}>{s.label}</option>
