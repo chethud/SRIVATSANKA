@@ -1,0 +1,30 @@
+# Render Blueprint – https://render.com/docs/blueprint-spec
+# Deploy: Dashboard → New → Blueprint → connect GitHub repo
+
+services:
+  - type: web
+    name: srivatsanka-api
+    runtime: python
+    rootDir: whatsapp
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./kannans.db
+      - key: CORS_ORIGINS
+        value: http://localhost:5173
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        generateValue: true
+      - key: OWNER_PHONE_NUMBER
+        value: "917899102165"

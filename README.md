@@ -70,6 +70,13 @@ Or double-click: `start-backend.bat` and `start-frontend.bat`
 
 See `docs/META_WHATSAPP_SETUP.md`
 
+## Deploy (share with client)
+
+- **Dashboard:** [Vercel](https://vercel.com) — root folder `website`, env `VITE_API_URL`
+- **API:** [Render](https://render.com) — root folder `whatsapp`, use `render.yaml`
+
+Full steps: **[docs/DEPLOY_VERCEL_RENDER.md](docs/DEPLOY_VERCEL_RENDER.md)**
+
 ## Environment (`whatsapp/.env`)
 
 ```env
