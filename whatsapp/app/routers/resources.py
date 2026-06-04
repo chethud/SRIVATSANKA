@@ -5,8 +5,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Expense, Vendor, Worker
-from app.schemas import AnalyticsOut, ExpenseIn, ExpenseOut, VendorIn, VendorOut, WorkerIn, WorkerOut, WorkerUpdateIn
+from app.models import Enquiry, EnquiryStatus, Expense, Vendor, Worker, WorkerAssignment
+from app.schemas import (
+    AnalyticsOut,
+    ExpenseIn,
+    ExpenseOut,
+    VendorIn,
+    VendorOut,
+    WorkerAssignmentIn,
+    WorkerAssignmentOut,
+    WorkerIn,
+    WorkerOut,
+    WorkerProfileOut,
+    WorkerUpdateIn,
+)
 
 router = APIRouter(prefix="/api", tags=["resources"])
 
@@ -102,6 +114,99 @@ async def update_worker(
         id=w.id, name=w.name, phoneNumber=w.phoneNumber,
         role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
     )
+
+
+def _assignment_out(a: WorkerAssignment, enquiry: Enquiry | None) -> WorkerAssignmentOut:
+    label = None
+    if enquiry:
+        label = f"{enquiry.customerName} — {enquiry.eventType}"
+    return WorkerAssignmentOut(
+        id=a.id,
+        workerId=a.workerId,
+        enquiryId=a.enquiryId,
+        dutyDate=a.dutyDate,
+        dutyType=a.dutyType,
+        notes=a.notes,
+        createdAt=a.createdAt,
+        customerName=enquiry.customerName if enquiry else None,
+        eventType=enquiry.eventType if enquiry else None,
+        eventLocation=enquiry.eventLocation if enquiry else None,
+        orderLabel=label,
+    )
+
+
+@router.get("/workers/{worker_id}/profile", response_model=WorkerProfileOut)
+async def get_worker_profile(worker_id: str, db: AsyncSession = Depends(get_db)) -> WorkerProfileOut:
+    w = await db.get(Worker, worker_id)
+    if not w:
+        raise HTTPException(404, "Worker not found")
+
+    result = await db.execute(
+        select(WorkerAssignment, Enquiry)
+        .outerjoin(Enquiry, WorkerAssignment.enquiryId == Enquiry.id)
+        .where(WorkerAssignment.workerId == worker_id)
+        .order_by(WorkerAssignment.dutyDate.desc(), WorkerAssignment.createdAt.desc())
+    )
+    rows = result.all()
+    assignments = [_assignment_out(a, e) for a, e in rows]
+
+    now = datetime.now()
+    upcoming = sum(1 for a in assignments if a.dutyDate >= now.replace(hour=0, minute=0, second=0, microsecond=0))
+
+    return WorkerProfileOut(
+        worker=WorkerOut(
+            id=w.id, name=w.name, phoneNumber=w.phoneNumber,
+            role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
+        ),
+        assignments=assignments,
+        totalDuties=len(assignments),
+        upcomingDuties=upcoming,
+    )
+
+
+@router.post("/workers/{worker_id}/assignments", response_model=WorkerAssignmentOut)
+async def create_worker_assignment(
+    worker_id: str,
+    payload: WorkerAssignmentIn,
+    db: AsyncSession = Depends(get_db),
+) -> WorkerAssignmentOut:
+    w = await db.get(Worker, worker_id)
+    if not w:
+        raise HTTPException(404, "Worker not found")
+
+    enquiry = None
+    if payload.enquiryId:
+        enquiry = await db.get(Enquiry, payload.enquiryId)
+        if not enquiry:
+            raise HTTPException(404, "Order / enquiry not found")
+
+    row = WorkerAssignment(
+        workerId=worker_id,
+        enquiryId=payload.enquiryId,
+        dutyDate=payload.dutyDate,
+        dutyType=payload.dutyType.strip(),
+        notes=payload.notes,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    if not enquiry and row.enquiryId:
+        enquiry = await db.get(Enquiry, row.enquiryId)
+    return _assignment_out(row, enquiry)
+
+
+@router.delete("/workers/{worker_id}/assignments/{assignment_id}")
+async def delete_worker_assignment(
+    worker_id: str,
+    assignment_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    row = await db.get(WorkerAssignment, assignment_id)
+    if not row or row.workerId != worker_id:
+        raise HTTPException(404, "Assignment not found")
+    await db.delete(row)
+    await db.commit()
+    return {"ok": True}
 
 
 @router.delete("/workers/{worker_id}")

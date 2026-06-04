@@ -280,6 +280,48 @@ export async function deleteWorker(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/workers/${id}`, { method: 'DELETE' });
 }
 
+export interface WorkerAssignment {
+  id: string;
+  workerId: string;
+  enquiryId: string | null;
+  dutyDate: string;
+  dutyType: string;
+  notes: string | null;
+  createdAt: string;
+  customerName: string | null;
+  eventType: string | null;
+  eventLocation: string | null;
+  orderLabel: string | null;
+}
+
+export interface WorkerProfile {
+  worker: Worker;
+  assignments: WorkerAssignment[];
+  totalDuties: number;
+  upcomingDuties: number;
+}
+
+export async function fetchWorkerProfile(workerId: string) {
+  return apiFetch<WorkerProfile>(`/api/workers/${workerId}/profile`);
+}
+
+export async function createWorkerAssignment(
+  workerId: string,
+  data: { enquiryId?: string | null; dutyDate: string; dutyType: string; notes?: string },
+) {
+  return apiFetch<WorkerAssignment>(`/api/workers/${workerId}/assignments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteWorkerAssignment(workerId: string, assignmentId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/workers/${workerId}/assignments/${assignmentId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function createExpense(data: { category: string; amount: number; description?: string }) {
   return apiFetch<Expense>('/api/expenses', {
     method: 'POST',

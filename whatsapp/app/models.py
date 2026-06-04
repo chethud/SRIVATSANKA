@@ -134,6 +134,27 @@ class Worker(Base):
     isLead: Mapped[bool] = mapped_column(Boolean, default=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    assignments: Mapped[list["WorkerAssignment"]] = relationship(
+        back_populates="worker", cascade="all, delete-orphan"
+    )
+
+
+class WorkerAssignment(Base):
+    __tablename__ = "WorkerAssignment"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=cuid)
+    workerId: Mapped[str] = mapped_column(String, ForeignKey("Worker.id", ondelete="CASCADE"))
+    enquiryId: Mapped[str | None] = mapped_column(
+        String, ForeignKey("Enquiry.id", ondelete="SET NULL"), nullable=True
+    )
+    dutyDate: Mapped[datetime] = mapped_column(DateTime)
+    dutyType: Mapped[str] = mapped_column(String)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    worker: Mapped["Worker"] = relationship(back_populates="assignments")
+    enquiry: Mapped["Enquiry | None"] = relationship()
+
 
 class Expense(Base):
     __tablename__ = "Expense"

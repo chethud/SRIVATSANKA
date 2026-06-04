@@ -41,6 +41,24 @@ async def _migrate_sqlite_columns() -> None:
                 wcols = {c["name"] for c in insp.get_columns("Worker")}
                 if "isLead" not in wcols:
                     alters.append("ALTER TABLE Worker ADD COLUMN isLead BOOLEAN DEFAULT 0")
+            if "WorkerAssignment" not in tables:
+                connection.execute(
+                    sa.text(
+                        """
+                        CREATE TABLE IF NOT EXISTS WorkerAssignment (
+                            id VARCHAR PRIMARY KEY,
+                            workerId VARCHAR NOT NULL,
+                            enquiryId VARCHAR,
+                            dutyDate DATETIME NOT NULL,
+                            dutyType VARCHAR NOT NULL,
+                            notes TEXT,
+                            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY(workerId) REFERENCES Worker(id) ON DELETE CASCADE,
+                            FOREIGN KEY(enquiryId) REFERENCES Enquiry(id) ON DELETE SET NULL
+                        )
+                        """
+                    )
+                )
             for sql in alters:
                 connection.execute(sa.text(sql))
 

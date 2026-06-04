@@ -179,6 +179,36 @@ class WorkerOut(WorkerIn):
     createdAt: datetime
 
 
+class WorkerAssignmentIn(BaseModel):
+    enquiryId: str | None = None
+    dutyDate: datetime
+    dutyType: str
+    notes: str | None = None
+
+
+class WorkerAssignmentOut(BaseModel):
+    id: str
+    workerId: str
+    enquiryId: str | None = None
+    dutyDate: datetime
+    dutyType: str
+    notes: str | None = None
+    createdAt: datetime
+    customerName: str | None = None
+    eventType: str | None = None
+    eventLocation: str | None = None
+    orderLabel: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class WorkerProfileOut(BaseModel):
+    worker: WorkerOut
+    assignments: list[WorkerAssignmentOut]
+    totalDuties: int
+    upcomingDuties: int
+
+
 class ExpenseIn(BaseModel):
     category: str
     amount: float
