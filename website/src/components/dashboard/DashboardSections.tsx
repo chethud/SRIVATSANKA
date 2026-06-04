@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../api/client';
 import type { Enquiry, Notification, Vendor, Worker } from '../../api/client';
-import { orderRevenueEstimate } from '../../utils/dashboardData';
+import { orderRevenueEstimate, type ChartPeriod } from '../../utils/dashboardData';
 
 const fade = {
   initial: { opacity: 0, y: 8 },
@@ -40,25 +40,31 @@ export function GlassCard({
   );
 }
 
+const PERIOD_LABELS: Record<ChartPeriod, string> = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+};
+
 export function ChartFilter({
   mode,
   onChange,
 }: {
-  mode: 'monthly' | 'weekly';
-  onChange: (m: 'monthly' | 'weekly') => void;
+  mode: ChartPeriod;
+  onChange: (m: ChartPeriod) => void;
 }) {
   return (
     <div className="inline-flex p-1 rounded-xl bg-[var(--background-alt)] border border-[var(--border)]">
-      {(['monthly', 'weekly'] as const).map((m) => (
+      {(['weekly', 'monthly', 'yearly'] as const).map((m) => (
         <button
           key={m}
           type="button"
           onClick={() => onChange(m)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             mode === m ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]'
           }`}
         >
-          {m}
+          {PERIOD_LABELS[m]}
         </button>
       ))}
     </div>
@@ -70,25 +76,25 @@ export function RecentOrdersTable({ orders }: { orders: Enquiry[] }) {
     return <p className="text-sm text-[var(--muted)] py-4">No converted orders yet.</p>;
   }
   return (
-    <div className="overflow-x-auto -mx-1">
-      <table className="w-full text-sm">
+    <div className="overflow-auto max-h-80 -mx-1 rounded-xl border border-[var(--border)]">
+      <table className="data-table w-full text-sm">
         <thead>
-          <tr className="text-left text-[var(--muted)] border-b border-[var(--border)]">
-            <th className="pb-3 font-medium">Customer</th>
-            <th className="pb-3 font-medium">Event</th>
-            <th className="pb-3 font-medium">Date</th>
-            <th className="pb-3 font-medium text-right">Est.</th>
+          <tr className="border-b border-[var(--border)]">
+            <th className="px-4 py-3 text-left">Customer</th>
+            <th className="px-4 py-3 text-left">Event</th>
+            <th className="px-4 py-3 text-left">Date</th>
+            <th className="px-4 py-3 text-right">Est.</th>
           </tr>
         </thead>
         <tbody>
           {orders.map((o) => (
-            <tr key={o.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--primary-light)]/50">
-              <td className="py-3 font-medium">
+            <tr key={o.id} className="border-b border-[var(--border)] last:border-0">
+              <td className="px-4 py-3 font-medium">
                 <Link to={`/orders/${o.id}`} className="hover:text-[var(--primary)]">{o.customerName}</Link>
               </td>
-              <td className="py-3 text-[var(--muted)]">{o.eventType}</td>
-              <td className="py-3 text-[var(--muted)]">{formatDate(o.eventDate)}</td>
-              <td className="py-3 text-right font-medium">{formatCurrency(orderRevenueEstimate(o))}</td>
+              <td className="px-4 py-3 text-[var(--muted)]">{o.eventType}</td>
+              <td className="px-4 py-3 text-[var(--muted)]">{formatDate(o.eventDate)}</td>
+              <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(orderRevenueEstimate(o))}</td>
             </tr>
           ))}
         </tbody>

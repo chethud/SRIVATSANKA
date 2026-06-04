@@ -378,6 +378,14 @@ function PremiumTooltip({
   );
 }
 
+export function ChartEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <p className="text-sm text-[var(--muted)] max-w-xs">{message}</p>
+    </div>
+  );
+}
+
 export function RevenueExpenseInteractiveChart({
   data,
 }: {
@@ -385,12 +393,12 @@ export function RevenueExpenseInteractiveChart({
 }) {
   const [ready, setReady] = useState(false);
   if (data.length === 0) {
-    return <p className="text-sm text-[var(--muted)] text-center py-16">Add orders and invoices to see revenue vs expenses.</p>;
+    return <ChartEmpty message="Add orders and upload expense invoices to see revenue vs expenses." />;
   }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onAnimationComplete={() => setReady(true)}>
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={360}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
@@ -408,44 +416,58 @@ export function RevenueExpenseInteractiveChart({
 export function ProfitRadialSnapshot({ profit, revenue, expenses }: { profit: number; revenue: number; expenses: number }) {
   const marginPct = revenue > 0 ? Math.min(100, Math.max(-100, (profit / revenue) * 100)) : 0;
   const positive = profit >= 0;
-  const circumference = 2 * Math.PI * 52;
-  const offset = circumference - (Math.abs(marginPct) / 100) * circumference;
+  const circumference = 2 * Math.PI * 54;
+  const targetOffset = circumference - (Math.abs(marginPct) / 100) * circumference;
+  const expenseRatio = revenue > 0 ? Math.min(100, (expenses / revenue) * 100) : 0;
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-36 h-36">
+    <div className="flex flex-col items-stretch gap-5">
+      <div className="relative w-40 h-40 mx-auto">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="52" fill="none" stroke="var(--chart-grid)" strokeWidth="10" />
-          <circle
+          <circle cx="60" cy="60" r="54" fill="none" stroke="var(--chart-grid)" strokeWidth="8" />
+          <motion.circle
             cx="60"
             cy="60"
-            r="52"
+            r="54"
             fill="none"
             stroke={positive ? BRAND_ACCENT : 'var(--danger)'}
-            strokeWidth="10"
+            strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            className="transition-all duration-700"
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: targetOffset }}
+            transition={{ duration: 1, ease: 'easeOut' }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-[var(--foreground)]">{Math.round(marginPct)}%</span>
-          <span className="text-xs text-[var(--muted)]">margin</span>
+          <motion.span
+            className="text-3xl font-bold text-[var(--foreground)] tabular-nums"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            {Math.round(marginPct)}%
+          </motion.span>
+          <span className="text-xs text-[var(--muted)] mt-0.5">Net margin</span>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 w-full mt-4 text-center text-xs">
-        <div className="p-3 rounded-2xl bg-[var(--primary-light)] border border-[var(--border)]">
-          <p className="text-[var(--muted)] mb-1">Revenue</p>
-          <p className="font-bold text-[var(--primary)]">{formatCurrency(revenue)}</p>
+      <p className="text-center text-xs text-[var(--muted)]">
+        Expenses are {Math.round(expenseRatio)}% of revenue
+      </p>
+      <div className="grid grid-cols-3 gap-3 text-center text-xs">
+        <div className="p-3 rounded-xl bg-[var(--primary-light)] border border-[var(--border)]">
+          <p className="text-[var(--muted)] mb-1 font-medium">Revenue</p>
+          <p className="font-bold text-[var(--primary)] tabular-nums">{formatCurrency(revenue)}</p>
         </div>
-        <div className="p-3 rounded-2xl bg-[var(--background-alt)] border border-[var(--border)]">
-          <p className="text-[var(--muted)] mb-1">Expense</p>
-          <p className="font-bold text-[var(--foreground)]">{formatCurrency(expenses)}</p>
+        <div className="p-3 rounded-xl bg-[var(--background-alt)] border border-[var(--border)]">
+          <p className="text-[var(--muted)] mb-1 font-medium">Expenses</p>
+          <p className="font-bold tabular-nums">{formatCurrency(expenses)}</p>
         </div>
-        <div className={`p-3 rounded-2xl border border-[var(--border)] ${positive ? 'bg-[var(--success-bg)]' : 'bg-[var(--danger-bg)]'}`}>
-          <p className="text-[var(--muted)] mb-1">Net</p>
-          <p className={`font-bold ${positive ? 'text-[var(--success-text)]' : 'text-[var(--danger)]'}`}>{formatCurrency(profit)}</p>
+        <div className={`p-3 rounded-xl border ${positive ? 'bg-[var(--success-bg)] border-[var(--border)]' : 'bg-[var(--danger-bg)] border-[var(--danger)]'}`}>
+          <p className="text-[var(--muted)] mb-1 font-medium">Net profit</p>
+          <p className={`font-bold tabular-nums ${positive ? 'text-[var(--success-text)]' : 'text-[var(--danger)]'}`}>
+            {formatCurrency(profit)}
+          </p>
         </div>
       </div>
     </div>

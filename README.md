@@ -45,13 +45,14 @@ Or double-click: `start-backend.bat` and `start-frontend.bat`
 - API docs: http://localhost:8000/docs  
 - Dashboard: http://localhost:5173  
 
-## WhatsApp Bot Flow
+## WhatsApp Agent Flow
 
-1. Collects event details (name, phone, event, date, location, guests, callback)
-2. Customer selects **dish categories** (South Indian, North Indian, Chinese, etc.)
-3. Customer picks **dishes** from each category
-4. Customer adds **customizations** (No Milk, Less Spice, etc.)
-5. Enquiry saved → shows on **Enquiries** page
+Conversational AI (Gemini) using [kannansharangapani.com](https://kannansharangapani.com/) — services, gallery, and reviews.
+
+1. Welcomes customer, shares sample event photos, explains what SRIVATSANKA offers
+2. Natural chat — asks what they are looking for, collects event details
+3. Cuisine styles only (Multi Cuisine, South Indian, etc.) — no individual dishes on WhatsApp
+4. Enquiry saved → **Enquiries** page + owner WhatsApp alert
 6. Owner gets **instant WhatsApp alert** to `917899102165`
 7. **Callback reminder** 15–20 min before preferred time
 

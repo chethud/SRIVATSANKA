@@ -49,7 +49,7 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
     if message.get("type") != "text":
         await send_whatsapp_message(
             from_number,
-            "Sorry, I can only read text messages right now. Please type your enquiry.",
+            "Thanks for reaching SRIVATSANKA! Please type your message so our team can help you plan your event.",
         )
         return {"status": "unsupported_type"}
 

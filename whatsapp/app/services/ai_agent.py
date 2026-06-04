@@ -5,35 +5,49 @@ from datetime import datetime, timedelta
 import google.generativeai as genai
 
 from app.config import settings
+from app.data.company_knowledge import COMPANY, WEBSITE_URL, build_agent_context
 from app.schemas import AgentTurnResult, EnquiryFields
 from app.services.session_store import ConversationSession
 
-SYSTEM_PROMPT = """You are the WhatsApp AI assistant for Kannans Catering, a professional catering service in India.
+AGENT_SYSTEM_PROMPT = f"""You are a warm, professional *human catering consultant* for SRIVATSANKA on WhatsApp — NOT a rigid bot.
 
-Your job is to warmly greet customers and collect an event enquiry through natural conversation.
+You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru pure-veg catering since {COMPANY['established']}.
+Official site: {WEBSITE_URL}
 
-You MUST collect ALL of these fields before marking complete:
-1. customer_name – customer's full name
-2. phone_number – contact number (include country code if given)
-3. event_type – e.g. Wedding, Birthday, Corporate, Reception
-4. event_date – date of the event (accept natural language like "15 June 2026")
-5. event_location – venue or city
-6. guest_count – approximate number of guests (integer)
-7. preferred_callback – when the owner should call back (e.g. "today 4 PM", "tomorrow 10 AM")
+{build_agent_context()}
 
-Rules:
-- Ask ONE or TWO related questions at a time; do not overwhelm the customer.
-- If the customer gives multiple details in one message, acknowledge all of them.
-- Keep replies concise and friendly (2–4 short sentences max).
-- Use simple English; customers may mix Tamil/Hindi – understand intent.
-- If a field is already collected, do not ask again unless unclear.
-- When ALL 7 fields are collected, confirm the summary and set is_complete to true.
-- If customer says "new" or wants to start over, treat all fields as empty.
+YOUR PERSONALITY
+- Sound like Kannan's team: confident, caring, experienced — never robotic or form-like.
+- Build a real conversation: acknowledge feelings, celebrate their occasion, then gently gather details.
+- Early in the chat, naturally mention what we do well (weddings, multi-cuisine veg menus, hygiene, personal touch by Mr. Kannan Sharangapani).
+- Ask what they are looking for: event type, scale, cuisine style, dates — listen first, then guide.
+- Use short WhatsApp-friendly paragraphs (2–4 sentences). Light emoji only where natural.
+- Never say "I am a bot" or "automated system". Say "our team" / "we at SRIVATSANKA".
+- Tamil/Hindi mixed English is fine — understand intent warmly.
 
-Respond ONLY with valid JSON in this exact shape:
-{
-  "reply": "your message to the customer",
-  "fields": {
+INFORMATION TO COLLECT (all required before is_complete=true)
+1. customer_name
+2. phone_number (use WhatsApp number if customer confirms)
+3. event_type
+4. event_date
+5. event_location
+6. guest_count (integer)
+7. preferred_callback — when Mr. Kannan's team should call
+
+CONVERSATION RULES
+- Do NOT ask for all fields in one message. Chat naturally; one or two questions at a time.
+- If they share multiple details, thank them and confirm what you understood.
+- Reference our experience when relevant (e.g. "We've catered many weddings in Bengaluru with South Indian & North Indian spreads").
+- If they ask price/menu: say our team customises every menu and will discuss on callback; offer to note their preferences.
+- When all 7 fields are clear, give a warm summary and set is_complete=true.
+- If they say "new" / start over, reset mentally and greet fresh.
+
+After is_complete=true the system will ask cuisine *types* only (multi cuisine, South Indian, etc.) — you do not need to list individual dishes.
+
+Respond ONLY with valid JSON:
+{{
+  "reply": "your WhatsApp message",
+  "fields": {{
     "customer_name": null or string,
     "phone_number": null or string,
     "event_type": null or string,
@@ -41,9 +55,9 @@ Respond ONLY with valid JSON in this exact shape:
     "event_location": null or string,
     "guest_count": null or integer,
     "preferred_callback": null or string
-  },
+  }},
   "is_complete": false or true
-}
+}}
 """
 
 
@@ -122,21 +136,23 @@ def _call_gemini(session: ConversationSession, user_text: str) -> str:
     genai.configure(api_key=settings.gemini_api_key)
 
     collected = session.fields.model_dump()
-    context = f"Already collected fields (keep unless customer corrects): {json.dumps(collected)}"
+    context = f"Already collected (keep unless customer corrects): {json.dumps(collected)}"
 
     model = genai.GenerativeModel(
         model_name=settings.gemini_model,
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=AGENT_SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            temperature=0.4,
+            temperature=0.72,
         ),
     )
 
     history = _build_gemini_history(session)
     chat = model.start_chat(history=history)
 
-    prompt = user_text if not collected else f"{context}\n\nCustomer message: {user_text}"
+    prompt = user_text if not any(v for v in collected.values() if v is not None) else (
+        f"{context}\n\nCustomer message: {user_text}"
+    )
     response = chat.send_message(prompt)
     return response.text or "{}"
 
@@ -147,13 +163,14 @@ class AIAgent:
             session.fields = EnquiryFields()
             session.completed = False
             session.history = []
-            user_text = "I'd like to submit a new enquiry"
+            session.welcome_media_sent = False
+            user_text = "Hi, I'd like to plan an event with SRIVATSANKA"
 
         if session.completed:
             return AgentTurnResult(
                 reply=(
-                    "Your enquiry is already submitted ✅ Our team will contact you at your "
-                    "preferred time. Send *new* to start another enquiry."
+                    "Your enquiry is with our team ✅ We'll call you at the time you chose. "
+                    "Send *new* anytime to plan another celebration."
                 ),
                 fields=session.fields,
                 is_complete=True,
@@ -161,19 +178,27 @@ class AIAgent:
 
         session.history.append({"role": "user", "content": user_text})
 
+        agent_input = user_text
+        if session.welcome_media_sent and sum(1 for m in session.history if m["role"] == "user") == 1:
+            agent_input = (
+                "[System: You already greeted the customer and sent sample photos from our website. "
+                "Do not repeat a long introduction — continue naturally.]\n\n"
+                f"Customer: {user_text}"
+            )
+
         if not settings.gemini_api_key or settings.gemini_api_key.startswith("paste-your"):
-            return self._fallback_reply(session, user_text)
+            return self._fallback_reply(session, agent_input)
 
         try:
-            raw = await asyncio.to_thread(_call_gemini, session, user_text)
+            raw = await asyncio.to_thread(_call_gemini, session, agent_input)
             payload = json.loads(raw)
             result = AgentTurnResult(
-                reply=payload.get("reply", "Thank you! Could you tell me more about your event?"),
+                reply=payload.get("reply", "Thank you for reaching SRIVATSANKA! What celebration are you planning?"),
                 fields=EnquiryFields(**payload.get("fields", {})),
                 is_complete=bool(payload.get("is_complete", False)),
             )
         except Exception:
-            return self._fallback_reply(session, user_text)
+            return self._fallback_reply(session, agent_input)
 
         session.fields = _merge_fields(session.fields, result.fields)
 
@@ -186,20 +211,30 @@ class AIAgent:
         return result
 
     def _fallback_reply(self, session: ConversationSession, user_text: str) -> AgentTurnResult:
-        """Rule-based fallback when Gemini key is missing."""
+        """Conversational fallback when Gemini is unavailable."""
+        if not session.history or len(session.history) <= 1:
+            reply = (
+                f"Vanakkam! Welcome to *{COMPANY['brand_name']}* 🌿\n\n"
+                "We're Srivatsanka Events — pure veg catering in Bengaluru since 2017. "
+                "Weddings, house warmings, naming ceremonies & more, with menus guests still talk about.\n\n"
+                f"See our work: {WEBSITE_URL}\n\n"
+                "What kind of celebration are you planning?"
+            )
+            session.history.append({"role": "assistant", "content": reply})
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
         steps = [
-            ("customer_name", "Welcome to Kannans Catering! 🍽️ May I know your name?"),
-            ("phone_number", "Thank you! What is your phone number?"),
-            ("event_type", "What type of event is this? (Wedding, Birthday, Corporate, etc.)"),
+            ("customer_name", "Lovely! May I have your name?"),
+            ("phone_number", "Thank you — and the best number to reach you?"),
+            ("event_type", "What celebration is it? (Wedding, house warming, baby shower, etc.)"),
             ("event_date", "When is the event?"),
-            ("event_location", "Where is the event location?"),
-            ("guest_count", "Approximately how many guests?"),
-            ("preferred_callback", "What time should we call you back? (e.g. today 4 PM)"),
+            ("event_location", "Which area or venue in Bengaluru?"),
+            ("guest_count", "Roughly how many guests?"),
+            ("preferred_callback", "When should Mr. Kannan's team call you? (e.g. today 4 PM)"),
         ]
 
-        has_assistant_reply = any(m["role"] == "assistant" for m in session.history)
-
-        if has_assistant_reply:
+        has_assistant = any(m["role"] == "assistant" for m in session.history)
+        if has_assistant:
             for key, _ in steps:
                 if getattr(session.fields, key) is None:
                     value: str | int | None = user_text.strip()
@@ -218,7 +253,10 @@ class AIAgent:
                 return AgentTurnResult(reply=prompt, fields=session.fields)
 
         return AgentTurnResult(
-            reply="Perfect! Let's select your menu next.",
+            reply=(
+                "Perfect — I have your event details. "
+                "Last step: which cuisine styles interest you? (e.g. Multi Cuisine, South Indian)"
+            ),
             fields=session.fields,
             enquiry_fields_complete=True,
         )

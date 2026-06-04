@@ -23,6 +23,7 @@ class ConversationSession:
     current_category_index: int = 0
     selected_dishes: list[SelectedDishItem] = field(default_factory=list)
     customization_dish_index: int = 0
+    welcome_media_sent: bool = False
     _saved: bool = False
 
 

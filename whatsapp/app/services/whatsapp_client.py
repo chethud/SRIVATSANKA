@@ -66,3 +66,40 @@ async def send_whatsapp_message(to: str, text: str) -> bool:
             return False
         logger.info("WhatsApp message sent to %s", to)
         return True
+
+
+async def send_whatsapp_image(to: str, image_url: str, caption: str | None = None) -> bool:
+    """Send image by public URL (Meta WhatsApp Cloud API)."""
+    to = normalize_phone(to)
+    if not to or not image_url:
+        return False
+
+    if not is_whatsapp_configured():
+        logger.info("[WhatsApp Mock Image] To: %s | %s | %s", to, image_url[:80], caption)
+        return True
+
+    payload: dict = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "image",
+        "image": {"link": image_url},
+    }
+    if caption:
+        payload["image"]["caption"] = caption[:1024]
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
+            headers={
+                "Authorization": f"Bearer {settings.whatsapp_token}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=30,
+        )
+        if response.status_code >= 400:
+            logger.error("WhatsApp image failed (%s): %s", response.status_code, response.text)
+            return False
+        logger.info("WhatsApp image sent to %s", to)
+        return True

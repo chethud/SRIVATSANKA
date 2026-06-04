@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import AgentTurnResult
+from app.services.agent_media import is_conversation_start, send_welcome_media
 from app.services.ai_agent import AIAgent, _all_fields_filled
 from app.services.dish_flow import handle_dish_flow, start_dish_flow
 from app.services.enquiry_service import save_enquiry
@@ -18,7 +19,7 @@ async def handle_conversation(
     if user_text.strip().lower() in {"new", "start over", "restart"}:
         session_store.reset(whatsapp_id)
         session = session_store.get(whatsapp_id)
-        user_text = "Hi"
+        user_text = "Hi, I'd like to enquire about catering"
 
     if session.completed and session._saved:
         return (
@@ -32,12 +33,8 @@ async def handle_conversation(
             False,
         )
 
-    # Dish selection phases
-    if session.phase in {
-        ConversationPhase.SELECT_CATEGORIES,
-        ConversationPhase.SELECT_DISHES,
-        ConversationPhase.CUSTOMIZATIONS,
-    }:
+    # Cuisine preference (types only — no individual dishes)
+    if session.phase == ConversationPhase.SELECT_CATEGORIES:
         result = await handle_dish_flow(session, user_text, db)
         if result.is_complete and not session._saved:
             await save_enquiry(db, session.fields, whatsapp_id, session.selected_dishes)
@@ -45,7 +42,10 @@ async def handle_conversation(
             return result, True
         return result, False
 
-    # Enquiry collection phase
+    if is_conversation_start(session, user_text):
+        await send_welcome_media(whatsapp_id, session)
+
+    # Agent-led enquiry conversation
     result = await ai_agent.process_message(session, user_text)
 
     if _all_fields_filled(session.fields) and session.phase == ConversationPhase.ENQUIRY:

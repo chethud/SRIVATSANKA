@@ -33,7 +33,7 @@ async def save_enquiry(
         guestCount=fields.guest_count or 0,
         preferredCallbackAt=parse_callback_time(fields.preferred_callback or "in 2 hours"),
         status=EnquiryStatus.NEW,
-        notes="Menu selected via WhatsApp" if dishes else None,
+        notes="Cuisine preferences via WhatsApp" if dishes else None,
     )
     db.add(enquiry)
     await db.flush()
@@ -66,11 +66,10 @@ async def save_enquiry(
 
 def _format_dishes_for_whatsapp(dishes: list[SelectedDishItem] | None) -> str:
     if not dishes:
-        return "Menu: To be discussed on callback"
-    lines = ["*Selected Dishes:*"]
+        return "Cuisine: To be discussed on callback"
+    lines = ["*Cuisine / menu style:*"]
     for d in dishes:
-        custom = ", ".join(d.customizations) if d.customizations else "No customization"
-        lines.append(f"• {d.dish_name} ({d.category}) – {custom}")
+        lines.append(f"• {d.dish_name}")
     return "\n".join(lines)
 
 

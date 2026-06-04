@@ -28,6 +28,8 @@ import {
   buildChartSeries,
   buildForecast,
   calcTrend,
+  sparklineFromMonthly,
+  type ChartPeriod,
   getAiInsights,
   getConvertedOrders,
   getRecentOrders,
@@ -40,7 +42,7 @@ import {
 
 export default function DashboardPage() {
   const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics } = useAppData();
-  const [chartMode, setChartMode] = useState<'monthly' | 'weekly'>('monthly');
+  const [chartMode, setChartMode] = useState<ChartPeriod>('monthly');
 
   const converted = useMemo(() => getConvertedOrders(enquiries), [enquiries]);
   const monthly = analytics?.monthly ?? [];
@@ -60,11 +62,9 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-6">
-      <motion.header initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-2">
-        <h1 className="text-3xl md:text-4xl font-bold text-[var(--foreground)] tracking-tight">Dashboard</h1>
-        <p className="text-[var(--muted)] mt-2 text-base max-w-xl">
-          Welcome back. Here&apos;s your SRIVATSANKA operations overview.
-        </p>
+      <motion.header initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-1">
+        <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
+        <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA catering — live metrics and pipeline</p>
       </motion.header>
 
       <ErrorBanner message={error} />
@@ -73,32 +73,46 @@ export default function DashboardPage() {
         <DashboardKpiCard
           label="New enquiries"
           value={String(stats?.new_enquiries ?? 0)}
+          numericValue={stats?.new_enquiries ?? 0}
           subtext="awaiting callback"
           icon={MessageSquare}
           trend={calcTrend(stats?.new_enquiries ?? 0, Math.max(0, (stats?.new_enquiries ?? 0) - 1))}
+          sparkline={sparklineFromMonthly(analytics, 'revenue')}
+          sparkId="enq"
           gradient={1}
         />
         <DashboardKpiCard
           label="Converted orders"
           value={String(converted.length)}
+          numericValue={converted.length}
           subtext="active pipeline"
           icon={ShoppingBag}
           trend={calcTrend(converted.length, analytics?.converted_orders ?? converted.length)}
+          sparkline={sparklineFromMonthly(analytics, 'profit')}
+          sparkId="ord"
           gradient={2}
         />
         <DashboardKpiCard
           label="Net profit"
           value={formatCurrency(profit)}
+          numericValue={profit}
+          formatValue={formatCurrency}
           subtext="after expenses"
           icon={TrendingUp}
           trend={calcTrend(lastM?.profit ?? profit, prevM?.profit ?? 0)}
+          sparkline={sparklineFromMonthly(analytics, 'profit')}
+          sparkId="profit"
         />
         <DashboardKpiCard
           label="Bill expenses"
           value={formatCurrency(expenses)}
+          numericValue={expenses}
+          formatValue={formatCurrency}
           subtext="from invoices"
           icon={Wallet}
           trend={calcTrend(lastM?.expenses ?? expenses, prevM?.expenses ?? 0)}
+          sparkline={sparklineFromMonthly(analytics, 'expenses')}
+          sparkId="exp"
           gradient={2}
         />
       </div>

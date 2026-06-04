@@ -15,10 +15,8 @@ uvicorn app.main:app --reload --port 8000
 ## WhatsApp Bot Phases
 
 1. **Enquiry** – event details (AI or step-by-step fallback)
-2. **Categories** – customer picks dish types (1–6)
-3. **Dishes** – customer picks items per category
-4. **Customizations** – No Milk, Less Spice, etc.
-5. **Save** – enquiry + dishes → database + owner WhatsApp alert
+2. **Cuisine preferences** – customer picks menu styles only (Multi Cuisine, South Indian, etc.) — no individual dish selection
+3. **Save** – enquiry + preferences → database + owner WhatsApp alert
 
 ## API Endpoints
 

@@ -1,74 +1,42 @@
 import re
-from sqlalchemy import select
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.data.seed_dishes import CATEGORY_LABELS, CUSTOMIZATION_OPTIONS
-from app.models import Dish, DishCategory
 from app.schemas import AgentTurnResult, SelectedDishItem
 from app.services.session_store import ConversationPhase, ConversationSession
 
-CATEGORY_MENU: list[tuple[str, DishCategory]] = [
-    ("1", DishCategory.SOUTH_INDIAN),
-    ("2", DishCategory.NORTH_INDIAN),
-    ("3", DishCategory.CHINESE),
-    ("4", DishCategory.SNACKS),
-    ("5", DishCategory.DESSERTS),
-    ("6", DishCategory.BEVERAGES),
+# Cuisine / menu style options (not individual dishes)
+CUISINE_OPTIONS: list[tuple[str, str]] = [
+    ("1", "Multi Cuisine"),
+    ("2", "South Indian"),
+    ("3", "North Indian"),
+    ("4", "Chinese"),
+    ("5", "Snacks & Starters"),
+    ("6", "Desserts"),
+    ("7", "Beverages"),
 ]
 
-CATEGORY_BY_KEY = {k: cat for k, cat in CATEGORY_MENU}
-CATEGORY_BY_LABEL = {label.lower(): cat for cat, label in CATEGORY_LABELS.items()}
+CUISINE_BY_KEY = {k: label for k, label in CUISINE_OPTIONS}
+CUISINE_BY_LABEL = {label.lower(): label for _, label in CUISINE_OPTIONS}
+PREFERENCE_CATEGORY = "Cuisine Preference"
 
 
 def _parse_numbers(text: str) -> list[str]:
     return re.findall(r"\d+", text)
 
 
-def _format_categories_prompt() -> str:
+def _format_cuisine_prompt() -> str:
     lines = [
-        "Great! Now let's plan your menu 🍽️\n",
-        "Which *types of dishes* do you need? Reply with numbers (e.g. 1,3,5):\n",
+        "Wonderful — your event details are with our team. 🌿\n",
+        "To help Mr. Kannan prepare ideas for your call, what *cuisine styles* do you have in mind?",
+        "Pick any (e.g. *1,2,4* for Multi Cuisine + South Indian + Chinese):\n",
     ]
-    for key, cat in CATEGORY_MENU:
-        lines.append(f"{key}. {CATEGORY_LABELS[cat]}")
-    lines.append("\nReply *skip* if you want the owner to suggest the menu on callback.")
-    return "\n".join(lines)
-
-
-async def _get_dishes_for_category(db: AsyncSession, category: DishCategory) -> list[Dish]:
-    result = await db.execute(
-        select(Dish)
-        .where(Dish.category == category, Dish.isActive.is_(True))
-        .order_by(Dish.name)
-    )
-    return list(result.scalars().all())
-
-
-def _format_dishes_prompt(category: DishCategory, dishes: list[Dish]) -> str:
-    label = CATEGORY_LABELS[category]
-    lines = [f"*{label}* – select dishes (reply with numbers, e.g. 1,2):\n"]
-    for i, dish in enumerate(dishes, 1):
-        lines.append(f"{i}. {dish.name} – ₹{dish.price:.0f}")
-    lines.append("\nReply *0* or *skip* to skip this category.")
-    return "\n".join(lines)
-
-
-def _format_customizations_prompt(dishes: list[SelectedDishItem]) -> str:
-    lines = [
-        "Your selected dishes:\n",
-    ]
-    for i, d in enumerate(dishes, 1):
-        lines.append(f"{i}. {d.dish_name} ({d.category})")
-    lines.extend([
-        "",
-        "Any *customizations*? Reply with numbers for ALL dishes, or type per dish:",
-        "",
-    ])
-    for key, label in CUSTOMIZATION_OPTIONS:
+    for key, label in CUISINE_OPTIONS:
         lines.append(f"{key}. {label}")
     lines.extend([
         "",
-        'Examples:\n• "1,4" → No Milk + Less Spice for all\n• "Sambar - less spice"\n• "none" → no customizations',
+        "You can also type names, e.g. *multi cuisine* or *south indian*.",
+        "Reply *skip* if you want our team to suggest options on the callback.",
     ])
     return "\n".join(lines)
 
@@ -86,133 +54,82 @@ def _format_confirmation(session: ConversationSession) -> str:
         "",
     ]
     if session.selected_dishes:
-        lines.append("*Selected Menu*")
+        lines.append("*Cuisine / menu style*")
         for d in session.selected_dishes:
-            custom = ", ".join(d.customizations) if d.customizations else "None"
-            extra = f" ({d.notes})" if d.notes else ""
-            lines.append(f"• {d.dish_name} [{d.category}] – {custom}{extra}")
+            extra = f" – {d.notes}" if d.notes else ""
+            lines.append(f"• {d.dish_name}{extra}")
     else:
-        lines.append("*Menu:* Owner will discuss menu on callback")
+        lines.append("*Cuisine:* Team will discuss menu options on callback")
     lines.extend([
         "",
-        "Our team will contact you at your preferred time.",
+        "Our team will contact you at your preferred time with a tailored menu.",
         "Send *new* to start another enquiry.",
     ])
     return "\n".join(lines)
 
 
-def _apply_customizations_to_all(dishes: list[SelectedDishItem], keys: list[str]) -> None:
-    labels = [label for key, label in CUSTOMIZATION_OPTIONS if key in keys]
-    for dish in dishes:
-        for label in labels:
-            if label not in dish.customizations:
-                dish.customizations.append(label)
+def _resolve_cuisine_selections(text: str) -> list[str]:
+    lower = text.strip().lower()
+    if lower in {"skip", "0", "none", "no", "later"}:
+        return []
 
-
-def _parse_customization_text(text: str, dishes: list[SelectedDishItem]) -> None:
-    lower = text.lower()
-    if lower in {"none", "no", "nothing", "skip", "na", "n/a"}:
-        return
-
+    selected: list[str] = []
     keys = _parse_numbers(text)
-    if keys and all(k in {o[0] for o in CUSTOMIZATION_OPTIONS} for k in keys):
-        _apply_customizations_to_all(dishes, keys)
-        return
+    for k in keys:
+        if k in CUISINE_BY_KEY and CUISINE_BY_KEY[k] not in selected:
+            selected.append(CUISINE_BY_KEY[k])
 
-    # Per-dish notes: "sambar less spice, gulab less sweet"
-    for dish in dishes:
-        if dish.dish_name.lower() in lower:
-            dish.notes = text.strip()
+    for label_key, label in CUISINE_BY_LABEL.items():
+        if label_key in lower and label not in selected:
+            selected.append(label)
+
+    # Free text fallback (e.g. "multi cuisine and north indian")
+    if not selected and len(text.strip()) > 2:
+        return [text.strip()[:120]]
+
+    return selected
 
 
-async def start_dish_flow(session: ConversationSession, db: AsyncSession) -> AgentTurnResult:
+def _preferences_to_items(labels: list[str]) -> list[SelectedDishItem]:
+    return [
+        SelectedDishItem(
+            dish_id=None,
+            dish_name=label,
+            category=PREFERENCE_CATEGORY,
+        )
+        for label in labels
+    ]
+
+
+async def start_dish_flow(session: ConversationSession, _db: AsyncSession) -> AgentTurnResult:
+    """Ask cuisine types only — no per-dish selection."""
     session.phase = ConversationPhase.SELECT_CATEGORIES
-    reply = _format_categories_prompt()
+    reply = _format_cuisine_prompt()
     session.history.append({"role": "assistant", "content": reply})
     return AgentTurnResult(reply=reply, fields=session.fields, enquiry_fields_complete=True)
 
 
 async def handle_dish_flow(
-    session: ConversationSession, user_text: str, db: AsyncSession
+    session: ConversationSession, user_text: str, _db: AsyncSession
 ) -> AgentTurnResult:
-    text = user_text.strip()
-    lower = text.lower()
+    if session.phase != ConversationPhase.SELECT_CATEGORIES:
+        return AgentTurnResult(
+            reply="Something went wrong. Send *new* to start again.",
+            fields=session.fields,
+        )
 
-    if session.phase == ConversationPhase.SELECT_CATEGORIES:
-        if lower in {"skip", "0", "none", "no"}:
-            session.selected_dishes = []
-            session.completed = True
-            session.phase = ConversationPhase.DONE
-            reply = _format_confirmation(session)
-            return AgentTurnResult(reply=reply, fields=session.fields, is_complete=True)
+    labels = _resolve_cuisine_selections(user_text)
+    if not labels and user_text.strip().lower() not in {"skip", "0", "none", "no", "later"}:
+        return AgentTurnResult(
+            reply=(
+                "Please pick cuisine types by number (e.g. *1,2*) or name (*multi cuisine*), "
+                "or reply *skip*."
+            ),
+            fields=session.fields,
+        )
 
-        keys = _parse_numbers(text)
-        session.selected_category_keys = [k for k in keys if k in CATEGORY_BY_KEY]
-        if not session.selected_category_keys:
-            # try matching names
-            for label, cat in CATEGORY_BY_LABEL.items():
-                if label in lower:
-                    key = next(k for k, c in CATEGORY_MENU if c == cat)
-                    session.selected_category_keys.append(key)
-            if not session.selected_category_keys:
-                return AgentTurnResult(
-                    reply="Please reply with category numbers (e.g. 1,3,5) or type *skip*.",
-                    fields=session.fields,
-                )
-
-        session.current_category_index = 0
-        session.phase = ConversationPhase.SELECT_DISHES
-        cat = CATEGORY_BY_KEY[session.selected_category_keys[0]]
-        dishes = await _get_dishes_for_category(db, cat)
-        reply = _format_dishes_prompt(cat, dishes)
-        session.history.append({"role": "assistant", "content": reply})
-        return AgentTurnResult(reply=reply, fields=session.fields)
-
-    if session.phase == ConversationPhase.SELECT_DISHES:
-        cat_key = session.selected_category_keys[session.current_category_index]
-        cat = CATEGORY_BY_KEY[cat_key]
-        dishes = await _get_dishes_for_category(db, cat)
-
-        if lower not in {"0", "skip", "none"}:
-            nums = [int(n) for n in _parse_numbers(text)]
-            for n in nums:
-                if 1 <= n <= len(dishes):
-                    d = dishes[n - 1]
-                    session.selected_dishes.append(
-                        SelectedDishItem(
-                            dish_id=d.id,
-                            dish_name=d.name,
-                            category=CATEGORY_LABELS[cat],
-                        )
-                    )
-
-        session.current_category_index += 1
-        if session.current_category_index < len(session.selected_category_keys):
-            next_cat = CATEGORY_BY_KEY[session.selected_category_keys[session.current_category_index]]
-            next_dishes = await _get_dishes_for_category(db, next_cat)
-            reply = _format_dishes_prompt(next_cat, next_dishes)
-            session.history.append({"role": "assistant", "content": reply})
-            return AgentTurnResult(reply=reply, fields=session.fields)
-
-        if not session.selected_dishes:
-            session.completed = True
-            session.phase = ConversationPhase.DONE
-            reply = _format_confirmation(session)
-            return AgentTurnResult(reply=reply, fields=session.fields, is_complete=True)
-
-        session.phase = ConversationPhase.CUSTOMIZATIONS
-        reply = _format_customizations_prompt(session.selected_dishes)
-        session.history.append({"role": "assistant", "content": reply})
-        return AgentTurnResult(reply=reply, fields=session.fields)
-
-    if session.phase == ConversationPhase.CUSTOMIZATIONS:
-        _parse_customization_text(text, session.selected_dishes)
-        session.completed = True
-        session.phase = ConversationPhase.DONE
-        reply = _format_confirmation(session)
-        return AgentTurnResult(reply=reply, fields=session.fields, is_complete=True)
-
-    return AgentTurnResult(
-        reply="Something went wrong. Send *new* to start again.",
-        fields=session.fields,
-    )
+    session.selected_dishes = _preferences_to_items(labels)
+    session.completed = True
+    session.phase = ConversationPhase.DONE
+    reply = _format_confirmation(session)
+    return AgentTurnResult(reply=reply, fields=session.fields, is_complete=True)

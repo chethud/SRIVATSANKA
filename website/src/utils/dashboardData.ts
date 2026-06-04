@@ -45,7 +45,9 @@ export function getTopDishes(enquiries: Enquiry[], limit = 5) {
     .slice(0, limit);
 }
 
-export function buildChartSeries(analytics: Analytics | null, mode: 'monthly' | 'weekly') {
+export type ChartPeriod = 'weekly' | 'monthly' | 'yearly';
+
+export function buildChartSeries(analytics: Analytics | null, mode: ChartPeriod) {
   if (!analytics?.monthly?.length) return [];
 
   if (mode === 'monthly') {
@@ -56,12 +58,39 @@ export function buildChartSeries(analytics: Analytics | null, mode: 'monthly' | 
     }));
   }
 
+  if (mode === 'yearly') {
+    const byYear = new Map<string, { revenue: number; expenses: number }>();
+    for (const m of analytics.monthly) {
+      const parts = m.month.trim().split(/\s+/);
+      const year = parts.length > 1 ? parts[parts.length - 1] : m.month;
+      const cur = byYear.get(year) ?? { revenue: 0, expenses: 0 };
+      cur.revenue += m.revenue;
+      cur.expenses += m.expenses;
+      byYear.set(year, cur);
+    }
+    return [...byYear.entries()].map(([label, v]) => ({
+      label,
+      revenue: v.revenue,
+      expenses: v.expenses,
+    }));
+  }
+
   const last = analytics.monthly.slice(-4);
   return last.map((m, i) => ({
     label: `W${i + 1}`,
     revenue: Math.round(m.revenue / 4),
     expenses: Math.round(m.expenses / 4),
   }));
+}
+
+export function sparklineFromMonthly(analytics: Analytics | null, field: 'revenue' | 'expenses' | 'profit') {
+  const rows = analytics?.monthly ?? [];
+  if (!rows.length) return [0, 0, 0, 0, 0];
+  return rows.slice(-8).map((m) => {
+    if (field === 'revenue') return m.revenue;
+    if (field === 'expenses') return m.expenses;
+    return m.profit;
+  });
 }
 
 export function buildForecast(analytics: Analytics | null) {

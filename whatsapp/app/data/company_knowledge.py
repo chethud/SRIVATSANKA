@@ -1,0 +1,95 @@
+"""Brand knowledge from https://kannansharangapani.com/ for the WhatsApp agent."""
+
+WEBSITE_URL = "https://kannansharangapani.com/"
+
+COMPANY = {
+    "legal_name": "Srivatsanka Events and Services Pvt Ltd",
+    "brand_name": "SRIVATSANKA",
+    "established": "2017",
+    "managing_director": "Mr. Kannan Sharangapani",
+    "phone": "+91-9945607074",
+    "whatsapp": "+91-9945607074",
+    "email": "srivatsankas@gmail.com",
+    "address": "#1, 4th Cross, 4th Main, N R Colony, Bengaluru 560019",
+    "tagline": "Pure Veg Catering Services for All Occasions",
+}
+
+SERVICES = [
+    "Wedding Catering",
+    "Decor for Celebrations",
+    "Wedding Pooja Setup",
+    "Venues for Celebrations",
+    "Full event food & hospitality",
+]
+
+EVENT_TYPES = [
+    "Wedding",
+    "House Warming",
+    "Naming Ceremony",
+    "Upanayanam",
+    "Baby Shower",
+    "Reception",
+    "Corporate events",
+]
+
+SPECIALTIES = [
+    "Food safety & hygiene in cooking and serving",
+    "100% transparency on requirements and delivery",
+    "Customer-centric solutions",
+    "Lifetime customer relationships",
+    "Innovative menus while keeping traditional cuisine",
+    "Excellence in execution with a personal touch",
+    "Biodegradable cutlery — environmentally sensitive",
+]
+
+SOCIAL_PROOF = [
+    "Trusted since 2017 in Bengaluru for weddings and family celebrations",
+    "Guests praise our South Indian, North Indian & Kerala menus, live counters, and warm service",
+    "Mr. Kannan personally oversees events — many families call him part of their celebration story",
+    "Known for Dumrot, Badam Puri, Pal Payasam, Pani Puri, chaat counters, and multi-day wedding catering",
+    "5-star feedback on food quality, presentation, and stress-free execution",
+]
+
+# Public gallery images (from company website) — used in WhatsApp welcome
+GALLERY_IMAGE_URLS = [
+    "https://kannansharangapani.com/wp-content/uploads/2024/11/1620985900177-1.jpeg",
+    "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534695-1.png",
+    "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534700-1.png",
+]
+
+WELCOME_IMAGE_CAPTIONS = [
+    "A glimpse of our celebration catering 🍽️",
+    "Elegant food presentation for your special day ✨",
+    "Traditional touch with premium hospitality 💚",
+]
+
+
+def build_agent_context() -> str:
+    """Compact knowledge block injected into the Gemini system prompt."""
+    services = "\n".join(f"- {s}" for s in SERVICES)
+    events = ", ".join(EVENT_TYPES)
+    specialties = "\n".join(f"- {s}" for s in SPECIALTIES)
+    proof = "\n".join(f"- {s}" for s in SOCIAL_PROOF)
+
+    return f"""
+COMPANY (official: {WEBSITE_URL})
+- {COMPANY['legal_name']} ({COMPANY['brand_name']}), est. {COMPANY['established']}
+- Managing Director: {COMPANY['managing_director']}
+- Pure vegetarian catering & events — Bengaluru
+- Contact: {COMPANY['phone']} | {COMPANY['email']}
+- {COMPANY['address']}
+
+WHAT WE DO
+{services}
+
+EVENTS WE SPECIALISE IN
+{events}
+
+OUR STRENGTHS
+{specialties}
+
+WHAT WE HAVE ACHIEVED (speak naturally, not as a list dump)
+{proof}
+
+WEBSITE: Share {WEBSITE_URL} when customers want photos, menu, or reviews.
+""".strip()
