@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { PageHeader, Card, Button } from '../components/Layout';
+import { PageHeader, Card, Button, EmptyState } from '../components/Layout';
+import { SearchInput } from '../components/ui';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { createWorker } from '../api/client';
@@ -10,7 +11,19 @@ export default function WorkersPage() {
   const navigate = useNavigate();
   const { workers, refresh } = useAppData();
   const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState({ name: '', phoneNumber: '', role: '' });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return workers;
+    return workers.filter(
+      (w) =>
+        w.name.toLowerCase().includes(q) ||
+        w.role.toLowerCase().includes(q) ||
+        w.phoneNumber.toLowerCase().includes(q),
+    );
+  }, [workers, search]);
 
   useCreateActionListener('worker', () => setShowForm(true));
 
@@ -35,6 +48,14 @@ export default function WorkersPage() {
         title="Workers"
         description={`${workers.length} workers — click a name to open profile, assign orders & wages`}
       />
+
+      <div className="mb-6 max-w-md">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name, role, or phone..."
+        />
+      </div>
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -52,6 +73,11 @@ export default function WorkersPage() {
         </Card>
       )}
 
+      {filtered.length === 0 ? (
+        <EmptyState
+          message={workers.length === 0 ? 'No workers yet. Use New worker in the header.' : 'No workers match your search.'}
+        />
+      ) : (
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-[var(--background)]">
@@ -63,7 +89,7 @@ export default function WorkersPage() {
             </tr>
           </thead>
           <tbody>
-            {workers.map((w) => (
+            {filtered.map((w) => (
               <tr
                 key={w.id}
                 onClick={() => navigate(`/workers/${w.id}`)}
@@ -79,10 +105,8 @@ export default function WorkersPage() {
             ))}
           </tbody>
         </table>
-        {workers.length === 0 && (
-          <p className="text-center text-[var(--muted)] py-12 text-sm">No workers yet. Use New worker in the header.</p>
-        )}
       </div>
+      )}
     </>
   );
 }

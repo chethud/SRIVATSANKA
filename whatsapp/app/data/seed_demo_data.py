@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.data.seed_dishes import CATEGORY_LABELS, seed_dishes
 from app.models import (
     Dish,
     Enquiry,
@@ -16,9 +17,55 @@ from app.models import (
     NotificationType,
     Vendor,
     Worker,
+    WorkerAssignment,
 )
 
 DEMO_MARKER = "[demo]"
+
+
+def _dish_category_label(dish: Dish) -> str:
+    cat = dish.category
+    if cat in CATEGORY_LABELS:
+        return CATEGORY_LABELS[cat]
+    if hasattr(cat, "value"):
+        return str(cat.value).replace("_", " ").title()
+    return str(cat)
+
+
+async def _load_all_dishes(session: AsyncSession) -> list[Dish]:
+    dishes = list((await session.execute(select(Dish).order_by(Dish.name))).scalars().all())
+    if not dishes:
+        await seed_dishes(session)
+        dishes = list((await session.execute(select(Dish).order_by(Dish.name))).scalars().all())
+    return dishes
+
+
+def _add_order_lines(
+    session: AsyncSession,
+    enquiry_id: str,
+    dishes: list[Dish],
+    mode: bool | str,
+) -> int:
+    if mode == "all":
+        subset = dishes
+    elif mode == "sample":
+        subset = dishes[:10]
+    elif mode:
+        subset = dishes[:6]
+    else:
+        return 0
+    for i, dish in enumerate(subset):
+        session.add(
+            EnquiryDish(
+                enquiryId=enquiry_id,
+                dishId=dish.id,
+                dishName=dish.name,
+                category=_dish_category_label(dish),
+                quantity=1 + (i % 3),
+                unitPrice=dish.price,
+            )
+        )
+    return len(subset)
 
 
 async def _clear_demo_rows(session: AsyncSession) -> None:
@@ -30,7 +77,14 @@ async def _clear_demo_rows(session: AsyncSession) -> None:
     if demo_enquiries:
         await session.execute(delete(EnquiryDish).where(EnquiryDish.enquiryId.in_(demo_enquiries)))
         await session.execute(delete(InvoiceUpload).where(InvoiceUpload.enquiryId.in_(demo_enquiries)))
+        await session.execute(delete(WorkerAssignment).where(WorkerAssignment.enquiryId.in_(demo_enquiries)))
         await session.execute(delete(Enquiry).where(Enquiry.id.in_(demo_enquiries)))
+
+    demo_worker_ids = (
+        await session.execute(select(Worker.id).where(Worker.role.contains(DEMO_MARKER)))
+    ).scalars().all()
+    if demo_worker_ids:
+        await session.execute(delete(WorkerAssignment).where(WorkerAssignment.workerId.in_(demo_worker_ids)))
 
     await session.execute(delete(Notification).where(Notification.message.contains(DEMO_MARKER)))
     await session.execute(delete(Vendor).where(Vendor.notes.contains(DEMO_MARKER)))
@@ -44,15 +98,29 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
     if force:
         await _clear_demo_rows(session)
 
-    dishes = list((await session.execute(select(Dish).limit(8))).scalars().all())
-    if not dishes:
-        from app.data.seed_dishes import seed_dishes
-
-        await seed_dishes(session)
-        dishes = list((await session.execute(select(Dish).limit(8))).scalars().all())
-
+    dishes = await _load_all_dishes(session)
     now = datetime.now()
     enquiries_data = [
+        {
+            "customerName": "Demo: Kazin Kumar",
+            "phoneNumber": "919900112233",
+            "eventType": "Wedding",
+            "eventDate": now + timedelta(days=30),
+            "eventLocation": "Palace Grounds, Bengaluru",
+            "guestCount": 500,
+            "preferredCallbackAt": now - timedelta(days=2),
+            "status": EnquiryStatus.CONVERTED,
+            "cuisines": [
+                "Multi Cuisine",
+                "South Indian",
+                "North Indian",
+                "Chinese",
+                "Snacks",
+                "Desserts",
+                "Beverages",
+            ],
+            "order_dishes": "all",
+        },
         {
             "customerName": "Demo: Priya Sharma",
             "phoneNumber": "919876543210",
@@ -85,7 +153,7 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
             "preferredCallbackAt": now + timedelta(hours=2),
             "status": EnquiryStatus.CONVERTED,
             "cuisines": ["South Indian", "Desserts"],
-            "order_dishes": True,
+            "order_dishes": "sample",
         },
         {
             "customerName": "Demo: Vikram & Meera",
@@ -110,9 +178,22 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
             "status": EnquiryStatus.NEW,
             "cuisines": [],
         },
+        {
+            "customerName": "Demo: Sunitha Nair",
+            "phoneNumber": "918877665544",
+            "eventType": "Birthday",
+            "eventDate": now - timedelta(days=14),
+            "eventLocation": "Koramangala, Bengaluru",
+            "guestCount": 40,
+            "preferredCallbackAt": now - timedelta(days=20),
+            "status": EnquiryStatus.CLOSED,
+            "cuisines": ["Snacks", "Desserts"],
+        },
     ]
 
     created_enquiries = 0
+    menu_lines = 0
+    kazin_enquiry_id: str | None = None
     for row in enquiries_data:
         enquiry = Enquiry(
             customerName=row["customerName"],
@@ -128,6 +209,9 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
         session.add(enquiry)
         await session.flush()
 
+        if "Kazin" in row["customerName"]:
+            kazin_enquiry_id = enquiry.id
+
         for label in row.get("cuisines", []):
             session.add(
                 EnquiryDish(
@@ -138,17 +222,7 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
             )
 
         if row.get("order_dishes") and dishes:
-            for i, dish in enumerate(dishes[:4]):
-                session.add(
-                    EnquiryDish(
-                        enquiryId=enquiry.id,
-                        dishId=dish.id,
-                        dishName=dish.name,
-                        category=dish.category.value if hasattr(dish.category, "value") else str(dish.category),
-                        quantity=1 + (i % 2),
-                        unitPrice=dish.price,
-                    )
-                )
+            menu_lines += _add_order_lines(session, enquiry.id, dishes, row["order_dishes"])
 
         session.add(
             Notification(
@@ -176,25 +250,47 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
             )
         )
 
-    workers = [
+    workers_data = [
         ("Demo: Ravi", "918004445566", "Head Chef", 1200),
         ("Demo: Lakshmi", "918005556677", "Service Lead", 900),
         ("Demo: Kumar", "918006667788", "Helper", 600),
     ]
-    for name, phone, role, wage in workers:
-        session.add(
-            Worker(
-                name=name,
-                phoneNumber=phone,
-                role=f"{role} {DEMO_MARKER}",
-                dailyWage=wage,
-            )
+    created_workers: list[Worker] = []
+    for name, phone, role, wage in workers_data:
+        worker = Worker(
+            name=name,
+            phoneNumber=phone,
+            role=f"{role} {DEMO_MARKER}",
+            dailyWage=wage,
         )
+        session.add(worker)
+        created_workers.append(worker)
+    await session.flush()
+
+    assignments_created = 0
+    if kazin_enquiry_id and created_workers:
+        duty_specs = [
+            (created_workers[0], "Kitchen", 1800),
+            (created_workers[1], "Service", 1200),
+            (created_workers[2], "Setup & breakdown", 800),
+        ]
+        for worker, duty_type, wage in duty_specs:
+            session.add(
+                WorkerAssignment(
+                    workerId=worker.id,
+                    enquiryId=kazin_enquiry_id,
+                    dutyDate=now + timedelta(days=28),
+                    dutyType=duty_type,
+                    wage=wage,
+                )
+            )
+            assignments_created += 1
 
     expenses = [
         ("Transport", 4500, "Demo veg delivery runs"),
         ("Gas & fuel", 2800, "Demo kitchen fuel"),
         ("Packaging", 1500, "Demo biodegradable boxes"),
+        ("Wages", 3800, "Demo event crew payout"),
     ]
     for category, amount, desc in expenses:
         session.add(
@@ -239,8 +335,11 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
     await session.commit()
     return {
         "enquiries": created_enquiries,
+        "menuLines": menu_lines,
+        "dishesInCatalog": len(dishes),
         "vendors": len(vendors),
-        "workers": len(workers),
+        "workers": len(workers_data),
+        "workerAssignments": assignments_created,
         "expenses": len(expenses),
         "marker": DEMO_MARKER,
     }

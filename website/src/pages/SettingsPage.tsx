@@ -17,7 +17,7 @@ export default function SettingsPage() {
     try {
       const r = await seedDemoData();
       setSeedMsg(
-        `Loaded ${r.enquiries} demo enquiries, ${r.vendors} vendors, ${r.workers} workers, ${r.expenses} expenses.`,
+        `Loaded ${r.enquiries} enquiries (${r.menuLines ?? 0} menu lines), ${r.vendors} vendors, ${r.workers} workers, ${r.expenses} expenses.`,
       );
       await refresh();
     } catch {

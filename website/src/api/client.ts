@@ -347,8 +347,11 @@ export async function deleteExpense(id: string) {
 
 export async function seedDemoData(): Promise<{
   enquiries: number;
+  menuLines?: number;
+  dishesInCatalog?: number;
   vendors: number;
   workers: number;
+  workerAssignments?: number;
   expenses: number;
   marker: string;
 }> {
