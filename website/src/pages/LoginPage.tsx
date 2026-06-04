@@ -51,7 +51,7 @@ export default function LoginPage() {
               <Lock size={22} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-[var(--foreground)]">Owner sign in</h1>
+              <h1 className="text-xl font-semibold text-[var(--foreground)]">Sign in</h1>
               <p className="text-sm text-[var(--muted)] mt-0.5">SRIVATSANKA catering dashboard</p>
             </div>
           </div>
@@ -99,10 +99,6 @@ export default function LoginPage() {
               {submitting ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-
-          <p className="text-xs text-[var(--muted)] text-center mt-6">
-            Up to several team members can be signed in at the same time.
-          </p>
         </div>
       </div>
     </div>
