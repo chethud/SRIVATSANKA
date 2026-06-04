@@ -1,0 +1,118 @@
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  fetchStats,
+  fetchEnquiries,
+  fetchDishes,
+  fetchNotifications,
+  fetchVendors,
+  fetchWorkers,
+  fetchAnalytics,
+  checkApiHealth,
+  type DashboardStats,
+  type Enquiry,
+  type Dish,
+  type Notification,
+  type Vendor,
+  type Worker,
+  type Analytics,
+} from '../api/client';
+
+const POLL_MS = 8000;
+
+interface AppData {
+  connected: boolean;
+  loading: boolean;
+  lastSync: Date | null;
+  error: string;
+  stats: DashboardStats | null;
+  enquiries: Enquiry[];
+  dishes: Dish[];
+  notifications: Notification[];
+  vendors: Vendor[];
+  workers: Worker[];
+  analytics: Analytics | null;
+  refresh: () => Promise<void>;
+}
+
+const AppDataContext = createContext<AppData | null>(null);
+
+export function AppDataProvider({ children }: { children: ReactNode }) {
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [error, setError] = useState('');
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const ok = await checkApiHealth();
+      setConnected(ok);
+      if (!ok) {
+        setError('API offline. Start FastAPI on port 8000.');
+        return;
+      }
+      const [s, e, d, n, v, w, a] = await Promise.all([
+        fetchStats(),
+        fetchEnquiries(),
+        fetchDishes(),
+        fetchNotifications(),
+        fetchVendors(),
+        fetchWorkers(),
+        fetchAnalytics(),
+      ]);
+      setStats(s);
+      setEnquiries(e);
+      setDishes(d);
+      setNotifications(n);
+      setVendors(v);
+      setWorkers(w);
+      setAnalytics(a);
+      setError('');
+      setLastSync(new Date());
+    } catch {
+      setConnected(false);
+      setError('Failed to load data from API.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, POLL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  return (
+    <AppDataContext.Provider
+      value={{
+        connected,
+        loading,
+        lastSync,
+        error,
+        stats,
+        enquiries,
+        dishes,
+        notifications,
+        vendors,
+        workers,
+        analytics,
+        refresh,
+      }}
+    >
+      {children}
+    </AppDataContext.Provider>
+  );
+}
+
+export function useAppData() {
+  const ctx = useContext(AppDataContext);
+  if (!ctx) throw new Error('useAppData must be used within AppDataProvider');
+  return ctx;
+}
