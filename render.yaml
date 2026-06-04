@@ -28,3 +28,5 @@ services:
         generateValue: true
       - key: OWNER_PHONE_NUMBER
         value: "917899102165"
+      - key: SEED_DEMO_ON_STARTUP
+        value: "true"

@@ -19,5 +19,9 @@ class Settings(BaseSettings):
     owner_phone_number: str = "917899102165"
     cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175"
 
+    # Demo dashboard data (Settings → Load demo data, or POST /dev/seed)
+    seed_demo_on_startup: bool = False
+    dev_seed_token: str = ""  # optional X-Dev-Seed-Token header when set
+
 
 settings = Settings()

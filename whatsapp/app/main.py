@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import init_db
+from app.database import SessionLocal, init_db
 from app.routers import api, dev, orders, resources, webhook
 from app.services.scheduler import start_scheduler
 
@@ -16,6 +16,12 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
+    if settings.seed_demo_on_startup:
+        from app.data.seed_demo_data import seed_demo_data
+
+        async with SessionLocal() as session:
+            result = await seed_demo_data(session, force=True)
+        logging.getLogger(__name__).info("Demo data seeded on startup: %s", result)
     start_scheduler()
     yield
 

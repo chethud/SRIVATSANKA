@@ -1,11 +1,36 @@
-from fastapi import APIRouter, Depends
+import logging
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.data.seed_demo_data import seed_demo_data
 from app.database import get_db
 from app.schemas import DevMessageRequest, DevMessageResponse
 from app.services.conversation_handler import handle_conversation
 
 router = APIRouter(prefix="/dev", tags=["dev"])
+logger = logging.getLogger(__name__)
+
+
+def _check_seed_token(x_dev_seed_token: str | None) -> None:
+    required = settings.dev_seed_token.strip()
+    if not required:
+        return
+    if x_dev_seed_token != required:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-Dev-Seed-Token")
+
+
+@router.post("/seed")
+async def seed_dashboard_demo(
+    db: AsyncSession = Depends(get_db),
+    x_dev_seed_token: str | None = Header(default=None),
+) -> dict:
+    """Load dummy enquiries, orders, vendors, workers, and expenses for UI testing."""
+    _check_seed_token(x_dev_seed_token)
+    result = await seed_demo_data(db, force=True)
+    logger.info("Demo data seeded via API: %s", result)
+    return result
 
 
 @router.post("/message", response_model=DevMessageResponse)

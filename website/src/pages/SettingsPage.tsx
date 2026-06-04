@@ -2,12 +2,30 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader, Card } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
-import { fetchWhatsAppStatus, type WhatsAppStatus } from '../api/client';
+import { fetchWhatsAppStatus, seedDemoData, type WhatsAppStatus } from '../api/client';
 import { ErrorBanner } from '../components/ui';
 
 export default function SettingsPage() {
   const { connected, stats, lastSync, refresh } = useAppData();
   const [wa, setWa] = useState<WhatsAppStatus | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState('');
+
+  async function loadDemoData() {
+    setSeeding(true);
+    setSeedMsg('');
+    try {
+      const r = await seedDemoData();
+      setSeedMsg(
+        `Loaded ${r.enquiries} demo enquiries, ${r.vendors} vendors, ${r.workers} workers, ${r.expenses} expenses.`,
+      );
+      await refresh();
+    } catch {
+      setSeedMsg('Failed to load demo data. Check API URL and redeploy Render.');
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   useEffect(() => {
     if (connected) {
@@ -81,6 +99,23 @@ export default function SettingsPage() {
         <Card className="p-6">
           <h3 className="font-semibold mb-4">WhatsApp AI Agent</h3>
           <p className="text-sm text-[var(--muted)]">Set <code>GEMINI_API_KEY</code> in <code>whatsapp/.env</code> for AI conversations.</p>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="font-semibold mb-4">Demo data (Vercel + Render)</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Loads sample enquiries, converted orders, vendors, workers, and expenses into the live API.
+            Safe to run again — replaces previous demo rows only.
+          </p>
+          {seedMsg && <p className="text-sm mb-3 text-[var(--foreground)]">{seedMsg}</p>}
+          <button
+            type="button"
+            onClick={loadDemoData}
+            disabled={!connected || seeding}
+            className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm hover:bg-[var(--primary-hover)] disabled:opacity-50"
+          >
+            {seeding ? 'Loading…' : 'Load demo data'}
+          </button>
         </Card>
 
         <Card className="p-6">

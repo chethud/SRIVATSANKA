@@ -257,6 +257,19 @@ export async function deleteExpense(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/expenses/${id}`, { method: 'DELETE' });
 }
 
+export async function seedDemoData(): Promise<{
+  enquiries: number;
+  vendors: number;
+  workers: number;
+  expenses: number;
+  marker: string;
+}> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = import.meta.env.VITE_DEV_SEED_TOKEN;
+  if (token) headers['X-Dev-Seed-Token'] = token;
+  return apiFetch('/dev/seed', { method: 'POST', headers });
+}
+
 export async function testBotMessage(from: string, text: string): Promise<BotTestResponse> {
   return apiFetch<BotTestResponse>('/dev/message', {
     method: 'POST',
