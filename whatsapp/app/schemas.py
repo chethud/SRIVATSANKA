@@ -92,6 +92,10 @@ class EnquiryCreateIn(BaseModel):
     notes: str | None = None
 
 
+class EnquiryUpdateIn(BaseModel):
+    notes: str | None = None
+
+
 class EnquiryOut(BaseModel):
     id: str
     customerName: str
@@ -102,6 +106,7 @@ class EnquiryOut(BaseModel):
     guestCount: int
     preferredCallbackAt: datetime
     status: str
+    notes: str | None = None
     createdAt: datetime
     dishes: list[EnquiryDishOut] = Field(default_factory=list)
 

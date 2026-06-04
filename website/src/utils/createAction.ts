@@ -21,7 +21,7 @@ export function getCreateButtonLabel(pathname: string): string {
     case 'worker':
       return 'New worker';
     case 'dish':
-      return 'New dish';
+      return 'New cuisine item';
     case 'invoice':
       return 'Upload invoice';
     default:

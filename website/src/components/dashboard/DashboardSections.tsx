@@ -197,7 +197,7 @@ export function QuickActionsPanel() {
     { to: '/enquiries', label: 'Enquiries', icon: Users },
     { to: '/orders', label: 'New order', icon: Plus },
     { to: '/invoices', label: 'Upload bill', icon: FileText },
-    { to: '/dishes', label: 'Menu', icon: UtensilsCrossed },
+    { to: '/dishes', label: 'Cuisine', icon: UtensilsCrossed },
     { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
   ];
   return (

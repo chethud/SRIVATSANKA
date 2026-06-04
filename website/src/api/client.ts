@@ -33,6 +33,7 @@ export interface Enquiry {
   guestCount: number;
   preferredCallbackAt: string;
   status: string;
+  notes?: string | null;
   createdAt: string;
   dishes: EnquiryDish[];
 }
@@ -178,6 +179,14 @@ export async function createEnquiry(data: {
 }): Promise<Enquiry> {
   return apiFetch<Enquiry>('/api/enquiries', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateEnquiry(id: string, data: { notes?: string | null }): Promise<Enquiry> {
+  return apiFetch<Enquiry>(`/api/enquiries/${id}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });

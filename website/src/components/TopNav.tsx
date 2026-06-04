@@ -11,7 +11,7 @@ const FALLBACK_LINKS = [
   { to: '/enquiries', label: 'New enquiry' },
   { to: '/vendors', label: 'New vendor' },
   { to: '/workers', label: 'New worker' },
-  { to: '/dishes', label: 'New dish' },
+  { to: '/dishes', label: 'New cuisine item' },
   { to: '/invoices', label: 'Upload invoice' },
 ];
 

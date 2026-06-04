@@ -57,6 +57,8 @@
   --kpi-accent-bar: linear-gradient(90deg, #0b6b3a, #7ac943);
   --chart-grid: #eef2ee;
   --table-header-bg: #f8faf8;
+  --order-accent: #9a7b4f;
+  --order-cream: #faf8f5;
   --input-bg: #ffffff;
   --input-text: #0f172a;
   --input-placeholder: #64748b;
@@ -106,6 +108,8 @@
   --kpi-gradient-2: linear-gradient(145deg, #1e293b 0%, #243828 100%);
   --chart-grid: #334155;
   --table-header-bg: #111827;
+  --order-accent: #c4a574;
+  --order-cream: #1a2332;
   --input-bg: #1e293b;
   --input-text: #f8fafc;
   --input-placeholder: #94a3b8;
@@ -164,6 +168,25 @@ body {
 }
 
 .animate-fade-in { animation: fade-in 0.3s ease-out; }
+
+.order-view {
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.order-view-title {
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.order-view .rounded-2xl.bg-\[var\(--card\)\] {
+  background: var(--card);
+}
+
+[data-theme="light"] .order-view {
+  background: linear-gradient(180deg, var(--order-cream) 0%, var(--background) 120px);
+  margin: -1rem -0.5rem 0;
+  padding: 1rem 0.5rem 0;
+  border-radius: var(--radius-xl);
+}
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 select,

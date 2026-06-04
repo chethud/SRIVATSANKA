@@ -54,7 +54,7 @@ export default function DishesPage() {
 
   return (
     <>
-      <PageHeader title="Dish Management" description={`${dishes.length} dishes — add extra items to the master menu`} />
+      <PageHeader title="Cuisine" description={`${dishes.length} menu items — manage cuisine types and menu catalog`} />
       <div className="mb-6">
         <Button onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add Extra Dish'}</Button>
       </div>

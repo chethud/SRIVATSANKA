@@ -16,6 +16,7 @@ from app.schemas import (
     EnquiryCreateIn,
     EnquiryDishOut,
     EnquiryOut,
+    EnquiryUpdateIn,
     NotificationOut,
     UpdateEnquiryStatus,
 )
@@ -36,6 +37,7 @@ def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
         guestCount=e.guestCount,
         preferredCallbackAt=e.preferredCallbackAt,
         status=e.status.value if hasattr(e.status, "value") else str(e.status),
+        notes=e.notes,
         createdAt=e.createdAt,
         dishes=[
             EnquiryDishOut(
@@ -187,6 +189,27 @@ async def update_enquiry_status(
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
     enquiry.status = new_status
+    await db.commit()
+    await db.refresh(enquiry)
+    return _enquiry_to_out(enquiry)
+
+
+@router.patch("/enquiries/{enquiry_id}", response_model=EnquiryOut)
+async def update_enquiry(
+    enquiry_id: str,
+    payload: EnquiryUpdateIn,
+    db: AsyncSession = Depends(get_db),
+) -> EnquiryOut:
+    result = await db.execute(
+        select(Enquiry)
+        .options(selectinload(Enquiry.dish_items))
+        .where(Enquiry.id == enquiry_id)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if payload.notes is not None:
+        enquiry.notes = payload.notes
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)

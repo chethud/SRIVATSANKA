@@ -196,7 +196,6 @@ export default function EnquiriesPage() {
                   <th className="text-left p-4">Customer</th>
                   <th className="text-left p-4">Event</th>
                   <th className="text-left p-4">Guests</th>
-                  <th className="text-left p-4">Dishes</th>
                   <th className="text-left p-4">Status</th>
                 </tr>
               </thead>
@@ -215,7 +214,6 @@ export default function EnquiriesPage() {
                     </td>
                     <td className="p-4">{e.eventType}</td>
                     <td className="p-4">{e.guestCount}</td>
-                    <td className="p-4">{e.dishes?.length || 0}</td>
                     <td className="p-4" onClick={(ev) => ev.stopPropagation()}>
                       <select
                         value={e.status}
