@@ -54,7 +54,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const ok = await checkApiHealth();
       setConnected(ok);
       if (!ok) {
-        setError('API offline. Start FastAPI on port 8000.');
+        setError('API offline. Check VITE_API_URL on Vercel or wait for Render to wake up.');
         return;
       }
       const [s, e, d, n, v, w, a] = await Promise.all([

@@ -16,12 +16,17 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
-    if settings.seed_demo_on_startup:
-        from app.data.seed_demo_data import seed_demo_data
+    from sqlalchemy import func, select
 
-        async with SessionLocal() as session:
-            result = await seed_demo_data(session, force=True)
-        logging.getLogger(__name__).info("Demo data seeded on startup: %s", result)
+    from app.data.seed_demo_data import seed_demo_data
+    from app.models import Enquiry
+
+    async with SessionLocal() as session:
+        count = await session.scalar(select(func.count()).select_from(Enquiry)) or 0
+        should_seed = settings.seed_demo_on_startup or count == 0
+        if should_seed:
+            result = await seed_demo_data(session, force=settings.seed_demo_on_startup or count == 0)
+            logging.getLogger(__name__).info("Demo data seeded on startup: %s", result)
     start_scheduler()
     yield
 

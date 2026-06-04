@@ -15,7 +15,9 @@ services:
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./kannans.db
       - key: CORS_ORIGINS
-        value: http://localhost:5173
+        value: http://localhost:5173,https://srivatsanka.onrender.com
+      - key: SEED_DEMO_ON_STARTUP
+        value: "true"
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
@@ -28,5 +30,3 @@ services:
         generateValue: true
       - key: OWNER_PHONE_NUMBER
         value: "917899102165"
-      - key: SEED_DEMO_ON_STARTUP
-        value: "true"

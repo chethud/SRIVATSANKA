@@ -1,4 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
+/** Live Render API — used when Vercel env VITE_API_URL is not set */
+const DEFAULT_LIVE_API = 'https://srivatsanka.onrender.com';
+
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? DEFAULT_LIVE_API : '');
 
 export interface DashboardStats {
   new_enquiries: number;
