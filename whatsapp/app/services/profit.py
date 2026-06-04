@@ -71,10 +71,13 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
         elif u.docType == "expense":
             order_expenses += amt
             monthly_exp[mk] += amt
-            if amt > 0:
-                expense_items.append({"label": label, "amount": amt, "date": date_str})
-
-    expense_items = expense_items[:12]
+            desc = (u.notes or "").strip() or (u.fileName or "Expense")
+            expense_items.append({
+                "label": desc[:80],
+                "amount": amt,
+                "date": date_str,
+                "purpose": (u.purpose or "").strip() or None,
+            })
     profit_items = profit_items[:8]
 
     all_months = sorted(

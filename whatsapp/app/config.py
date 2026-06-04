@@ -1,14 +1,23 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Always load whatsapp/.env regardless of process working directory
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     database_url: str = "sqlite+aiosqlite:///./kannans.db"
     port: int = 8000
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-flash-latest"
 
     # Meta WhatsApp Cloud API
     whatsapp_token: str = ""
@@ -24,4 +33,12 @@ class Settings(BaseSettings):
     dev_seed_token: str = ""  # optional X-Dev-Seed-Token header when set
 
 
-settings = Settings()
+def _load_settings() -> Settings:
+    s = Settings()
+    # Strip quotes if present in .env
+    if s.gemini_api_key:
+        s.gemini_api_key = s.gemini_api_key.strip().strip('"').strip("'")
+    return s
+
+
+settings = _load_settings()

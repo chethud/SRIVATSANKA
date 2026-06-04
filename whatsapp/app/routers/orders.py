@@ -211,15 +211,24 @@ def _invoice_upload_out(upload: InvoiceUpload, *, recognized: bool = True) -> In
 async def recognize_expense_invoice(file: UploadFile = File(...)) -> InvoiceRecognizeOut:
     """Upload bill, run AI, return fields for owner review before saving."""
     pending_id, dest = _save_uploaded_file(file, subdir="pending")
+    import json
+
+    meta_path = dest.with_suffix(".meta.json")
+    meta_path.write_text(
+        json.dumps({"fileName": file.filename or dest.name, "pendingId": pending_id}),
+        encoding="utf-8",
+    )
     recognized = await recognize_bill(dest, expense_only=True)
+    ok = bool(recognized.get("recognized"))
     return InvoiceRecognizeOut(
         pendingId=pending_id,
         fileName=file.filename or dest.name,
-        description=recognized.get("description") or recognized.get("notes"),
+        description=recognized.get("description") if ok else None,
         expenseDate=recognized.get("expense_date"),
         amount=recognized.get("amount"),
         purpose=recognized.get("purpose"),
-        recognized=bool(recognized.get("recognized")),
+        recognized=ok,
+        message=None if ok else (recognized.get("notes") or "Could not read this bill."),
     )
 
 
@@ -246,19 +255,37 @@ async def confirm_expense_invoice(
         except (TypeError, ValueError):
             amount = None
 
+    display_name = src.name
+    meta_path = src.with_suffix(".meta.json")
+    if meta_path.exists():
+        try:
+            import json
+
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            display_name = meta.get("fileName") or display_name
+            meta_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
     upload = InvoiceUpload(
         enquiryId=None,
         docType="expense",
-        fileName=src.name,
+        fileName=display_name,
         filePath=str(dest),
         amount=amount,
         notes=(payload.description or "").strip() or None,
         purpose=(payload.purpose or "").strip() or None,
         expenseDate=_parse_expense_date(payload.expenseDate),
     )
-    db.add(upload)
-    await db.commit()
-    await db.refresh(upload)
+    try:
+        db.add(upload)
+        await db.commit()
+        await db.refresh(upload)
+    except Exception as exc:
+        await db.rollback()
+        if dest.exists():
+            dest.unlink(missing_ok=True)
+        raise HTTPException(500, f"Could not save invoice: {exc}") from exc
     return _invoice_upload_out(upload)
 
 

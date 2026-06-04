@@ -177,13 +177,11 @@ export function EventTypeChart({ analytics }: { analytics: Analytics }) {
 }
 
 export function ExpenseItemsChart({ analytics }: { analytics: Analytics }) {
-  const data = (analytics.expense_items ?? [])
-    .map((e) => ({
-      name: e.label.length > 18 ? `${e.label.slice(0, 16)}…` : e.label,
-      amount: e.amount,
-      fullLabel: e.label,
-    }))
-    .slice(0, 10);
+  const data = (analytics.expense_items ?? []).map((e) => ({
+    name: e.label.length > 18 ? `${e.label.slice(0, 16)}…` : e.label,
+    amount: e.amount,
+    fullLabel: e.label,
+  }));
 
   if (data.length === 0) {
     return <p className="text-sm text-[var(--muted)] text-center py-12">Upload expense bills on Invoices to see breakdown here.</p>;

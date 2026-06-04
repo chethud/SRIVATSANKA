@@ -87,8 +87,9 @@ export default function InvoicesPage() {
       setNeedsEdit(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await refresh();
-    } catch {
-      setError('Could not save. Upload the bill again.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not save.';
+      setError(msg.includes('expired') || msg.includes('404') ? `${msg} Upload the bill again.` : msg);
     } finally {
       setSaving(false);
     }
@@ -140,7 +141,8 @@ export default function InvoicesPage() {
             File: <span className="font-medium text-[var(--foreground)]">{preview.fileName}</span>
             {!preview.recognized && (
               <span className="block mt-1 text-amber-700 dark:text-amber-400">
-                Some fields could not be read automatically — please fill or correct them.
+                {preview.message ||
+                  'Some fields could not be read automatically — please fill or correct them.'}
               </span>
             )}
           </p>

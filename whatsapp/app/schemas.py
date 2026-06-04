@@ -79,6 +79,7 @@ class InvoiceRecognizeOut(BaseModel):
     amount: float | None = None
     purpose: str | None = None
     recognized: bool = False
+    message: str | None = None
 
 
 class InvoiceConfirmIn(BaseModel):
@@ -263,6 +264,7 @@ class ChartMoneyItem(BaseModel):
     label: str
     amount: float
     date: str | None = None
+    purpose: str | None = None
 
 
 class MonthlyChartPoint(BaseModel):

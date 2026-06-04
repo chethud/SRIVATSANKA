@@ -93,6 +93,7 @@ export interface ChartMoneyItem {
   label: string;
   amount: number;
   date?: string | null;
+  purpose?: string | null;
 }
 
 export interface MonthlyChartPoint {
@@ -149,9 +150,25 @@ export interface BotTestResponse {
   media?: { url: string; caption?: string | null }[];
 }
 
+async function apiErrorMessage(res: Response, path: string): Promise<string> {
+  try {
+    const body = await res.json();
+    const detail = body?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((d: { msg?: string }) => d?.msg ?? String(d)).join(', ');
+    }
+    if (detail && typeof detail === 'object') return JSON.stringify(detail);
+    if (body?.message) return String(body.message);
+  } catch {
+    /* ignore */
+  }
+  return `Request failed (${res.status}) at ${path}`;
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, options);
-  if (!res.ok) throw new Error(`API error: ${path}`);
+  if (!res.ok) throw new Error(await apiErrorMessage(res, path));
   return res.json();
 }
 
@@ -250,6 +267,7 @@ export interface InvoiceRecognizePreview {
   amount: number | null;
   purpose: string | null;
   recognized: boolean;
+  message?: string | null;
 }
 
 export interface InvoiceUploadResult extends InvoiceUpload {

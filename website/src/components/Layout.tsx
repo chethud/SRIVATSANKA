@@ -158,12 +158,41 @@ export function PageHeader({ title, description }: { title: string; description?
   );
 }
 
-export function StatCard({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
+export function StatCard({
+  label,
+  value,
+  subtext,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  subtext?: string;
+  onClick?: () => void;
+}) {
+  const interactive = Boolean(onClick);
   return (
-    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow">
+    <div
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow ${
+        interactive ? 'cursor-pointer hover:border-[var(--primary)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30' : ''
+      }`}
+    >
       <p className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-semibold mt-2 text-[var(--primary)] tabular-nums">{value}</p>
       {subtext && <p className="text-xs text-[var(--muted)] mt-1">{subtext}</p>}
+      {interactive && <p className="text-xs text-[var(--primary)] mt-2 font-medium">View all →</p>}
     </div>
   );
 }

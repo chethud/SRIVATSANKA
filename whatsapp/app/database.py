@@ -18,6 +18,45 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+def _recreate_invoice_upload_nullable_enquiry(connection) -> None:
+    """SQLite cannot ALTER COLUMN nullability — recreate InvoiceUpload for standalone expenses."""
+    import sqlalchemy as sa
+
+    connection.execute(
+        sa.text(
+            """
+            CREATE TABLE IF NOT EXISTS InvoiceUpload_new (
+                id VARCHAR PRIMARY KEY,
+                enquiryId VARCHAR,
+                docType VARCHAR NOT NULL,
+                fileName VARCHAR NOT NULL,
+                filePath VARCHAR NOT NULL,
+                amount FLOAT,
+                notes TEXT,
+                purpose VARCHAR,
+                expenseDate DATETIME,
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(enquiryId) REFERENCES Enquiry(id) ON DELETE SET NULL
+            )
+            """
+        )
+    )
+    connection.execute(
+        sa.text(
+            """
+            INSERT INTO InvoiceUpload_new (
+                id, enquiryId, docType, fileName, filePath, amount, notes, purpose, expenseDate, createdAt
+            )
+            SELECT
+                id, enquiryId, docType, fileName, filePath, amount, notes, purpose, expenseDate, createdAt
+            FROM InvoiceUpload
+            """
+        )
+    )
+    connection.execute(sa.text("DROP TABLE InvoiceUpload"))
+    connection.execute(sa.text("ALTER TABLE InvoiceUpload_new RENAME TO InvoiceUpload"))
+
+
 async def _migrate_sqlite_columns() -> None:
     """Add new columns to existing SQLite DBs without full reset."""
     import sqlalchemy as sa
@@ -48,11 +87,16 @@ async def _migrate_sqlite_columns() -> None:
                 if "paymentCompleted" not in acols:
                     alters.append("ALTER TABLE WorkerAssignment ADD COLUMN paymentCompleted BOOLEAN DEFAULT 0")
             if "InvoiceUpload" in tables:
-                icols = {c["name"] for c in insp.get_columns("InvoiceUpload")}
-                if "purpose" not in icols:
-                    alters.append("ALTER TABLE InvoiceUpload ADD COLUMN purpose VARCHAR")
-                if "expenseDate" not in icols:
-                    alters.append("ALTER TABLE InvoiceUpload ADD COLUMN expenseDate DATETIME")
+                icols = list(insp.get_columns("InvoiceUpload"))
+                icol_names = {c["name"] for c in icols}
+                if "purpose" not in icol_names:
+                    connection.execute(sa.text("ALTER TABLE InvoiceUpload ADD COLUMN purpose VARCHAR"))
+                if "expenseDate" not in icol_names:
+                    connection.execute(sa.text("ALTER TABLE InvoiceUpload ADD COLUMN expenseDate DATETIME"))
+                icols = list(insp.get_columns("InvoiceUpload"))
+                enquiry_col = next((c for c in icols if c["name"] == "enquiryId"), None)
+                if enquiry_col is not None and enquiry_col.get("nullable") is False:
+                    _recreate_invoice_upload_nullable_enquiry(connection)
             elif "Worker" in tables:
                 connection.execute(
                     sa.text(
