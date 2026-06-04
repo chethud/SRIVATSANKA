@@ -1,29 +1,19 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Bell, Moon, Plus, Search, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
 import { useTheme } from '../context/ThemeContext';
-import { getCreateActionForPath, getCreateButtonLabel, type CreateActionType } from '../utils/createAction';
+import { getCreateActionForPath, getCreateButtonLabel } from '../utils/createAction';
 import { getUnreadNotifications } from '../utils/dashboardData';
-
-const FALLBACK_LINKS = [
-  { to: '/enquiries', label: 'New enquiry' },
-  { to: '/vendors', label: 'New vendor' },
-  { to: '/workers', label: 'New worker' },
-  { to: '/dishes', label: 'New cuisine item' },
-  { to: '/invoices', label: 'Upload invoice' },
-];
 
 export function TopNav() {
   const { notifications, stats } = useAppData();
   const { theme, toggleTheme } = useTheme();
   const { triggerCreate } = useCreateAction();
   const location = useLocation();
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [notifOpen, setNotifOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const unread = getUnreadNotifications(notifications);
   const pageAction = getCreateActionForPath(location.pathname);
@@ -31,21 +21,11 @@ export function TopNav() {
 
   function handleCreate() {
     setNotifOpen(false);
-    if (pageAction) {
-      setMenuOpen(false);
-      triggerCreate(pageAction);
-      requestAnimationFrame(() => {
-        document.getElementById('page-create-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-      return;
-    }
-    setMenuOpen((o) => !o);
-  }
-
-  function goToCreate(path: string, action: CreateActionType) {
-    setMenuOpen(false);
-    navigate(path);
-    setTimeout(() => triggerCreate(action), 120);
+    if (!pageAction) return;
+    triggerCreate(pageAction);
+    requestAnimationFrame(() => {
+      document.getElementById('page-create-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   return (
@@ -63,7 +43,7 @@ export function TopNav() {
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
-          <div className="relative">
+          {pageAction && (
             <button
               type="button"
               onClick={handleCreate}
@@ -72,24 +52,7 @@ export function TopNav() {
               <Plus size={18} />
               <span className="hidden sm:inline">{createLabel}</span>
             </button>
-            {menuOpen && !pageAction && (
-              <div className="absolute right-0 mt-2 w-52 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-md)] z-50">
-                {FALLBACK_LINKS.map((item) => (
-                  <button
-                    key={item.to}
-                    type="button"
-                    className="block w-full text-left px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
-                    onClick={() => {
-                      const action = getCreateActionForPath(item.to);
-                      if (action) goToCreate(item.to, action);
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           <button
             type="button"
@@ -103,7 +66,7 @@ export function TopNav() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => { setNotifOpen((o) => !o); setMenuOpen(false); }}
+              onClick={() => setNotifOpen((o) => !o)}
               className="relative p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-[var(--foreground)]"
             >
               <Bell size={18} />

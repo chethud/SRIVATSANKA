@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft, ChefHat, Clock, MapPin, Phone, Plus, Pencil, FileText, User,
 } from 'lucide-react';
-import type { Dish, Enquiry, EnquiryDish } from '../../api/client';
+import type { Dish, Enquiry, EnquiryDish, Worker } from '../../api/client';
 import {
   addOrderDish,
   formatCurrency,
@@ -12,6 +12,7 @@ import {
 } from '../../api/client';
 import { DishSearchSelect } from '../DishSearchSelect';
 import { Button } from '../Layout';
+import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderMenuItem } from './OrderMenuItem';
 import {
   formatOrderId,
@@ -34,10 +35,12 @@ function splitCategories(categories: string[]): [string[], string[]] {
 export function OrderDetailView({
   order,
   dishes,
+  workers,
   onRefresh,
 }: {
   order: Enquiry;
   dishes: Dish[];
+  workers: Worker[];
   onRefresh: () => void;
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
@@ -299,6 +302,17 @@ export function OrderDetailView({
           </div>
         )}
       </div>
+
+      <OrderDispatchSection
+        orderId={order.id}
+        menuItems={menuItems}
+        byCategory={byCategory}
+        colLeft={colLeft}
+        colRight={colRight}
+        workers={workers}
+        extras={extras}
+        onRefresh={onRefresh}
+      />
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)]">
         <div className="flex items-center justify-between gap-3 mb-5">

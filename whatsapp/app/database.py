@@ -22,21 +22,25 @@ async def _migrate_sqlite_columns() -> None:
     """Add new columns to existing SQLite DBs without full reset."""
     import sqlalchemy as sa
 
-    from app.models import EnquiryDish
+    from app.models import EnquiryDish, Worker
 
     async with engine.begin() as conn:
         def run(connection):
             insp = sa.inspect(connection)
-            if "EnquiryDish" not in insp.get_table_names():
-                return
-            cols = {c["name"] for c in insp.get_columns("EnquiryDish")}
-            alters = []
-            if "quantity" not in cols:
-                alters.append("ALTER TABLE EnquiryDish ADD COLUMN quantity INTEGER DEFAULT 1")
-            if "unitPrice" not in cols:
-                alters.append("ALTER TABLE EnquiryDish ADD COLUMN unitPrice FLOAT")
-            if "served" not in cols:
-                alters.append("ALTER TABLE EnquiryDish ADD COLUMN served BOOLEAN DEFAULT 0")
+            tables = insp.get_table_names()
+            alters: list[str] = []
+            if "EnquiryDish" in tables:
+                cols = {c["name"] for c in insp.get_columns("EnquiryDish")}
+                if "quantity" not in cols:
+                    alters.append("ALTER TABLE EnquiryDish ADD COLUMN quantity INTEGER DEFAULT 1")
+                if "unitPrice" not in cols:
+                    alters.append("ALTER TABLE EnquiryDish ADD COLUMN unitPrice FLOAT")
+                if "served" not in cols:
+                    alters.append("ALTER TABLE EnquiryDish ADD COLUMN served BOOLEAN DEFAULT 0")
+            if "Worker" in tables:
+                wcols = {c["name"] for c in insp.get_columns("Worker")}
+                if "isLead" not in wcols:
+                    alters.append("ALTER TABLE Worker ADD COLUMN isLead BOOLEAN DEFAULT 0")
             for sql in alters:
                 connection.execute(sa.text(sql))
 

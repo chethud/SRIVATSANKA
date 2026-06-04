@@ -26,10 +26,7 @@ export default function VendorsPage() {
 
   return (
     <>
-      <PageHeader title="Vendor Directory" description={`${vendors.length} vendors — add & delete live`} />
-      <div className="mb-6">
-        <Button onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add Vendor'}</Button>
-      </div>
+      <PageHeader title="Vendor Directory" description={`${vendors.length} vendors — use header New vendor to add`} />
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6 animate-slide-up">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -40,7 +37,10 @@ export default function VendorsPage() {
               {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
             </select>
             <input placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="px-3 py-2 border rounded-lg md:col-span-2" />
-            <Button type="submit">Save Vendor</Button>
+            <div className="flex gap-2 md:col-span-2">
+              <Button type="submit">Save Vendor</Button>
+              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2.5 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)]">Cancel</button>
+            </div>
           </form>
         </Card>
       )}

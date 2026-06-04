@@ -54,10 +54,7 @@ export default function DishesPage() {
 
   return (
     <>
-      <PageHeader title="Cuisine" description={`${dishes.length} menu items — manage cuisine types and menu catalog`} />
-      <div className="mb-6">
-        <Button onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add Extra Dish'}</Button>
-      </div>
+      <PageHeader title="Cuisine" description={`${dishes.length} menu items — use header New cuisine item to add`} />
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -67,7 +64,16 @@ export default function DishesPage() {
             </select>
             <input required type="number" placeholder="Price (₹)" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="px-3 py-2 border rounded-lg" />
             <input placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-3 py-2 border rounded-lg" />
-            <Button type="submit">Save to menu</Button>
+            <div className="flex gap-2 md:col-span-2">
+              <Button type="submit">Save to menu</Button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2.5 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)]"
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         </Card>
       )}

@@ -1,10 +1,23 @@
+export type DispatchItemStatus = 'pending' | 'packed' | 'dispatched' | 'served';
+export type DispatchPhase = 'planned' | 'preparing' | 'out_for_delivery' | 'completed';
+
 export type OrderExtras = {
   dietary: string[];
   liveCounters: string[];
   addOns: string[];
+  primaryWorkerId?: string | null;
+  dispatchPhase?: DispatchPhase;
+  itemDispatch?: Record<string, DispatchItemStatus>;
 };
 
-const EMPTY: OrderExtras = { dietary: [], liveCounters: [], addOns: [] };
+const EMPTY: OrderExtras = {
+  dietary: [],
+  liveCounters: [],
+  addOns: [],
+  primaryWorkerId: null,
+  dispatchPhase: 'planned',
+  itemDispatch: {},
+};
 
 export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
   if (!notes?.trim()) return { ...EMPTY };
@@ -15,6 +28,9 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         dietary: Array.isArray(parsed.dietary) ? parsed.dietary.filter(Boolean) : [],
         liveCounters: Array.isArray(parsed.liveCounters) ? parsed.liveCounters.filter(Boolean) : [],
         addOns: Array.isArray(parsed.addOns) ? parsed.addOns.filter(Boolean) : [],
+        primaryWorkerId: parsed.primaryWorkerId ?? null,
+        dispatchPhase: parsed.dispatchPhase ?? 'planned',
+        itemDispatch: parsed.itemDispatch ?? {},
       };
     }
   } catch {

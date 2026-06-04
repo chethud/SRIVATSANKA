@@ -131,6 +131,7 @@ class Worker(Base):
     phoneNumber: Mapped[str] = mapped_column(String)
     role: Mapped[str] = mapped_column(String)
     dailyWage: Mapped[float] = mapped_column(Float, default=0)
+    isLead: Mapped[bool] = mapped_column(Boolean, default=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

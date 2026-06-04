@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Expense, Vendor, Worker
-from app.schemas import AnalyticsOut, ExpenseIn, ExpenseOut, VendorIn, VendorOut, WorkerIn, WorkerOut
+from app.schemas import AnalyticsOut, ExpenseIn, ExpenseOut, VendorIn, VendorOut, WorkerIn, WorkerOut, WorkerUpdateIn
 
 router = APIRouter(prefix="/api", tags=["resources"])
 
@@ -63,7 +63,7 @@ async def list_workers(db: AsyncSession = Depends(get_db)) -> list[WorkerOut]:
     return [
         WorkerOut(
             id=w.id, name=w.name, phoneNumber=w.phoneNumber,
-            role=w.role, dailyWage=w.dailyWage, createdAt=w.createdAt,
+            role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
         )
         for w in result.scalars().all()
     ]
@@ -77,7 +77,30 @@ async def create_worker(payload: WorkerIn, db: AsyncSession = Depends(get_db)) -
     await db.refresh(w)
     return WorkerOut(
         id=w.id, name=w.name, phoneNumber=w.phoneNumber,
-        role=w.role, dailyWage=w.dailyWage, createdAt=w.createdAt,
+        role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
+    )
+
+
+@router.patch("/workers/{worker_id}", response_model=WorkerOut)
+async def update_worker(
+    worker_id: str,
+    payload: WorkerUpdateIn,
+    db: AsyncSession = Depends(get_db),
+) -> WorkerOut:
+    w = await db.get(Worker, worker_id)
+    if not w:
+        raise HTTPException(404, "Worker not found")
+    if payload.isLead is not None:
+        if payload.isLead:
+            others = await db.execute(select(Worker).where(Worker.id != worker_id))
+            for other in others.scalars().all():
+                other.isLead = False
+        w.isLead = payload.isLead
+    await db.commit()
+    await db.refresh(w)
+    return WorkerOut(
+        id=w.id, name=w.name, phoneNumber=w.phoneNumber,
+        role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
     )
 
 

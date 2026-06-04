@@ -6,7 +6,7 @@ import { useAppData } from '../context/AppDataContext';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { enquiries, dishes, refresh } = useAppData();
+  const { enquiries, dishes, workers, refresh } = useAppData();
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
 
   if (!order) {
@@ -20,5 +20,5 @@ export default function OrderDetailPage() {
     );
   }
 
-  return <OrderDetailView order={order} dishes={dishes} onRefresh={refresh} />;
+  return <OrderDetailView order={order} dishes={dishes} workers={workers} onRefresh={refresh} />;
 }

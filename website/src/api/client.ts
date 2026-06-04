@@ -71,6 +71,7 @@ export interface Worker {
   phoneNumber: string;
   role: string;
   dailyWage: number;
+  isLead?: boolean;
   createdAt: string;
 }
 
@@ -262,6 +263,14 @@ export async function deleteVendor(id: string) {
 export async function createWorker(data: Omit<Worker, 'id' | 'createdAt'>) {
   return apiFetch<Worker>('/api/workers', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateWorker(id: string, data: { isLead?: boolean }) {
+  return apiFetch<Worker>(`/api/workers/${id}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });

@@ -167,6 +167,11 @@ class WorkerIn(BaseModel):
     phoneNumber: str
     role: str
     dailyWage: float = 0
+    isLead: bool = False
+
+
+class WorkerUpdateIn(BaseModel):
+    isLead: bool | None = None
 
 
 class WorkerOut(WorkerIn):
