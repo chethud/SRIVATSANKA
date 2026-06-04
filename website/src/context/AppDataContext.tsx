@@ -75,9 +75,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setAnalytics(a);
       setError('');
       setLastSync(new Date());
-    } catch {
+    } catch (err) {
       setConnected(false);
-      setError('Failed to load data from API.');
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('sign in') || msg.includes('Session expired')) {
+        setError('Session expired. Please sign in again.');
+      } else {
+        setError(msg || 'Failed to load data from API.');
+      }
     } finally {
       setLoading(false);
     }

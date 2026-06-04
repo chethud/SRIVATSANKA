@@ -225,19 +225,31 @@ async function apiErrorMessage(res: Response, path: string): Promise<string> {
   return `Request failed (${res.status}) at ${path}`;
 }
 
+function redirectToLoginIfNeeded(path: string): void {
+  if (path === '/api/auth/me') return;
+  setAuthToken(null);
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    window.location.assign('/login');
+  }
+}
+
+async function parseApiResponse<T>(res: Response, path: string): Promise<T> {
+  if (res.status === 401) {
+    redirectToLoginIfNeeded(path);
+    throw new Error(
+      path === '/api/auth/me' ? 'Session expired' : 'Session expired. Please sign in again.',
+    );
+  }
+  if (!res.ok) throw new Error(await apiErrorMessage(res, path));
+  return res.json();
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: authHeaders(options?.headers),
   });
-  if (res.status === 401 && path !== '/api/auth/me') {
-    setAuthToken(null);
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      window.location.assign('/login');
-    }
-  }
-  if (!res.ok) throw new Error(await apiErrorMessage(res, path));
-  return res.json();
+  return parseApiResponse<T>(res, path);
 }
 
 export async function checkApiHealth(): Promise<boolean> {
@@ -350,8 +362,7 @@ export async function recognizeExpenseInvoice(file: File): Promise<InvoiceRecogn
     body: fd,
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Recognize failed');
-  return res.json();
+  return parseApiResponse<InvoiceRecognizePreview>(res, '/api/invoices/recognize');
 }
 
 export async function confirmExpenseInvoice(data: {

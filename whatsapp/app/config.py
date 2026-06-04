@@ -42,8 +42,10 @@ class Settings(BaseSettings):
 def _load_settings() -> Settings:
     s = Settings()
     # Strip quotes if present in .env
-    if s.gemini_api_key:
-        s.gemini_api_key = s.gemini_api_key.strip().strip('"').strip("'")
+    for attr in ("gemini_api_key", "jwt_secret", "dashboard_password"):
+        val = getattr(s, attr, None)
+        if val and isinstance(val, str):
+            setattr(s, attr, val.strip().strip('"').strip("'"))
     return s
 
 
