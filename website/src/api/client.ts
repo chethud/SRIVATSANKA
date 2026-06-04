@@ -286,6 +286,8 @@ export interface WorkerAssignment {
   enquiryId: string | null;
   dutyDate: string;
   dutyType: string;
+  wage: number;
+  paymentCompleted: boolean;
   notes: string | null;
   createdAt: string;
   customerName: string | null;
@@ -299,6 +301,7 @@ export interface WorkerProfile {
   assignments: WorkerAssignment[];
   totalDuties: number;
   upcomingDuties: number;
+  totalWagesEarned: number;
 }
 
 export async function fetchWorkerProfile(workerId: string) {
@@ -307,12 +310,20 @@ export async function fetchWorkerProfile(workerId: string) {
 
 export async function createWorkerAssignment(
   workerId: string,
-  data: { enquiryId?: string | null; dutyDate: string; dutyType: string; notes?: string },
+  data: { enquiryId?: string | null; dutyDate: string; dutyType: string; wage?: number; notes?: string },
 ) {
   return apiFetch<WorkerAssignment>(`/api/workers/${workerId}/assignments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+  });
+}
+
+export async function markWorkerAssignmentPaid(workerId: string, assignmentId: string) {
+  return apiFetch<WorkerAssignment>(`/api/workers/${workerId}/assignments/${assignmentId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentCompleted: true }),
   });
 }
 

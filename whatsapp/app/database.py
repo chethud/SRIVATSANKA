@@ -41,7 +41,13 @@ async def _migrate_sqlite_columns() -> None:
                 wcols = {c["name"] for c in insp.get_columns("Worker")}
                 if "isLead" not in wcols:
                     alters.append("ALTER TABLE Worker ADD COLUMN isLead BOOLEAN DEFAULT 0")
-            if "WorkerAssignment" not in tables:
+            if "WorkerAssignment" in tables:
+                acols = {c["name"] for c in insp.get_columns("WorkerAssignment")}
+                if "wage" not in acols:
+                    alters.append("ALTER TABLE WorkerAssignment ADD COLUMN wage FLOAT DEFAULT 0")
+                if "paymentCompleted" not in acols:
+                    alters.append("ALTER TABLE WorkerAssignment ADD COLUMN paymentCompleted BOOLEAN DEFAULT 0")
+            elif "Worker" in tables:
                 connection.execute(
                     sa.text(
                         """
@@ -51,6 +57,8 @@ async def _migrate_sqlite_columns() -> None:
                             enquiryId VARCHAR,
                             dutyDate DATETIME NOT NULL,
                             dutyType VARCHAR NOT NULL,
+                            wage FLOAT DEFAULT 0,
+                            paymentCompleted BOOLEAN DEFAULT 0,
                             notes TEXT,
                             createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                             FOREIGN KEY(workerId) REFERENCES Worker(id) ON DELETE CASCADE,

@@ -59,13 +59,10 @@ export function OrderDispatchSection({
 }) {
   const [saving, setSaving] = useState(false);
 
-  const sortedWorkers = useMemo(() => {
-    return [...workers].sort((a, b) => {
-      if (a.isLead && !b.isLead) return -1;
-      if (!a.isLead && b.isLead) return 1;
-      return a.name.localeCompare(b.name);
-    });
-  }, [workers]);
+  const sortedWorkers = useMemo(
+    () => [...workers].sort((a, b) => a.name.localeCompare(b.name)),
+    [workers],
+  );
 
   const primaryWorker = workers.find((w) => w.id === extras.primaryWorkerId);
 
@@ -147,7 +144,7 @@ export function OrderDispatchSection({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="md:col-span-2">
           <label className="text-xs font-semibold text-[var(--order-accent)] uppercase tracking-wide flex items-center gap-1 mb-2">
-            <User size={14} /> Primary worker (प्रधान)
+            <User size={14} /> Assigned worker
           </label>
           <select
             value={extras.primaryWorkerId ?? ''}
@@ -158,7 +155,7 @@ export function OrderDispatchSection({
             <option value="">Assign lead worker…</option>
             {sortedWorkers.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name} — {w.role}{(w.isLead ?? false) ? ' ★ Lead' : ''}
+                {w.name} — {w.role}
               </option>
             ))}
           </select>

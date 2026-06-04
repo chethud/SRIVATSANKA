@@ -8,6 +8,7 @@ import OrderCopyPage from './pages/OrderCopyPage';
 import DishesPage from './pages/DishesPage';
 import VendorsPage from './pages/VendorsPage';
 import WorkersPage from './pages/WorkersPage';
+import WorkerDetailPage from './pages/WorkerDetailPage';
 import InvoicesPage from './pages/InvoicesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AIAssistantPage from './pages/AIAssistantPage';
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="dishes" element={<DishesPage />} />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="workers" element={<WorkersPage />} />
+        <Route path="workers/:workerId" element={<WorkerDetailPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="ai-assistant" element={<AIAssistantPage />} />

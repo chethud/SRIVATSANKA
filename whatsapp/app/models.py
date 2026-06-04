@@ -149,6 +149,8 @@ class WorkerAssignment(Base):
     )
     dutyDate: Mapped[datetime] = mapped_column(DateTime)
     dutyType: Mapped[str] = mapped_column(String)
+    wage: Mapped[float] = mapped_column(Float, default=0)
+    paymentCompleted: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

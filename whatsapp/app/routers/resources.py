@@ -14,6 +14,7 @@ from app.schemas import (
     VendorOut,
     WorkerAssignmentIn,
     WorkerAssignmentOut,
+    WorkerAssignmentPatchIn,
     WorkerIn,
     WorkerOut,
     WorkerProfileOut,
@@ -126,6 +127,8 @@ def _assignment_out(a: WorkerAssignment, enquiry: Enquiry | None) -> WorkerAssig
         enquiryId=a.enquiryId,
         dutyDate=a.dutyDate,
         dutyType=a.dutyType,
+        wage=float(a.wage or 0),
+        paymentCompleted=bool(a.paymentCompleted),
         notes=a.notes,
         createdAt=a.createdAt,
         customerName=enquiry.customerName if enquiry else None,
@@ -151,7 +154,10 @@ async def get_worker_profile(worker_id: str, db: AsyncSession = Depends(get_db))
     assignments = [_assignment_out(a, e) for a, e in rows]
 
     now = datetime.now()
-    upcoming = sum(1 for a in assignments if a.dutyDate >= now.replace(hour=0, minute=0, second=0, microsecond=0))
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    pending = [(a, e) for a, e in rows if not a.paymentCompleted]
+    upcoming = sum(1 for a, _ in pending if a.dutyDate >= day_start)
+    total_wages = sum(float(a.wage or 0) for a, _ in pending)
 
     return WorkerProfileOut(
         worker=WorkerOut(
@@ -159,8 +165,9 @@ async def get_worker_profile(worker_id: str, db: AsyncSession = Depends(get_db))
             role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
         ),
         assignments=assignments,
-        totalDuties=len(assignments),
+        totalDuties=len(pending),
         upcomingDuties=upcoming,
+        totalWagesEarned=total_wages,
     )
 
 
@@ -185,6 +192,7 @@ async def create_worker_assignment(
         enquiryId=payload.enquiryId,
         dutyDate=payload.dutyDate,
         dutyType=payload.dutyType.strip(),
+        wage=max(0.0, float(payload.wage or 0)),
         notes=payload.notes,
     )
     db.add(row)
@@ -192,6 +200,24 @@ async def create_worker_assignment(
     await db.refresh(row)
     if not enquiry and row.enquiryId:
         enquiry = await db.get(Enquiry, row.enquiryId)
+    return _assignment_out(row, enquiry)
+
+
+@router.patch("/workers/{worker_id}/assignments/{assignment_id}", response_model=WorkerAssignmentOut)
+async def patch_worker_assignment(
+    worker_id: str,
+    assignment_id: str,
+    payload: WorkerAssignmentPatchIn,
+    db: AsyncSession = Depends(get_db),
+) -> WorkerAssignmentOut:
+    row = await db.get(WorkerAssignment, assignment_id)
+    if not row or row.workerId != worker_id:
+        raise HTTPException(404, "Assignment not found")
+    if payload.paymentCompleted is not None:
+        row.paymentCompleted = payload.paymentCompleted
+    await db.commit()
+    await db.refresh(row)
+    enquiry = await db.get(Enquiry, row.enquiryId) if row.enquiryId else None
     return _assignment_out(row, enquiry)
 
 

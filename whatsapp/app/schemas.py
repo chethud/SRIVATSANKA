@@ -183,7 +183,12 @@ class WorkerAssignmentIn(BaseModel):
     enquiryId: str | None = None
     dutyDate: datetime
     dutyType: str
+    wage: float = 0
     notes: str | None = None
+
+
+class WorkerAssignmentPatchIn(BaseModel):
+    paymentCompleted: bool | None = None
 
 
 class WorkerAssignmentOut(BaseModel):
@@ -192,6 +197,8 @@ class WorkerAssignmentOut(BaseModel):
     enquiryId: str | None = None
     dutyDate: datetime
     dutyType: str
+    wage: float = 0
+    paymentCompleted: bool = False
     notes: str | None = None
     createdAt: datetime
     customerName: str | None = None
@@ -207,6 +214,7 @@ class WorkerProfileOut(BaseModel):
     assignments: list[WorkerAssignmentOut]
     totalDuties: int
     upcomingDuties: int
+    totalWagesEarned: float = 0
 
 
 class ExpenseIn(BaseModel):
