@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import AgentTurnResult
-from app.services.agent_media import is_conversation_start, send_welcome_media
 from app.services.ai_agent import AIAgent, _all_fields_filled
+from app.services.guided_flow import process_guided_flow
 from app.services.dish_flow import handle_dish_flow, start_dish_flow
 from app.services.enquiry_service import save_enquiry
-from app.services.session_store import ConversationPhase, ConversationSession, session_store
+from app.services.session_store import ConversationPhase, GuidedStep, session_store
 
 ai_agent = AIAgent()
 
@@ -19,7 +19,7 @@ async def handle_conversation(
     if user_text.strip().lower() in {"new", "start over", "restart"}:
         session_store.reset(whatsapp_id)
         session = session_store.get(whatsapp_id)
-        user_text = "Hi, I'd like to enquire about catering"
+        user_text = "Hi"
 
     if session.completed and session._saved:
         return (
@@ -42,10 +42,15 @@ async def handle_conversation(
             return result, True
         return result, False
 
-    if is_conversation_start(session, user_text):
-        await send_welcome_media(whatsapp_id, session)
+    if session.phase == ConversationPhase.ENQUIRY and session.guided_step != GuidedStep.DONE:
+        guided = await process_guided_flow(session, whatsapp_id, user_text)
+        if guided is not None:
+            if guided.enquiry_fields_complete:
+                dish_result = await start_dish_flow(session, db)
+                return dish_result, False
+            return guided, False
 
-    # Agent-led enquiry conversation
+    # Agent-led enquiry (fallback if guided flow completed without all fields)
     result = await ai_agent.process_message(session, user_text)
 
     if _all_fields_filled(session.fields) and session.phase == ConversationPhase.ENQUIRY:

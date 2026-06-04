@@ -47,4 +47,5 @@ async def simulate_message(
         is_complete=result.is_complete,
         fields=result.fields,
         enquiry_saved=enquiry_saved,
+        media=result.media,
     )

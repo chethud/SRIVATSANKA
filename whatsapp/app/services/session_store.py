@@ -12,6 +12,15 @@ class ConversationPhase(str, Enum):
     DONE = "done"
 
 
+class GuidedStep(str, Enum):
+    AWAIT_HI = "await_hi"
+    AWAIT_NAME = "await_name"
+    AWAIT_EVENT_TYPE = "await_event_type"
+    AWAIT_POST_SHOWCASE = "await_post_showcase"
+    COLLECT_DETAILS = "collect_details"
+    DONE = "done"
+
+
 @dataclass
 class ConversationSession:
     whatsapp_id: str
@@ -24,6 +33,7 @@ class ConversationSession:
     selected_dishes: list[SelectedDishItem] = field(default_factory=list)
     customization_dish_index: int = 0
     welcome_media_sent: bool = False
+    guided_step: GuidedStep = GuidedStep.AWAIT_HI
     _saved: bool = False
 
 

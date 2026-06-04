@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Send } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
-import { testBotMessage } from '../api/client';
+import { testBotMessage, type BotTestResponse } from '../api/client';
 
 interface ChatMessage {
   role: 'user' | 'bot';
   text: string;
+  media?: BotTestResponse['media'];
 }
 
 export default function BotTesterPage() {
@@ -24,7 +25,10 @@ export default function BotTesterPage() {
 
     try {
       const res = await testBotMessage(phone, text);
-      setMessages((prev) => [...prev, { role: 'bot', text: res.reply }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'bot', text: res.reply, media: res.media },
+      ]);
       if (res.enquiry_saved) refresh();
     } catch {
       setMessages((prev) => [
@@ -43,26 +47,46 @@ export default function BotTesterPage() {
         description="Simulate customer conversations with the FastAPI AI agent"
       />
       <p className="text-sm text-[var(--muted)] mb-4">
-        Full flow: event details → dish categories → dish selection → customizations → saved to Enquiries page.
-        Send <strong>new</strong> to restart. Use a new phone number for a fresh session.
+        Flow: Hi → name → company → event type → photos → ask questions freely → reply <strong>ok</strong> →
+        event details → cuisine. Send <strong>new</strong> to restart.
       </p>
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col h-[520px] max-w-2xl">
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.length === 0 ? (
             <p className="text-[var(--muted)] text-center mt-16">
-              Try: &quot;Hi&quot; then answer each question, then pick categories like &quot;1,5&quot; and dishes like &quot;1,2&quot;
+              Start with &quot;Hi&quot; — after event photos you can ask questions before typing &quot;ok&quot;.
             </p>
           ) : (
             messages.map((msg, i) => (
               <div
                 key={i}
-                className={`max-w-[85%] p-3 rounded-xl text-sm whitespace-pre-wrap ${
-                  msg.role === 'user'
-                    ? 'ml-auto bg-[#dcf8c6] text-[#111]'
-                    : 'bg-[var(--background)] border border-[var(--border)]'
-                }`}
+                className={`max-w-[85%] ${msg.role === 'user' ? 'ml-auto' : ''}`}
               >
-                {msg.text}
+                <div
+                  className={`p-3 rounded-xl text-sm whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-[#dcf8c6] text-[#111]'
+                      : 'bg-[var(--background)] border border-[var(--border)]'
+                  }`}
+                >
+                  {msg.text}
+                </div>
+                {msg.media && msg.media.length > 0 && (
+                  <div className="mt-2 grid grid-cols-1 gap-2">
+                    {msg.media.map((m, j) => (
+                      <figure key={j} className="rounded-lg overflow-hidden border border-[var(--border)]">
+                        <img
+                          src={m.url}
+                          alt={m.caption || 'Event photo'}
+                          className="w-full max-h-48 object-cover"
+                        />
+                        {m.caption && (
+                          <figcaption className="text-xs p-2 text-[var(--muted)]">{m.caption}</figcaption>
+                        )}
+                      </figure>
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}

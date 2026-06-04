@@ -164,7 +164,10 @@ class AIAgent:
             session.completed = False
             session.history = []
             session.welcome_media_sent = False
-            user_text = "Hi, I'd like to plan an event with SRIVATSANKA"
+            from app.services.session_store import GuidedStep
+
+            session.guided_step = GuidedStep.AWAIT_HI
+            user_text = "Hi"
 
         if session.completed:
             return AgentTurnResult(

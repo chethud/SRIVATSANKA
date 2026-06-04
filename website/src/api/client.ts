@@ -141,6 +141,7 @@ export interface BotTestResponse {
   is_complete: boolean;
   enquiry_saved?: boolean;
   fields: Record<string, unknown>;
+  media?: { url: string; caption?: string | null }[];
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {

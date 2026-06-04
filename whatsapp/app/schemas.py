@@ -21,11 +21,17 @@ class SelectedDishItem(BaseModel):
     notes: str | None = None
 
 
+class MediaAttachment(BaseModel):
+    url: str
+    caption: str | None = None
+
+
 class AgentTurnResult(BaseModel):
     reply: str
     fields: EnquiryFields = Field(default_factory=EnquiryFields)
     is_complete: bool = False
     enquiry_fields_complete: bool = False
+    media: list[MediaAttachment] = Field(default_factory=list)
 
 
 class EnquiryDishOut(BaseModel):
@@ -298,6 +304,7 @@ class DevMessageResponse(BaseModel):
     is_complete: bool
     fields: EnquiryFields
     enquiry_saved: bool = False
+    media: list[MediaAttachment] = Field(default_factory=list)
 
 
 class AIAssistantRequest(BaseModel):

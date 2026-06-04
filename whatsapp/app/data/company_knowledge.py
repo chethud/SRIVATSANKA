@@ -63,6 +63,106 @@ WELCOME_IMAGE_CAPTIONS = [
     "Traditional touch with premium hospitality 💚",
 ]
 
+EVENT_TYPE_DETAILS: dict[str, dict] = {
+    "Wedding": {
+        "title": "Wedding Catering",
+        "description": (
+            "Multi-day wedding menus with South Indian, North Indian & Kerala favourites — "
+            "live counters, Dumrot, Badam Puri, chaat, and elegant service for family & guests."
+        ),
+        "image_captions": [
+            "Wedding feast — pure veg spread 🍽️",
+            "Live counters & traditional sweets ✨",
+            "Elegant plating for your big day 💚",
+        ],
+    },
+    "House Warming": {
+        "title": "House Warming",
+        "description": (
+            "Warm homely menus with snacks, meals, and desserts — perfect for griha pravesham "
+            "with neighbours and close family."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "Baby Shower": {
+        "title": "Baby Shower",
+        "description": (
+            "Light, festive menus with snacks, sweets, and refreshing beverages — "
+            "beautiful presentation for celebrating the new arrival."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "Reception": {
+        "title": "Reception",
+        "description": (
+            "Grand reception dining with multi-cuisine veg spreads, live counters, and "
+            "smooth service for large guest lists."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "Corporate events": {
+        "title": "Corporate Events",
+        "description": (
+            "Professional catering for office lunches, conferences, and team events — "
+            "hygienic, on-time, and customisable pure-veg menus."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "Naming Ceremony": {
+        "title": "Naming Ceremony",
+        "description": (
+            "Traditional naming ceremony menus with homely meals, sweets, and snacks for family and guests."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "Upanayanam": {
+        "title": "Upanayanam",
+        "description": (
+            "Sacred ceremony catering with sattvic pure-veg meals prepared with care for family gatherings."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "General": {
+        "title": "Celebration Catering",
+        "description": (
+            "Custom pure-veg menus for naming ceremonies, upanayanam, birthdays, and family functions — "
+            "we plan every detail with you."
+        ),
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+}
+
+
+def match_event_type(text: str) -> str:
+    """Map customer text to a known event type."""
+    lower = text.lower().strip()
+    aliases = {
+        "wedding": "Wedding",
+        "marriage": "Wedding",
+        "reception": "Reception",
+        "house warming": "House Warming",
+        "housewarming": "House Warming",
+        "griha": "House Warming",
+        "baby shower": "Baby Shower",
+        "seemantham": "Baby Shower",
+        "naming": "Naming Ceremony",
+        "naming ceremony": "Naming Ceremony",
+        "upanayanam": "Upanayanam",
+        "corporate": "Corporate events",
+        "office": "Corporate events",
+        "lunch": "Corporate events",
+        "birthday": "General",
+    }
+    for key, canonical in aliases.items():
+        if key in lower:
+            if canonical == "Naming Ceremony" or canonical == "Upanayanam":
+                return canonical
+            return canonical
+    for event in EVENT_TYPES:
+        if event.lower() in lower:
+            return event
+    return "General"
+
 
 def build_agent_context() -> str:
     """Compact knowledge block injected into the Gemini system prompt."""
