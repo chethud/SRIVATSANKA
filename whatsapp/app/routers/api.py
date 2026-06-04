@@ -7,12 +7,13 @@ from sqlalchemy.orm import selectinload
 
 from app.data.seed_dishes import CATEGORY_LABELS
 from app.database import get_db
-from app.models import Dish, Enquiry, EnquiryStatus, Expense, Notification, Vendor, Worker
+from app.models import Dish, Enquiry, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
 from app.schemas import (
     AIAssistantRequest,
     AIAssistantResponse,
     DashboardStats,
     DishOut,
+    EnquiryCreateIn,
     EnquiryDishOut,
     EnquiryOut,
     NotificationOut,
@@ -116,6 +117,42 @@ async def list_dishes(db: AsyncSession = Depends(get_db)) -> list[DishOut]:
         )
         for d in dishes
     ]
+
+
+@router.post("/enquiries", response_model=EnquiryOut)
+async def create_enquiry(
+    payload: EnquiryCreateIn,
+    db: AsyncSession = Depends(get_db),
+) -> EnquiryOut:
+    """Owner-created enquiry (walk-in, phone, email — not from WhatsApp)."""
+    enquiry = Enquiry(
+        customerName=payload.customerName.strip(),
+        phoneNumber=payload.phoneNumber.strip(),
+        eventType=payload.eventType.strip(),
+        eventDate=payload.eventDate,
+        eventLocation=payload.eventLocation.strip(),
+        guestCount=max(1, payload.guestCount),
+        preferredCallbackAt=payload.preferredCallbackAt,
+        status=EnquiryStatus.NEW,
+        notes=payload.notes or "Created manually by owner",
+    )
+    db.add(enquiry)
+    await db.flush()
+    db.add(
+        Notification(
+            type=NotificationType.NEW_ENQUIRY,
+            title="New Enquiry",
+            message=f"{enquiry.customerName} – {enquiry.eventType} (manual)",
+        )
+    )
+    await db.commit()
+    result = await db.execute(
+        select(Enquiry)
+        .options(selectinload(Enquiry.dish_items))
+        .where(Enquiry.id == enquiry.id)
+    )
+    row = result.scalar_one()
+    return _enquiry_to_out(row)
 
 
 @router.get("/enquiries", response_model=list[EnquiryOut])

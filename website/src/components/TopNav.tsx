@@ -1,18 +1,52 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Moon, Plus, Search, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
+import { useCreateAction } from '../context/CreateActionContext';
 import { useTheme } from '../context/ThemeContext';
+import { getCreateActionForPath, getCreateButtonLabel, type CreateActionType } from '../utils/createAction';
 import { getUnreadNotifications } from '../utils/dashboardData';
+
+const FALLBACK_LINKS = [
+  { to: '/enquiries', label: 'New enquiry' },
+  { to: '/vendors', label: 'New vendor' },
+  { to: '/workers', label: 'New worker' },
+  { to: '/dishes', label: 'New dish' },
+  { to: '/invoices', label: 'Upload invoice' },
+];
 
 export function TopNav() {
   const { notifications, stats } = useAppData();
   const { theme, toggleTheme } = useTheme();
+  const { triggerCreate } = useCreateAction();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [notifOpen, setNotifOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const unread = getUnreadNotifications(notifications);
+  const pageAction = getCreateActionForPath(location.pathname);
+  const createLabel = getCreateButtonLabel(location.pathname);
+
+  function handleCreate() {
+    setNotifOpen(false);
+    if (pageAction) {
+      setMenuOpen(false);
+      triggerCreate(pageAction);
+      requestAnimationFrame(() => {
+        document.getElementById('page-create-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return;
+    }
+    setMenuOpen((o) => !o);
+  }
+
+  function goToCreate(path: string, action: CreateActionType) {
+    setMenuOpen(false);
+    navigate(path);
+    setTimeout(() => triggerCreate(action), 120);
+  }
 
   return (
     <header className="sticky top-0 z-30 mb-6 -mx-1 px-1">
@@ -32,17 +66,27 @@ export function TopNav() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => { setCreateOpen((o) => !o); setNotifOpen(false); }}
+              onClick={handleCreate}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm"
             >
               <Plus size={18} />
-              <span className="hidden sm:inline">Create</span>
+              <span className="hidden sm:inline">{createLabel}</span>
             </button>
-            {createOpen && (
-              <div className="absolute right-0 mt-2 w-48 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-md)] z-50">
-                <Link to="/enquiries" className="block px-4 py-2 text-sm hover:bg-[var(--sidebar-hover)]" onClick={() => setCreateOpen(false)}>New enquiry</Link>
-                <Link to="/orders" className="block px-4 py-2 text-sm hover:bg-[var(--sidebar-hover)]" onClick={() => setCreateOpen(false)}>View orders</Link>
-                <Link to="/invoices" className="block px-4 py-2 text-sm hover:bg-[var(--sidebar-hover)]" onClick={() => setCreateOpen(false)}>Upload invoice</Link>
+            {menuOpen && !pageAction && (
+              <div className="absolute right-0 mt-2 w-52 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-md)] z-50">
+                {FALLBACK_LINKS.map((item) => (
+                  <button
+                    key={item.to}
+                    type="button"
+                    className="block w-full text-left px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
+                    onClick={() => {
+                      const action = getCreateActionForPath(item.to);
+                      if (action) goToCreate(item.to, action);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -50,7 +94,7 @@ export function TopNav() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors"
+            className="p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-[var(--foreground)]"
             aria-label="Toggle theme"
           >
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -59,8 +103,8 @@ export function TopNav() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => { setNotifOpen((o) => !o); setCreateOpen(false); }}
-              className="relative p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors"
+              onClick={() => { setNotifOpen((o) => !o); setMenuOpen(false); }}
+              className="relative p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-[var(--foreground)]"
             >
               <Bell size={18} />
               {(stats?.unread_notifications ?? 0) > 0 && (
@@ -76,7 +120,7 @@ export function TopNav() {
                   <p className="px-4 py-6 text-sm text-[var(--muted)]">No new notifications</p>
                 ) : (
                   unread.map((n) => (
-                    <div key={n.id} className="px-4 py-3 border-b border-[var(--border)] last:border-0 text-sm">
+                    <div key={n.id} className="px-4 py-3 border-b border-[var(--border)] last:border-0 text-sm text-[var(--foreground)]">
                       <p className="font-medium">{n.title}</p>
                       <p className="text-xs text-[var(--muted)] mt-0.5 line-clamp-2">{n.message}</p>
                     </div>

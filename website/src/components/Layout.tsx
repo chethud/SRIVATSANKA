@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useTheme } from '../context/ThemeContext';
+import { CreateActionProvider } from '../context/CreateActionContext';
 import { LayoutProvider, useLayout } from '../context/LayoutContext';
 import { BrandLogo } from './BrandLogo';
 import { TopNav } from './TopNav';
@@ -141,7 +142,9 @@ function DashboardLayoutInner() {
 export function DashboardLayout() {
   return (
     <LayoutProvider>
-      <DashboardLayoutInner />
+      <CreateActionProvider>
+        <DashboardLayoutInner />
+      </CreateActionProvider>
     </LayoutProvider>
   );
 }

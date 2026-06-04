@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { createDish } from '../api/client';
+import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { SearchInput, FilterChips } from '../components/ui';
 
 const CATEGORIES = [
@@ -22,6 +23,8 @@ export default function DishesPage() {
   const [cat, setCat] = useState('ALL');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', category: 'South Indian', price: 0, description: '' });
+
+  useCreateActionListener('dish', () => setShowForm(true));
 
   const filtered = useMemo(() => {
     return dishes.filter((d) => {
@@ -56,7 +59,7 @@ export default function DishesPage() {
         <Button onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add Extra Dish'}</Button>
       </div>
       {showForm && (
-        <Card className="p-6 mb-6">
+        <Card id="page-create-form" className="p-6 mb-6">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input required placeholder="Dish name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border rounded-lg" />
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="form-select px-3 py-2 rounded-lg">

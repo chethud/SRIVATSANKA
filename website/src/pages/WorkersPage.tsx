@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
+import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { createWorker, deleteWorker } from '../api/client';
 
 export default function WorkersPage() {
   const { workers, refresh } = useAppData();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', phoneNumber: '', role: '', dailyWage: 0 });
+
+  useCreateActionListener('worker', () => setShowForm(true));
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -21,7 +24,7 @@ export default function WorkersPage() {
       <PageHeader title="Workers" description={`${workers.length} workers — live database`} />
       <Button onClick={() => setShowForm(!showForm)} className="mb-6">{showForm ? 'Cancel' : '+ Add Worker'}</Button>
       {showForm && (
-        <Card className="p-6 mb-6">
+        <Card id="page-create-form" className="p-6 mb-6">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border rounded-lg" />
             <input required placeholder="Phone" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} className="px-3 py-2 border rounded-lg" />

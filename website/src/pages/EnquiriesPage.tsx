@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { PageHeader, EmptyState, Card } from '../components/Layout';
+import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, SearchInput, FilterChips, LoadingScreen } from '../components/ui';
-import { updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
+import { useCreateActionListener } from '../hooks/useCreateActionListener';
+import { createEnquiry, updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
 
 const STATUS_FILTERS = [
   { id: 'ALL', label: 'All' },
@@ -12,11 +13,43 @@ const STATUS_FILTERS = [
   { id: 'CLOSED', label: 'Closed' },
 ];
 
+const EVENT_TYPES = ['Wedding', 'House Warming', 'Baby Shower', 'Reception', 'Corporate Lunch', 'Naming Ceremony', 'Other'];
+
+function defaultEventDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().slice(0, 10);
+}
+
+function defaultCallbackAt() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const emptyForm = () => ({
+  customerName: '',
+  phoneNumber: '',
+  eventType: EVENT_TYPES[0],
+  eventDate: defaultEventDate(),
+  eventLocation: '',
+  guestCount: 50,
+  preferredCallbackAt: defaultCallbackAt(),
+});
+
 export default function EnquiriesPage() {
   const { loading, error, enquiries, refresh } = useAppData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selected, setSelected] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useCreateActionListener('enquiry', () => setShowForm(true));
 
   const filtered = useMemo(() => {
     return enquiries.filter((e) => {
@@ -39,15 +72,114 @@ export default function EnquiriesPage() {
     refresh();
   }
 
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setFormError('');
+    try {
+      const created = await createEnquiry({
+        customerName: form.customerName,
+        phoneNumber: form.phoneNumber,
+        eventType: form.eventType,
+        eventDate: new Date(`${form.eventDate}T12:00:00`).toISOString(),
+        eventLocation: form.eventLocation,
+        guestCount: form.guestCount,
+        preferredCallbackAt: new Date(form.preferredCallbackAt).toISOString(),
+        notes: 'Created manually by owner',
+      });
+      setForm(emptyForm());
+      setShowForm(false);
+      setSelected(created.id);
+      await refresh();
+    } catch {
+      setFormError('Could not save enquiry. Check API connection.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading && enquiries.length === 0) return <LoadingScreen />;
 
   return (
     <>
       <PageHeader
         title="Enquiries"
-        description={`${filtered.length} enquiries — mark CONVERTED when client confirms, then manage dishes on Orders`}
+        description={`${filtered.length} enquiries — add manually or from WhatsApp; mark CONVERTED when confirmed`}
       />
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error || formError} />
+      {showForm && (
+        <Card id="page-create-form" className="p-6 mb-6">
+          <h3 className="font-semibold mb-4 text-[var(--foreground)]">New enquiry (owner)</h3>
+          <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              required
+              placeholder="Customer name"
+              value={form.customerName}
+              onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+              className="form-input px-3 py-2 rounded-lg"
+            />
+            <input
+              required
+              placeholder="Phone number"
+              value={form.phoneNumber}
+              onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+              className="form-input px-3 py-2 rounded-lg"
+            />
+            <select
+              value={form.eventType}
+              onChange={(e) => setForm({ ...form, eventType: e.target.value })}
+              className="form-select px-3 py-2 rounded-lg"
+            >
+              {EVENT_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <input
+              required
+              type="date"
+              value={form.eventDate}
+              onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
+              className="form-input px-3 py-2 rounded-lg"
+            />
+            <input
+              required
+              placeholder="Event location"
+              value={form.eventLocation}
+              onChange={(e) => setForm({ ...form, eventLocation: e.target.value })}
+              className="form-input px-3 py-2 rounded-lg md:col-span-2"
+            />
+            <input
+              required
+              type="number"
+              min={1}
+              placeholder="Guest count"
+              value={form.guestCount}
+              onChange={(e) => setForm({ ...form, guestCount: Number(e.target.value) })}
+              className="form-input px-3 py-2 rounded-lg"
+            />
+            <div>
+              <label className="text-xs text-[var(--muted)] block mb-1">Preferred callback</label>
+              <input
+                required
+                type="datetime-local"
+                value={form.preferredCallbackAt}
+                onChange={(e) => setForm({ ...form, preferredCallbackAt: e.target.value })}
+                className="form-input w-full px-3 py-2 rounded-lg"
+              />
+            </div>
+            <div className="md:col-span-2 flex gap-3">
+              <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save enquiry'}</Button>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); setFormError(''); }}
+                className="px-4 py-2.5 text-sm border border-[var(--border)] rounded-xl text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </Card>
+      )}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <SearchInput value={search} onChange={setSearch} placeholder="Search name, event, phone..." />
         <FilterChips options={STATUS_FILTERS} selected={statusFilter} onSelect={setStatusFilter} />

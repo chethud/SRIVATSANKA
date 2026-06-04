@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
+import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { createVendor, deleteVendor } from '../api/client';
 
 const CATEGORIES = [
@@ -12,6 +13,8 @@ export default function VendorsPage() {
   const { vendors, refresh } = useAppData();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', businessName: '', phoneNumber: '', category: CATEGORIES[0], notes: '' });
+
+  useCreateActionListener('vendor', () => setShowForm(true));
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +31,7 @@ export default function VendorsPage() {
         <Button onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add Vendor'}</Button>
       </div>
       {showForm && (
-        <Card className="p-6 mb-6 animate-slide-up">
+        <Card id="page-create-form" className="p-6 mb-6 animate-slide-up">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border rounded-lg" />
             <input placeholder="Business name" value={form.businessName} onChange={(e) => setForm({ ...form, businessName: e.target.value })} className="px-3 py-2 border rounded-lg" />

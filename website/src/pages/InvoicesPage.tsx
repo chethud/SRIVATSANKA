@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { Link } from 'react-router-dom';
 import { BarChart3, CheckCircle2 } from 'lucide-react';
 import { PageHeader, Card } from '../components/Layout';
@@ -11,6 +12,9 @@ export default function InvoicesPage() {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
   const [lastSuccess, setLastSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useCreateActionListener('invoice', () => fileInputRef.current?.click());
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -41,7 +45,7 @@ export default function InvoicesPage() {
         description="Upload expense bills only — AI reads what the expense is. Data appears in Analytics."
       />
 
-      <Card className="p-8 max-w-xl mx-auto text-center">
+      <Card id="page-create-form" className="p-8 max-w-xl mx-auto text-center">
         <BrandLogo variant="card" className="mx-auto mb-6 max-w-[220px]" />
         <h3 className="text-lg font-semibold mb-2">Upload expense invoice</h3>
         <p className="text-sm text-[var(--muted)] mb-6">
@@ -52,6 +56,7 @@ export default function InvoicesPage() {
         <label className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-medium cursor-pointer hover:bg-[var(--primary-hover)] transition-colors shadow-sm">
           {uploading ? 'Reading invoice...' : 'Choose file to upload'}
           <input
+            ref={fileInputRef}
             type="file"
             accept=".jpg,.jpeg,.png,.webp,.pdf"
             className="hidden"

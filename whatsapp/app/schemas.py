@@ -81,6 +81,17 @@ class InvoiceUploadWithOrder(InvoiceUploadOut):
     eventType: str | None = None
 
 
+class EnquiryCreateIn(BaseModel):
+    customerName: str
+    phoneNumber: str
+    eventType: str
+    eventDate: datetime
+    eventLocation: str
+    guestCount: int
+    preferredCallbackAt: datetime
+    notes: str | None = None
+
+
 class EnquiryOut(BaseModel):
     id: str
     customerName: str

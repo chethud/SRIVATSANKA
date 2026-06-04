@@ -166,6 +166,23 @@ export const fetchExpenses = () => apiFetch<Expense[]>('/api/expenses');
 export const fetchAnalytics = () => apiFetch<Analytics>('/api/analytics');
 export const fetchWhatsAppStatus = () => apiFetch<WhatsAppStatus>('/api/whatsapp/status');
 
+export async function createEnquiry(data: {
+  customerName: string;
+  phoneNumber: string;
+  eventType: string;
+  eventDate: string;
+  eventLocation: string;
+  guestCount: number;
+  preferredCallbackAt: string;
+  notes?: string;
+}): Promise<Enquiry> {
+  return apiFetch<Enquiry>('/api/enquiries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
 export async function updateEnquiryStatus(id: string, status: string): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}/status`, {
     method: 'PATCH',
