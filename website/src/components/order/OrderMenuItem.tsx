@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { updateOrderDish, deleteOrderDish, type EnquiryDish } from '../../api/client';
-
-const CUSTOMIZATION_OPTIONS = [
-  '', 'No Milk', 'No Onion', 'No Garlic', 'Less Spice', 'Less Sweet', 'Extra Vegetables',
-];
+import { CustomizationInput } from './CustomizationInput';
 
 export function OrderMenuItem({
   orderId,
@@ -57,15 +54,12 @@ export function OrderMenuItem({
           </div>
           <div className="flex-1 min-w-[140px]">
             <label className="text-[10px] uppercase text-[var(--muted)]">Customization</label>
-            <select
+            <CustomizationInput
+              id={`edit-custom-${dish.id}`}
               value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-              className="form-select w-full mt-0.5 px-2 py-1 rounded text-sm"
-            >
-              {CUSTOMIZATION_OPTIONS.map((c) => (
-                <option key={c || 'none'} value={c}>{c || 'None'}</option>
-              ))}
-            </select>
+              onChange={setCustom}
+              className="form-input w-full mt-0.5 px-2 py-1 rounded text-sm"
+            />
           </div>
           <button
             type="button"
@@ -91,7 +85,12 @@ export function OrderMenuItem({
 
   return (
     <li className="flex items-center gap-2 py-1.5 text-sm group">
-      <span className="flex-1 text-[var(--foreground)]">{dish.dishName}</span>
+      <span className="flex-1 text-[var(--foreground)] min-w-0">
+        {dish.dishName}
+        {dish.customizations && (
+          <span className="block text-xs text-[var(--muted)] truncate">{dish.customizations}</span>
+        )}
+      </span>
       <span className="text-[var(--muted)] tabular-nums shrink-0">{qty} pcs</span>
       <div className="flex gap-0.5 opacity-70 group-hover:opacity-100 shrink-0">
         <button

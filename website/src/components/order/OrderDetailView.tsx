@@ -14,6 +14,7 @@ import { DishSearchSelect } from '../DishSearchSelect';
 import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderMenuItem } from './OrderMenuItem';
+import { CustomizationInput } from './CustomizationInput';
 import {
   formatOrderId,
   groupMenuItems,
@@ -22,10 +23,6 @@ import {
   statusLabel,
   type OrderExtras,
 } from '../../utils/orderNotes';
-
-const CUSTOMIZATION_OPTIONS = [
-  '', 'No Milk', 'No Onion', 'No Garlic', 'Less Spice', 'Less Sweet', 'Extra Vegetables',
-];
 
 function splitCategories(categories: string[]): [string[], string[]] {
   const mid = Math.ceil(categories.length / 2);
@@ -248,15 +245,11 @@ export function OrderDetailView({
               </div>
               <div className="lg:col-span-3">
                 <label className="text-xs text-[var(--muted)]">Customization</label>
-                <select
+                <CustomizationInput
+                  id={`add-custom-${order.id}`}
                   value={customization}
-                  onChange={(e) => setCustomization(e.target.value)}
-                  className="form-select w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                >
-                  {CUSTOMIZATION_OPTIONS.map((c) => (
-                    <option key={c || 'n'} value={c}>{c || 'None'}</option>
-                  ))}
-                </select>
+                  onChange={setCustomization}
+                />
               </div>
               <div className="lg:col-span-2">
                 <label className="text-xs text-[var(--muted)]">Unit price (₹)</label>

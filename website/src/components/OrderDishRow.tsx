@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import { Button } from './Layout';
 import { updateOrderDish, deleteOrderDish, formatCurrency, type EnquiryDish } from '../api/client';
-
-const CUSTOMIZATION_OPTIONS = [
-  'No Milk', 'No Onion', 'No Garlic', 'Less Spice', 'Less Sweet', 'Extra Vegetables',
-];
+import { CustomizationInput } from './order/CustomizationInput';
 
 export function OrderDishRow({
   orderId,
@@ -60,12 +57,12 @@ export function OrderDishRow({
           </div>
           <div className="col-span-2">
             <label className="text-xs text-[var(--muted)]">Customization</label>
-            <select value={custom} onChange={(e) => setCustom(e.target.value)} className="form-select w-full mt-1 px-2 py-1.5 rounded-lg">
-              <option value="">None</option>
-              {CUSTOMIZATION_OPTIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <CustomizationInput
+              id={`row-custom-${dish.id}`}
+              value={custom}
+              onChange={setCustom}
+              className="form-input w-full mt-1 px-2 py-1.5 rounded-lg"
+            />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
