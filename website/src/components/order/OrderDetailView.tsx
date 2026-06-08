@@ -23,6 +23,7 @@ import {
   statusLabel,
   type OrderExtras,
 } from '../../utils/orderNotes';
+import { QuantityUnitFields } from './QuantityUnitFields';
 
 function splitCategories(categories: string[]): [string[], string[]] {
   const mid = Math.ceil(categories.length / 2);
@@ -44,6 +45,7 @@ export function OrderDetailView({
   const [editingExtras, setEditingExtras] = useState(false);
   const [dishId, setDishId] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [quantityUnit, setQuantityUnit] = useState('pcs');
   const [unitPrice, setUnitPrice] = useState<number | ''>('');
   const [customization, setCustomization] = useState('');
   const [saving, setSaving] = useState(false);
@@ -98,12 +100,14 @@ export function OrderDetailView({
     try {
       await addOrderDish(order.id, {
         dishId,
-        quantity: Math.max(1, quantity),
+        quantity,
+        quantityUnit,
         customizations: customization || undefined,
         unitPrice: unitPrice === '' ? undefined : Number(unitPrice),
       });
       setDishId('');
       setQuantity(1);
+      setQuantityUnit('pcs');
       setUnitPrice('');
       setCustomization('');
       setShowAddForm(false);
@@ -223,9 +227,9 @@ export function OrderDetailView({
 
         {showAddForm && (
           <div className="mb-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]">
-            <p className="text-sm text-[var(--muted)] mb-4">Search the menu and set quantity (shown as pcs in breakdown).</p>
+            <p className="text-sm text-[var(--muted)] mb-4">Search the menu, set quantity and unit (pieces, kg, liters, etc.).</p>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
-              <div className="lg:col-span-4">
+              <div className="lg:col-span-3">
                 <DishSearchSelect
                   dishes={dishes}
                   value={dishId}
@@ -233,17 +237,16 @@ export function OrderDetailView({
                   onSelectDish={(d) => setUnitPrice(d ? d.price : '')}
                 />
               </div>
-              <div className="lg:col-span-2">
-                <label className="text-xs text-[var(--muted)]">Quantity (pcs)</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
+              <div className="lg:col-span-4 grid grid-cols-2 gap-2">
+                <QuantityUnitFields
+                  idPrefix={`add-${order.id}`}
+                  quantity={quantity}
+                  unit={quantityUnit}
+                  onQuantityChange={setQuantity}
+                  onUnitChange={setQuantityUnit}
                 />
               </div>
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-2">
                 <label className="text-xs text-[var(--muted)]">Customization</label>
                 <CustomizationInput
                   id={`add-custom-${order.id}`}

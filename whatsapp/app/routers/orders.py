@@ -23,7 +23,7 @@ from app.schemas import (
     OrderDishIn,
     OrderDishUpdate,
 )
-from app.services.bill_recognition import recognize_bill
+from app.quantity_units import normalize_quantity, normalize_quantity_unit
 
 router = APIRouter(prefix="/api", tags=["orders"])
 
@@ -49,7 +49,8 @@ def _dish_out(d: EnquiryDish) -> EnquiryDishOut:
         category=d.category,
         customizations=d.customizations,
         notes=d.notes,
-        quantity=d.quantity,
+        quantity=normalize_quantity(d.quantity),
+        quantityUnit=normalize_quantity_unit(getattr(d, "quantityUnit", None)),
         unitPrice=d.unitPrice,
         served=d.served,
     )
@@ -121,7 +122,8 @@ async def add_order_dish(
         category=CATEGORY_LABELS.get(menu.category, str(menu.category)),
         customizations=payload.customizations,
         notes=payload.notes,
-        quantity=max(1, payload.quantity),
+        quantity=normalize_quantity(payload.quantity),
+        quantityUnit=normalize_quantity_unit(payload.quantityUnit),
         unitPrice=payload.unitPrice if payload.unitPrice is not None else menu.price,
         served=False,
     )
@@ -144,6 +146,10 @@ async def update_order_dish(
         raise HTTPException(404, "Order dish not found")
 
     data = payload.model_dump(exclude_unset=True)
+    if "quantity" in data:
+        data["quantity"] = normalize_quantity(data["quantity"])
+    if "quantityUnit" in data:
+        data["quantityUnit"] = normalize_quantity_unit(data["quantityUnit"])
     for key, val in data.items():
         setattr(item, key, val)
     await db.commit()

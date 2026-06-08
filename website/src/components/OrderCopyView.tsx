@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate, type Enquiry } from '../api/client';
 import { BrandLogo } from './BrandLogo';
+import { formatQuantityDisplay } from '../utils/quantityUnits';
 
 export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: 'kitchen' | 'billing' }) {
   const lines = (enquiry.dishes ?? []).map((d) => ({
@@ -37,7 +38,7 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
             {lines.map((l) => (
               <tr key={l.id} className="border-b border-[var(--border)]">
                 <td className="py-3">
-                  {l.dishName} ×{l.quantity}
+                  {l.dishName} — {formatQuantityDisplay(l.quantity, l.quantityUnit)}
                   {l.served && <span className="text-[var(--logo-forest)] text-xs ml-1">✓ served</span>}
                   {l.customizations && <span className="block text-xs text-[var(--muted)] mt-0.5">{l.customizations}</span>}
                 </td>

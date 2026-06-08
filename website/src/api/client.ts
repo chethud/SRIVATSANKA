@@ -83,6 +83,7 @@ export interface EnquiryDish {
   customizations: string | null;
   notes: string | null;
   quantity: number;
+  quantityUnit?: string | null;
   unitPrice: number | null;
   served: boolean;
 }
@@ -314,7 +315,7 @@ export async function createDish(data: { name: string; category: string; price: 
 
 export async function addOrderDish(
   enquiryId: string,
-  data: { dishId: string; quantity?: number; customizations?: string; notes?: string; unitPrice?: number },
+  data: { dishId: string; quantity?: number; quantityUnit?: string; customizations?: string; notes?: string; unitPrice?: number },
 ) {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/dishes`, {
     method: 'POST',
@@ -326,7 +327,7 @@ export async function addOrderDish(
 export async function updateOrderDish(
   enquiryId: string,
   dishItemId: string,
-  data: { customizations?: string; notes?: string; quantity?: number; unitPrice?: number; served?: boolean },
+  data: { customizations?: string; notes?: string; quantity?: number; quantityUnit?: string; unitPrice?: number; served?: boolean },
 ) {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/dishes/${dishItemId}`, {
     method: 'PATCH',

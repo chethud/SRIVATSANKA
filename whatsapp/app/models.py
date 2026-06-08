@@ -76,7 +76,8 @@ class EnquiryDish(Base):
     category: Mapped[str] = mapped_column(String)
     customizations: Mapped[str | None] = mapped_column(Text, nullable=True)  # comma-separated
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    quantity: Mapped[float] = mapped_column(Float, default=1.0)
+    quantityUnit: Mapped[str] = mapped_column(String, default="pcs")
     unitPrice: Mapped[float | None] = mapped_column(Float, nullable=True)
     served: Mapped[bool] = mapped_column(Boolean, default=False)
 

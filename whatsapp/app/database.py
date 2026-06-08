@@ -76,6 +76,8 @@ async def _migrate_sqlite_columns() -> None:
                     alters.append("ALTER TABLE EnquiryDish ADD COLUMN unitPrice FLOAT")
                 if "served" not in cols:
                     alters.append("ALTER TABLE EnquiryDish ADD COLUMN served BOOLEAN DEFAULT 0")
+                if "quantityUnit" not in cols:
+                    alters.append("ALTER TABLE EnquiryDish ADD COLUMN quantityUnit VARCHAR DEFAULT 'pcs'")
             if "Worker" in tables:
                 wcols = {c["name"] for c in insp.get_columns("Worker")}
                 if "isLead" not in wcols:

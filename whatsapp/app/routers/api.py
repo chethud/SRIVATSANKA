@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.data.seed_dishes import CATEGORY_LABELS
 from app.database import get_db
 from app.models import Dish, Enquiry, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
+from app.quantity_units import normalize_quantity, normalize_quantity_unit
 from app.schemas import (
     AIAssistantRequest,
     AIAssistantResponse,
@@ -47,7 +48,8 @@ def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
                 category=d.category,
                 customizations=d.customizations,
                 notes=d.notes,
-                quantity=getattr(d, "quantity", 1) or 1,
+                quantity=normalize_quantity(getattr(d, "quantity", 1)),
+                quantityUnit=normalize_quantity_unit(getattr(d, "quantityUnit", None)),
                 unitPrice=d.unitPrice,
                 served=getattr(d, "served", False) or False,
             )

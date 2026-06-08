@@ -3,6 +3,8 @@ import { Pencil, Trash2, Check, X } from 'lucide-react';
 import { Button } from './Layout';
 import { updateOrderDish, deleteOrderDish, formatCurrency, type EnquiryDish } from '../api/client';
 import { CustomizationInput } from './order/CustomizationInput';
+import { formatQuantityDisplay, normalizeQuantityUnit } from '../utils/quantityUnits';
+import { QuantityUnitFields } from './order/QuantityUnitFields';
 
 export function OrderDishRow({
   orderId,
@@ -15,16 +17,27 @@ export function OrderDishRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState(dish.quantity);
+  const [qtyUnit, setQtyUnit] = useState<string>(normalizeQuantityUnit(dish.quantityUnit));
   const [price, setPrice] = useState(dish.unitPrice ?? 0);
   const [custom, setCustom] = useState(dish.customizations ?? '');
   const [served, setServed] = useState(dish.served);
   const [saving, setSaving] = useState(false);
 
+  function startEdit() {
+    setQty(dish.quantity);
+    setQtyUnit(normalizeQuantityUnit(dish.quantityUnit));
+    setPrice(dish.unitPrice ?? 0);
+    setCustom(dish.customizations ?? '');
+    setServed(dish.served);
+    setEditing(true);
+  }
+
   async function saveEdit() {
     setSaving(true);
     try {
       await updateOrderDish(orderId, dish.id, {
-        quantity: Math.max(1, qty),
+        quantity: qty,
+        quantityUnit: qtyUnit,
         unitPrice: price,
         customizations: custom || undefined,
         served,
@@ -46,16 +59,23 @@ export function OrderDishRow({
     return (
       <li className="p-4 border border-[var(--primary)] rounded-xl bg-[var(--primary-light)]/30 space-y-3">
         <p className="font-medium text-sm">Edit — {dish.dishName}</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <div>
-            <label className="text-xs text-[var(--muted)]">Quantity</label>
-            <input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-full mt-1 px-2 py-1.5 border rounded-lg" />
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-sm">
+          <div className="col-span-2 grid grid-cols-2 gap-2">
+            <QuantityUnitFields
+              idPrefix={`row-${dish.id}`}
+              quantity={qty}
+              unit={qtyUnit}
+              onQuantityChange={setQty}
+              onUnitChange={setQtyUnit}
+              quantityClassName="w-full mt-1 px-2 py-1.5 border rounded-lg"
+              unitClassName="form-select w-full mt-1 px-2 py-1.5 rounded-lg"
+            />
           </div>
           <div>
             <label className="text-xs text-[var(--muted)]">Unit price (₹)</label>
-            <input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full mt-1 px-2 py-1.5 border rounded-lg" />
+            <input type="number" min={0} step="any" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full mt-1 px-2 py-1.5 border rounded-lg" />
           </div>
-          <div className="col-span-2">
+          <div className="col-span-2 sm:col-span-3">
             <label className="text-xs text-[var(--muted)]">Customization</label>
             <CustomizationInput
               id={`row-custom-${dish.id}`}
@@ -85,7 +105,9 @@ export function OrderDishRow({
 
   return (
     <li className="flex flex-wrap items-center gap-3 py-3 px-4 bg-[var(--card)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)]/40 transition-colors">
-      <span className="font-semibold text-[var(--primary-dark)] min-w-[2rem]">{dish.quantity}×</span>
+      <span className="font-semibold text-[var(--primary-dark)] min-w-[2rem] tabular-nums">
+        {formatQuantityDisplay(dish.quantity, dish.quantityUnit)}
+      </span>
       <span className="font-medium flex-1 min-w-[120px]">{dish.dishName}</span>
       {dish.customizations && (
         <span className="text-xs text-[var(--muted)] bg-[var(--background)] px-2 py-0.5 rounded-full max-w-[200px] truncate">
@@ -99,7 +121,7 @@ export function OrderDishRow({
       <div className="flex gap-1 ml-auto">
         <button
           type="button"
-          onClick={() => setEditing(true)}
+          onClick={startEdit}
           className="p-2 rounded-lg hover:bg-[var(--background)] text-[var(--muted)] hover:text-[var(--primary)]"
           title="Edit"
         >

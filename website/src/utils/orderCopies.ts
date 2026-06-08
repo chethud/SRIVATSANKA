@@ -1,4 +1,5 @@
 import { formatCurrency, formatDate, type Enquiry } from '../api/client';
+import { formatQuantityDisplay } from './quantityUnits';
 
 function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const lines = (enquiry.dishes ?? []).map((d) => {
@@ -14,7 +15,7 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
       (l) => `
       <tr>
         <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;">
-          ${l.dishName} ×${l.quantity}
+          ${l.dishName} — ${formatQuantityDisplay(l.quantity, l.quantityUnit)}
           ${l.served ? '<span style="color:#15803d;font-size:12px;"> ✓ served</span>' : ''}
           ${l.customizations ? `<br><span style="color:#6b7280;font-size:12px;">${l.customizations}</span>` : ''}
         </td>

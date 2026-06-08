@@ -41,7 +41,8 @@ class EnquiryDishOut(BaseModel):
     category: str
     customizations: str | None = None
     notes: str | None = None
-    quantity: int = 1
+    quantity: float = 1
+    quantityUnit: str = "pcs"
     unitPrice: float | None = None
     served: bool = False
 
@@ -50,7 +51,8 @@ class EnquiryDishOut(BaseModel):
 
 class OrderDishIn(BaseModel):
     dishId: str
-    quantity: int = 1
+    quantity: float = 1
+    quantityUnit: str = "pcs"
     customizations: str | None = None
     notes: str | None = None
     unitPrice: float | None = None
@@ -59,7 +61,8 @@ class OrderDishIn(BaseModel):
 class OrderDishUpdate(BaseModel):
     customizations: str | None = None
     notes: str | None = None
-    quantity: int | None = None
+    quantity: float | None = None
+    quantityUnit: str | None = None
     unitPrice: float | None = None
     served: bool | None = None
 
