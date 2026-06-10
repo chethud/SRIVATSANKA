@@ -22,7 +22,7 @@ export default function DishesPage() {
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('ALL');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', category: 'South Indian', price: 0, description: '' });
+  const [form, setForm] = useState({ name: '', category: 'South Indian', description: '' });
 
   useCreateActionListener('dish', () => setShowForm(true));
 
@@ -44,10 +44,10 @@ export default function DishesPage() {
     await createDish({
       name: form.name,
       category: form.category,
-      price: form.price,
+      price: 0,
       description: form.description || undefined,
     });
-    setForm({ name: '', category: 'South Indian', price: 0, description: '' });
+    setForm({ name: '', category: 'South Indian', description: '' });
     setShowForm(false);
     refresh();
   }
@@ -62,8 +62,7 @@ export default function DishesPage() {
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="form-select px-3 py-2 rounded-lg">
               {ADD_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
-            <input required type="number" placeholder="Price (₹)" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="px-3 py-2 border rounded-lg" />
-            <input placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-3 py-2 border rounded-lg" />
+            <input placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-3 py-2 border rounded-lg md:col-span-2" />
             <div className="flex gap-2 md:col-span-2">
               <Button type="submit">Save to menu</Button>
               <button
@@ -90,9 +89,11 @@ export default function DishesPage() {
               <h3 className="font-semibold text-[var(--primary-dark)] mb-3">{category}</h3>
               <ul className="space-y-2">
                 {items.map((d) => (
-                  <li key={d.id} className="flex justify-between text-sm py-1 border-b border-[var(--border)] last:border-0">
-                    <span>{d.name}</span>
-                    <span className="font-medium">₹{d.price}</span>
+                  <li key={d.id} className="text-sm py-1 border-b border-[var(--border)] last:border-0">
+                    {d.name}
+                    {d.description && (
+                      <span className="block text-xs text-[var(--muted)] mt-0.5">{d.description}</span>
+                    )}
                   </li>
                 ))}
               </ul>

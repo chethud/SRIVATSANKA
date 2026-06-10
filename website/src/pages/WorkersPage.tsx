@@ -46,7 +46,7 @@ export default function WorkersPage() {
     <>
       <PageHeader
         title="Workers"
-        description={`${workers.length} workers — click a name to open profile, assign orders & wages`}
+        description={`${workers.length} workers — click a name to open profile and assign duties`}
       />
 
       <div className="mb-6 max-w-md">
@@ -62,9 +62,6 @@ export default function WorkersPage() {
             <input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input px-3 py-2 rounded-lg" />
             <input required placeholder="Phone" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} className="form-input px-3 py-2 rounded-lg" />
             <input required placeholder="Role (e.g. Chef, Server)" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="form-input px-3 py-2 rounded-lg md:col-span-2" />
-            <p className="text-xs text-[var(--muted)] md:col-span-2">
-              Wages are set per order when you assign a duty on the worker profile page.
-            </p>
             <div className="flex gap-2 md:col-span-2">
               <Button type="submit">Save Worker</Button>
               <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2.5 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)]">Cancel</button>

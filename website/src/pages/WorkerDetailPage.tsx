@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, ClipboardList, IndianRupee, Phone, User, Wallet } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, ClipboardList, Phone, User, Wallet } from 'lucide-react';
 import { PageHeader, Card, Button, EmptyState } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import {
@@ -8,7 +8,6 @@ import {
   deleteWorkerAssignment,
   fetchWorkerProfile,
   markWorkerAssignmentPaid,
-  formatCurrency,
   formatDate,
   type WorkerProfile,
 } from '../api/client';
@@ -30,7 +29,6 @@ export default function WorkerDetailPage() {
     dutyDate: defaultDutyDate(),
     enquiryId: '',
     dutyType: DUTY_TYPES[0],
-    wage: '',
     notes: '',
   });
   const [saving, setSaving] = useState(false);
@@ -65,10 +63,9 @@ export default function WorkerDetailPage() {
         enquiryId: assignForm.enquiryId || null,
         dutyDate: new Date(`${assignForm.dutyDate}T09:00:00`).toISOString(),
         dutyType: assignForm.dutyType,
-        wage: assignForm.wage === '' ? 0 : Number(assignForm.wage),
         notes: assignForm.notes || undefined,
       });
-      setAssignForm({ dutyDate: defaultDutyDate(), enquiryId: '', dutyType: DUTY_TYPES[0], wage: '', notes: '' });
+      setAssignForm({ dutyDate: defaultDutyDate(), enquiryId: '', dutyType: DUTY_TYPES[0], notes: '' });
       setShowAssign(false);
       await load();
       refresh();
@@ -80,7 +77,7 @@ export default function WorkerDetailPage() {
   }
 
   async function completePayment(assignmentId: string) {
-    if (!workerId || !confirm('Make payment for this wage? It will be removed from open duties and wages due.')) return;
+    if (!workerId || !confirm('Mark this duty as completed? It will move out of open duties.')) return;
     setPayingId(assignmentId);
     setError('');
     try {
@@ -88,7 +85,7 @@ export default function WorkerDetailPage() {
       await load();
       refresh();
     } catch {
-      setError('Could not mark payment as completed.');
+      setError('Could not mark duty as completed.');
     } finally {
       setPayingId(null);
     }
@@ -130,12 +127,11 @@ export default function WorkerDetailPage() {
         description={`${worker.role} · ${worker.phoneNumber}`}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {[
           { icon: User, label: 'Role', value: worker.role },
           { icon: Phone, label: 'Phone', value: worker.phoneNumber },
           { icon: ClipboardList, label: 'Open duties', value: String(profile.totalDuties) },
-          { icon: IndianRupee, label: 'Wages due', value: formatCurrency(profile.totalWagesEarned) },
         ].map(({ icon: Icon, label, value }) => (
           <Card key={label} className="p-4">
             <Icon size={18} className="text-[var(--order-accent)] mb-2" />
@@ -195,20 +191,6 @@ export default function WorkerDetailPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-xs text-[var(--muted)] flex items-center gap-1 mb-1">
-                <IndianRupee size={12} /> Wage for this order (₹)
-              </label>
-              <input
-                type="number"
-                min={0}
-                required
-                placeholder="e.g. 1200"
-                value={assignForm.wage}
-                onChange={(e) => setAssignForm({ ...assignForm, wage: e.target.value })}
-                className="form-input w-full px-3 py-2 rounded-lg text-sm"
-              />
-            </div>
             <input
               placeholder="Notes (optional)"
               value={assignForm.notes}
@@ -227,7 +209,7 @@ export default function WorkerDetailPage() {
           <ClipboardList size={20} /> Work history
         </h3>
         {profile.assignments.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No assignments yet. Add a duty linked to an order with wage above.</p>
+          <p className="text-sm text-[var(--muted)]">No assignments yet. Add a duty linked to an order above.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm data-table">
@@ -236,8 +218,7 @@ export default function WorkerDetailPage() {
                   <th className="text-left p-3">Date</th>
                   <th className="text-left p-3">Order</th>
                   <th className="text-left p-3">Duty</th>
-                  <th className="text-left p-3">Wage</th>
-                  <th className="text-left p-3">Payment</th>
+                  <th className="text-left p-3">Status</th>
                   <th className="text-left p-3" />
                 </tr>
               </thead>
@@ -263,11 +244,10 @@ export default function WorkerDetailPage() {
                       )}
                     </td>
                     <td className="p-3">{a.dutyType}</td>
-                    <td className="p-3 font-medium tabular-nums">{formatCurrency(a.wage)}</td>
                     <td className="p-3">
                       {a.paymentCompleted ? (
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-[var(--primary-light)] text-[var(--primary)]">
-                          <CheckCircle2 size={14} /> Payment completed
+                          <CheckCircle2 size={14} /> Completed
                         </span>
                       ) : (
                         <button
@@ -277,7 +257,7 @@ export default function WorkerDetailPage() {
                           className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors disabled:opacity-50"
                         >
                           <Wallet size={14} />
-                          {payingId === a.id ? 'Processing…' : 'Make payment'}
+                          {payingId === a.id ? 'Saving…' : 'Mark completed'}
                         </button>
                       )}
                     </td>

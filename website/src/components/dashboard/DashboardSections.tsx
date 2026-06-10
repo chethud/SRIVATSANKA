@@ -4,9 +4,9 @@ import {
   Bot, Bell, Calendar, ChevronRight, HardHat, Sparkles, Truck, UtensilsCrossed,
   FileText, Plus, Users,
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '../../api/client';
+import { formatDate } from '../../api/client';
 import type { Enquiry, Notification, Vendor, Worker } from '../../api/client';
-import { orderRevenueEstimate, type ChartPeriod } from '../../utils/dashboardData';
+import type { ChartPeriod } from '../../utils/dashboardData';
 
 const fade = {
   initial: { opacity: 0, y: 8 },
@@ -83,7 +83,7 @@ export function RecentOrdersTable({ orders }: { orders: Enquiry[] }) {
             <th className="px-4 py-3 text-left">Customer</th>
             <th className="px-4 py-3 text-left">Event</th>
             <th className="px-4 py-3 text-left">Date</th>
-            <th className="px-4 py-3 text-right">Est.</th>
+            <th className="px-4 py-3 text-right">Items</th>
           </tr>
         </thead>
         <tbody>
@@ -94,7 +94,7 @@ export function RecentOrdersTable({ orders }: { orders: Enquiry[] }) {
               </td>
               <td className="px-4 py-3 text-[var(--muted)]">{o.eventType}</td>
               <td className="px-4 py-3 text-[var(--muted)]">{formatDate(o.eventDate)}</td>
-              <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(orderRevenueEstimate(o))}</td>
+              <td className="px-4 py-3 text-right font-medium tabular-nums">{o.dishes?.length ?? 0}</td>
             </tr>
           ))}
         </tbody>

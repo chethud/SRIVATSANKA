@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import { Button } from './Layout';
-import { updateOrderDish, deleteOrderDish, formatCurrency, type EnquiryDish } from '../api/client';
+import { updateOrderDish, deleteOrderDish, type EnquiryDish } from '../api/client';
 import { CustomizationInput } from './order/CustomizationInput';
 import { formatQuantityDisplay, normalizeQuantityUnit } from '../utils/quantityUnits';
 import { QuantityUnitFields } from './order/QuantityUnitFields';
@@ -18,7 +18,6 @@ export function OrderDishRow({
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState(dish.quantity);
   const [qtyUnit, setQtyUnit] = useState<string>(normalizeQuantityUnit(dish.quantityUnit));
-  const [price, setPrice] = useState(dish.unitPrice ?? 0);
   const [custom, setCustom] = useState(dish.customizations ?? '');
   const [served, setServed] = useState(dish.served);
   const [saving, setSaving] = useState(false);
@@ -26,7 +25,6 @@ export function OrderDishRow({
   function startEdit() {
     setQty(dish.quantity);
     setQtyUnit(normalizeQuantityUnit(dish.quantityUnit));
-    setPrice(dish.unitPrice ?? 0);
     setCustom(dish.customizations ?? '');
     setServed(dish.served);
     setEditing(true);
@@ -38,7 +36,6 @@ export function OrderDishRow({
       await updateOrderDish(orderId, dish.id, {
         quantity: qty,
         quantityUnit: qtyUnit,
-        unitPrice: price,
         customizations: custom || undefined,
         served,
       });
@@ -59,7 +56,7 @@ export function OrderDishRow({
     return (
       <li className="p-4 border border-[var(--primary)] rounded-xl bg-[var(--primary-light)]/30 space-y-3">
         <p className="font-medium text-sm">Edit — {dish.dishName}</p>
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div className="col-span-2 grid grid-cols-2 gap-2">
             <QuantityUnitFields
               idPrefix={`row-${dish.id}`}
@@ -71,11 +68,7 @@ export function OrderDishRow({
               unitClassName="form-select w-full mt-1 px-2 py-1.5 rounded-lg"
             />
           </div>
-          <div>
-            <label className="text-xs text-[var(--muted)]">Unit price (₹)</label>
-            <input type="number" min={0} step="any" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full mt-1 px-2 py-1.5 border rounded-lg" />
-          </div>
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 sm:col-span-2">
             <label className="text-xs text-[var(--muted)]">Customization</label>
             <CustomizationInput
               id={`row-custom-${dish.id}`}
@@ -101,8 +94,6 @@ export function OrderDishRow({
     );
   }
 
-  const lineTotal = (dish.unitPrice ?? 0) * (dish.quantity || 1);
-
   return (
     <li className="flex flex-wrap items-center gap-3 py-3 px-4 bg-[var(--card)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)]/40 transition-colors">
       <span className="font-semibold text-[var(--primary-dark)] min-w-[2rem] tabular-nums">
@@ -114,7 +105,6 @@ export function OrderDishRow({
           {dish.customizations}
         </span>
       )}
-      <span className="text-sm font-medium">{formatCurrency(lineTotal)}/unit</span>
       {dish.served && (
         <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--success-bg)] text-[var(--success-text)]">Served</span>
       )}

@@ -11,7 +11,7 @@ export default function OrderCopyPage({ copyType }: Props) {
   const { orderId } = useParams<{ orderId: string }>();
   const { enquiries } = useAppData();
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
-  const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Billing Copy';
+  const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
 
   if (!order) {
     return (

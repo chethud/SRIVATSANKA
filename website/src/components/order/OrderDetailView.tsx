@@ -6,7 +6,6 @@ import {
 import type { Dish, Enquiry, EnquiryDish, Worker } from '../../api/client';
 import {
   addOrderDish,
-  formatCurrency,
   formatDateTime,
   updateEnquiry,
 } from '../../api/client';
@@ -46,7 +45,6 @@ export function OrderDetailView({
   const [dishId, setDishId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [quantityUnit, setQuantityUnit] = useState('pcs');
-  const [unitPrice, setUnitPrice] = useState<number | ''>('');
   const [customization, setCustomization] = useState('');
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState('');
@@ -74,12 +72,6 @@ export function OrderDetailView({
   const categories = groupMenuItems(menuItems);
   const [colLeft, colRight] = splitCategories(categories);
 
-  const lineTotal = menuItems.reduce(
-    (s, d) => s + (d.unitPrice ?? 0) * (d.quantity || 1),
-    0,
-  );
-  const orderTotal = lineTotal * (order.guestCount || 1);
-
   const dietaryFromDishes = useMemo(() => {
     const set = new Set<string>();
     for (const d of order.dishes ?? []) {
@@ -103,12 +95,10 @@ export function OrderDetailView({
         quantity,
         quantityUnit,
         customizations: customization || undefined,
-        unitPrice: unitPrice === '' ? undefined : Number(unitPrice),
       });
       setDishId('');
       setQuantity(1);
       setQuantityUnit('pcs');
-      setUnitPrice('');
       setCustomization('');
       setShowAddForm(false);
       await onRefresh();
@@ -205,7 +195,7 @@ export function OrderDetailView({
           to={`/orders/${order.id}/billing`}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-[var(--sidebar-hover)]"
         >
-          <FileText size={16} /> Billing copy
+          <FileText size={16} /> Order copy
         </Link>
       </div>
 
@@ -234,7 +224,6 @@ export function OrderDetailView({
                   dishes={dishes}
                   value={dishId}
                   onChange={setDishId}
-                  onSelectDish={(d) => setUnitPrice(d ? d.price : '')}
                 />
               </div>
               <div className="lg:col-span-4 grid grid-cols-2 gap-2">
@@ -246,7 +235,7 @@ export function OrderDetailView({
                   onUnitChange={setQuantityUnit}
                 />
               </div>
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-3">
                 <label className="text-xs text-[var(--muted)]">Customization</label>
                 <CustomizationInput
                   id={`add-custom-${order.id}`}
@@ -255,16 +244,6 @@ export function OrderDetailView({
                 />
               </div>
               <div className="lg:col-span-2">
-                <label className="text-xs text-[var(--muted)]">Unit price (₹)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                />
-              </div>
-              <div className="lg:col-span-1">
                 <Button type="button" onClick={handleAdd} disabled={saving || !dishId} className="w-full !py-2">
                   Add
                 </Button>
@@ -427,10 +406,6 @@ export function OrderDetailView({
             </div>
           </div>
         )}
-
-        <p className="order-view-title text-right text-2xl md:text-3xl font-semibold text-[var(--foreground)] mt-8 pt-6 border-t border-[var(--border)]">
-          Total: {formatCurrency(orderTotal)}
-        </p>
       </div>
     </div>
   );

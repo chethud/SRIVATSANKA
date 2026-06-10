@@ -124,7 +124,7 @@ async def add_order_dish(
         notes=payload.notes,
         quantity=normalize_quantity(payload.quantity),
         quantityUnit=normalize_quantity_unit(payload.quantityUnit),
-        unitPrice=payload.unitPrice if payload.unitPrice is not None else menu.price,
+        unitPrice=0.0 if payload.unitPrice is None else payload.unitPrice,
         served=False,
     )
     db.add(item)

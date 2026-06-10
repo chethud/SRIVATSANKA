@@ -87,7 +87,7 @@ export function DishSearchSelect({
                     onClick={() => pick(d)}
                   >
                     <span className="font-medium">{d.name}</span>
-                    <span className="text-[var(--muted)] ml-2">{d.category} · ₹{d.price}</span>
+                    <span className="text-[var(--muted)] ml-2">{d.category}</span>
                   </button>
                 </li>
               ))
