@@ -183,7 +183,33 @@ body {
 }
 
 .order-view .excel-menu-grid {
-  font-size: 15px;
+  font-size: 16px;
+}
+
+#order-copy-print {
+  font-size: 17px;
+}
+
+#order-copy-print .copy-client-line {
+  font-size: 18px;
+}
+
+#order-copy-print .copy-grid-meta {
+  font-size: 16px;
+  padding: 10px 14px;
+}
+
+#order-copy-print .copy-dish-name {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.45;
+  padding: 6px 0;
+}
+
+@media print {
+  #order-copy-print .copy-dish-name {
+    font-size: 20px;
+  }
 }
 
 .order-view .rounded-2xl.bg-\[var\(--card\)\] {

@@ -85,8 +85,8 @@ export function OrderMenuItem({
   }
 
   return (
-    <li className="flex items-start gap-2 py-2 text-[15px] leading-snug border-b border-[var(--border)] last:border-0">
-      <span className="flex-1 text-[var(--foreground)] min-w-0 pt-0.5">{dish.dishName}</span>
+    <li className="flex items-start gap-2 py-2.5 text-lg leading-snug border-b border-[var(--border)] last:border-0">
+      <span className="flex-1 text-[var(--foreground)] min-w-0 pt-0.5 text-[19px] font-semibold">{dish.dishName}</span>
       <div className="flex gap-1 shrink-0">
         <button
           type="button"
