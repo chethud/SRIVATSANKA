@@ -8,6 +8,7 @@ from app.data.seed_demo_data import seed_demo_data
 from app.database import get_db
 from app.schemas import DevMessageRequest, DevMessageResponse
 from app.services.conversation_handler import handle_conversation
+from app.services.data_reset import clear_all_dashboard_data
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 logger = logging.getLogger(__name__)
@@ -31,6 +32,20 @@ async def seed_dashboard_demo(
     result = await seed_demo_data(db, force=True)
     logger.info("Demo data seeded via API: %s", result)
     return result
+
+
+@router.post("/reset")
+async def reset_dashboard_data(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    x_dev_seed_token: str | None = Header(default=None),
+) -> dict:
+    """Delete all enquiries, orders, menu items, vendors, workers, expenses, and uploads."""
+    _check_seed_token(x_dev_seed_token)
+    if payload.get("confirm") != "DELETE_ALL":
+        raise HTTPException(status_code=400, detail='Send {"confirm": "DELETE_ALL"} to wipe all data')
+    result = await clear_all_dashboard_data(db)
+    return {"status": "cleared", **result}
 
 
 @router.post("/message", response_model=DevMessageResponse)
