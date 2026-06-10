@@ -1,6 +1,6 @@
 import type { Enquiry, EnquiryDish } from '../api/client';
 import { formatScheduleTime, type MenuColumn, type OrderExtras } from './orderNotes';
-import { MEAL_SESSIONS, PREFERENCE_CATEGORIES } from './mealSessions';
+import { MEAL_SESSIONS, MEAL_SESSION_ORDER, PREFERENCE_CATEGORIES } from './mealSessions';
 
 export type { MenuColumn };
 
@@ -17,6 +17,22 @@ export function formatPaxTimeLine(column: MenuColumn): string {
     parts.push(formatScheduleTime(column.timeFrom));
   }
   return parts.join('  ');
+}
+
+/** Stack sessions top-to-bottom: date, then breakfast → lunch → dinner order. */
+export function sortMenuColumns(columns: MenuColumn[]): MenuColumn[] {
+  return [...columns].sort((a, b) => {
+    const dateCmp = a.date.localeCompare(b.date);
+    if (dateCmp !== 0) return dateCmp;
+    const ia = MEAL_SESSION_ORDER.indexOf(a.baseSession);
+    const ib = MEAL_SESSION_ORDER.indexOf(b.baseSession);
+    if (ia !== ib) {
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    }
+    return a.sessionLabel.localeCompare(b.sessionLabel);
+  });
 }
 
 function defaultDate(extras: OrderExtras, order: Enquiry): string {
@@ -52,7 +68,7 @@ export function resolveMenuColumns(
   const items = menuItemsOnly(dishes);
   const saved = extras.menuColumns ?? [];
   if (saved.length > 0) {
-    return saved.map((c) => mapColumn(c, extras));
+    return sortMenuColumns(saved.map((c) => mapColumn(c, extras)));
   }
 
   const fallbackDate = defaultDate(extras, order);
@@ -76,7 +92,7 @@ export function resolveMenuColumns(
     });
   }
 
-  return inferred;
+  return sortMenuColumns(inferred);
 }
 
 export function dishesForColumn(

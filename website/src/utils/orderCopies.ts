@@ -1,4 +1,4 @@
-import { formatDate, type Enquiry } from '../api/client';
+import { formatDate, type Enquiry, type EnquiryDish } from '../api/client';
 import { parseOrderNotes } from './orderNotes';
 import {
   dishesForColumn,
@@ -7,6 +7,37 @@ import {
   resolveMenuColumns,
 } from './orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from './mealSessions';
+
+function buildSessionHtml(
+  col: ReturnType<typeof resolveMenuColumns>[number],
+  copyType: 'kitchen' | 'billing',
+  extras: ReturnType<typeof parseOrderNotes>,
+  menuItems: EnquiryDish[],
+) {
+  const dishItems = dishesForColumn(col, menuItems, extras);
+  const list =
+    dishItems.length === 0
+      ? '<p style="color:#64748b;text-align:center;">—</p>'
+      : `<ul style="margin:0;padding:0;list-style:none;">${dishItems
+          .map(
+            (l) =>
+              `<li style="font-size:22px;font-weight:600;line-height:1.45;padding:6px 0;">${l.dishName}${l.served ? ' ✓' : ''}</li>`,
+          )
+          .join('')}</ul>`;
+  const amountRow =
+    copyType === 'billing' && dishItems.length > 0
+      ? `<div style="border-top:1px solid #cbd5cb;background:#faf8f5;padding:10px 12px;text-align:center;font-weight:bold;font-size:16px;">${formatColumnAmount(col.amount) || '—'}</div>`
+      : '';
+
+  return `
+    <div style="border:1px solid #cbd5cb;margin-bottom:20px;overflow:hidden;">
+      <div style="background:#f8faf8;font-weight:bold;font-size:16px;padding:10px 12px;text-align:center;border-bottom:1px solid #cbd5cb;">${formatDate(col.date)}</div>
+      <div style="font-weight:bold;font-size:16px;padding:10px 12px;text-align:center;border-bottom:1px solid #cbd5cb;">${col.sessionLabel}</div>
+      <div style="background:#eef2ee;font-weight:bold;font-size:16px;padding:10px 12px;text-align:center;border-bottom:1px solid #cbd5cb;">${formatPaxTimeLine(col)}</div>
+      <div style="padding:12px 14px;">${list}</div>
+      ${amountRow}
+    </div>`;
+}
 
 function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
@@ -17,40 +48,14 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const columnHtml =
     columns.length === 0
       ? '<p style="color:#64748b;">No dishes</p>'
-      : `
-    <table style="width:100%;border-collapse:collapse;font-size:16px;margin-top:12px;">
-      <tr style="background:#f8faf8;font-weight:bold;font-size:16px;">
-        ${columns.map((c) => `<td style="border:1px solid #cbd5cb;padding:10px 12px;text-align:center;">${formatDate(c.date)}</td>`).join('')}
-      </tr>
-      <tr style="font-weight:bold;font-size:16px;">
-        ${columns.map((c) => `<td style="border:1px solid #cbd5cb;padding:10px 12px;text-align:center;">${c.sessionLabel}</td>`).join('')}
-      </tr>
-      <tr style="background:#eef2ee;font-weight:bold;font-size:16px;">
-        ${columns.map((c) => `<td style="border:1px solid #cbd5cb;padding:10px 12px;text-align:center;">${formatPaxTimeLine(c)}</td>`).join('')}
-      </tr>
-      ${copyType === 'billing' ? `<tr style="background:#faf8f5;font-weight:bold;font-size:16px;">
-        ${columns.map((c) => `<td style="border:1px solid #cbd5cb;padding:10px 12px;text-align:center;">${formatColumnAmount(c.amount) || '—'}</td>`).join('')}
-      </tr>` : ''}
-      <tr>
-        ${columns
-          .map((col) => {
-            const items = dishesForColumn(col, menuItems, extras);
-            const list =
-              items.length === 0
-                ? '—'
-                : `<ul style="margin:0;padding-left:0;list-style:none;">${items.map((l) => `<li style="font-size:22px;font-weight:600;line-height:1.45;padding:6px 0;">${l.dishName}${l.served ? ' ✓' : ''}</li>`).join('')}</ul>`;
-            return `<td style="border:1px solid #cbd5cb;padding:12px 14px;vertical-align:top;font-size:22px;">${list}</td>`;
-          })
-          .join('')}
-      </tr>
-    </table>`;
+      : columns.map((col) => buildSessionHtml(col, copyType, extras, menuItems)).join('');
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Verdana,Geneva,Tahoma,sans-serif;padding:24px;max-width:900px;margin:0 auto;font-size:17px;">
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Verdana,Geneva,Tahoma,sans-serif;padding:24px;max-width:720px;margin:0 auto;font-size:17px;">
     <h1 style="color:#0b6b3a;font-size:22px;">SRIVATSANKA</h1>
     <h2 style="font-size:16px;color:#64748b;">${title}</h2>
     <p style="font-weight:bold;font-size:18px;">Client : ${enquiry.customerName}${enquiry.eventType ? ` · ${enquiry.eventType}` : ''}</p>
     <p style="font-weight:bold;font-size:18px;">${enquiry.eventLocation}</p>
-    ${columnHtml}
+    <div style="margin-top:12px;">${columnHtml}</div>
   </body></html>`;
 }
 
