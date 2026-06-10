@@ -13,19 +13,26 @@ import {
 import { DishSearchSelect } from '../DishSearchSelect';
 import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
-import { OrderMenuItem } from './OrderMenuItem';
+import { OrderExcelHeader, OrderExcelMenuGrid } from './OrderExcelMenuGrid';
 import {
   formatOrderId,
   formatMealTimeRange,
+  groupMenuItems,
   mealSchedulesForSave,
   parseOrderNotes,
-  resolveMealSchedules,
   serializeOrderNotes,
   statusLabel,
   toDateInputValue,
   type OrderExtras,
 } from '../../utils/orderNotes';
-import { allMealSessionIds, MEAL_SESSIONS, PREFERENCE_CATEGORIES } from '../../utils/mealSessions';
+import { MEAL_SESSIONS, PREFERENCE_CATEGORIES } from '../../utils/mealSessions';
+import {
+  assignDishColumn,
+  findOrCreateColumn,
+  resolveMenuColumns,
+  sessionLabelOptions,
+  stripMenuColumnsForSave,
+} from '../../utils/orderMenuGrid';
 
 function splitCategories(categories: string[]): [string[], string[]] {
   const mid = Math.ceil(categories.length / 2);
@@ -33,7 +40,6 @@ function splitCategories(categories: string[]): [string[], string[]] {
 }
 
 function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
-  const sessions = resolveMealSchedules(extras);
   return {
     dateFrom: extras.scheduleDateFrom ?? defaultEventDate,
     dateTo: extras.scheduleDateTo ?? defaultEventDate,
@@ -41,11 +47,18 @@ function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
       MEAL_SESSIONS.map((s) => [
         s.id,
         {
-          timeFrom: sessions[s.id]?.timeFrom ?? '08:00',
-          timeTo: sessions[s.id]?.timeTo ?? '11:00',
+          timeFrom: extras.mealSchedules?.[s.id]?.timeFrom ?? '',
+          timeTo: extras.mealSchedules?.[s.id]?.timeTo ?? '',
         },
       ]),
     ) as Record<string, { timeFrom: string; timeTo: string }>,
+  };
+}
+
+function sessionTimesFromExtras(extras: OrderExtras, session: string) {
+  return {
+    timeFrom: extras.mealSchedules?.[session]?.timeFrom ?? '',
+    timeTo: extras.mealSchedules?.[session]?.timeTo ?? '',
   };
 }
 
@@ -72,8 +85,12 @@ export function OrderDetailView({
   const extras = useMemo(() => parseOrderNotes(order.notes), [order.notes]);
   const [draftExtras, setDraftExtras] = useState<OrderExtras>(extras);
   const defaultEventDate = toDateInputValue(order.eventDate);
-  const mealSchedules = useMemo(() => resolveMealSchedules(extras), [extras]);
   const [draftSchedule, setDraftSchedule] = useState(() => buildScheduleDraft(extras, defaultEventDate));
+  const [sessionTimeFrom, setSessionTimeFrom] = useState(() => sessionTimesFromExtras(extras, 'Breakfast').timeFrom);
+  const [sessionTimeTo, setSessionTimeTo] = useState(() => sessionTimesFromExtras(extras, 'Breakfast').timeTo);
+  const [columnDate, setColumnDate] = useState(() => extras.scheduleDateFrom ?? defaultEventDate);
+  const [columnPax, setColumnPax] = useState(String(order.guestCount || ''));
+  const [sessionLabel, setSessionLabel] = useState('');
 
   const menuItems = useMemo(
     () => (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category)),
@@ -92,8 +109,8 @@ export function OrderDetailView({
     return map;
   }, [menuItems]);
 
-  const sessionIds = allMealSessionIds();
-  const [colLeft, colRight] = splitCategories(sessionIds);
+  const orderedSessions = useMemo(() => groupMenuItems(menuItems), [menuItems]);
+  const [colLeft, colRight] = splitCategories(orderedSessions);
 
   const displayDietary = extras.dietary;
 
@@ -106,12 +123,22 @@ export function OrderDetailView({
           ? formatDate(from)
           : `${formatDate(from)} – ${formatDate(to)}`
         : '';
-    const sessionLines = MEAL_SESSIONS.map((s) => {
-      const range = formatMealTimeRange(mealSchedules[s.id]);
-      return range ? `${s.label}: ${range}` : null;
-    }).filter(Boolean) as string[];
+    const sessionLines = orderedSessions
+      .map((session) => {
+        const range = formatMealTimeRange(extras.mealSchedules?.[session]);
+        return range ? `${session}: ${range}` : null;
+      })
+      .filter(Boolean) as string[];
     return { datePart, sessionLines };
-  }, [extras, mealSchedules]);
+  }, [extras, orderedSessions]);
+
+  function pickMealSession(session: string) {
+    setMealSession(session);
+    const times = sessionTimesFromExtras(extras, session);
+    setSessionTimeFrom(times.timeFrom);
+    setSessionTimeTo(times.timeTo);
+    setSessionLabel('');
+  }
 
   async function handleAdd() {
     setAddError('');
@@ -123,12 +150,50 @@ export function OrderDetailView({
       setAddError('Choose a meal session (breakfast, lunch, etc.).');
       return;
     }
+    if (!columnDate) {
+      setAddError('Pick the service date for this column (like Excel row 3).');
+      return;
+    }
     setSaving(true);
     try {
-      await addOrderDish(order.id, {
+      const currentColumns = resolveMenuColumns(extras, order, menuItems);
+      const label = sessionLabel.trim() || sessionLabelOptions(mealSession);
+      const paxNum = columnPax.trim() ? Number(columnPax) : order.guestCount || null;
+      const { columns, columnId } = findOrCreateColumn(currentColumns, {
+        date: columnDate,
+        baseSession: mealSession,
+        sessionLabel: label,
+        pax: paxNum && !Number.isNaN(paxNum) ? paxNum : null,
+        timeFrom: sessionTimeFrom,
+        timeTo: sessionTimeTo,
+      });
+
+      let merged: OrderExtras = {
+        ...extras,
+        menuColumns: stripMenuColumnsForSave(columns),
+        mealSchedules: {
+          ...(extras.mealSchedules ?? {}),
+          [mealSession]: {
+            timeFrom: sessionTimeFrom || null,
+            timeTo: sessionTimeTo || null,
+          },
+        },
+      };
+      await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
+
+      const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
+      const updated = await addOrderDish(order.id, {
         dishId,
         category: mealSession,
       });
+      const newDish = updated.dishes.find(
+        (d) => !prevIds.has(d.id) && (d.dishId === dishId || d.dishName),
+      );
+      if (newDish) {
+        merged = assignDishColumn(merged, newDish.id, columnId);
+        await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
+      }
+
       setDishId('');
       await onRefresh();
     } catch {
@@ -178,35 +243,10 @@ export function OrderDetailView({
     setEditingExtras(true);
   }
 
-  function renderCategoryColumn(cats: string[]) {
-    return (
-      <div className="space-y-6">
-        {cats.map((cat) => {
-          const items = byCategory[cat] ?? [];
-          const timeLabel = formatMealTimeRange(mealSchedules[cat]);
-          return (
-            <div key={cat}>
-              <h4 className="text-sm font-semibold text-[var(--order-accent)] tracking-wide">
-                {cat}
-              </h4>
-              {timeLabel && (
-                <p className="text-[10px] text-[var(--muted)] mb-2">{timeLabel}</p>
-              )}
-              {items.length === 0 ? (
-                <p className="text-xs text-[var(--muted)] italic py-1">No dishes yet</p>
-              ) : (
-                <ul>
-                  {items.map((d) => (
-                    <OrderMenuItem key={d.id} orderId={order.id} dish={d} onUpdated={onRefresh} />
-                  ))}
-                </ul>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
+  const menuColumns = useMemo(
+    () => resolveMenuColumns(extras, order, menuItems),
+    [extras, order, menuItems],
+  );
 
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
@@ -282,14 +322,14 @@ export function OrderDetailView({
         {showAddForm && (
           <div className="mb-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]">
             <p className="text-sm text-[var(--muted)] mb-4">
-              One event can include breakfast, lunch, dinner, snacks, coffee, and more. Pick a session, add dishes, then switch session and keep adding.
+              Each column = one Excel block (date → session name → pax & time → dishes). Set details, then add dish names.
             </p>
             <div className="flex flex-wrap gap-2 mb-4">
               {MEAL_SESSIONS.map((s) => (
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setMealSession(s.id)}
+                  onClick={() => pickMealSession(s.id)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                     mealSession === s.id
                       ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
@@ -300,20 +340,57 @@ export function OrderDetailView({
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
-              <div className="lg:col-span-3">
-                <label className="text-xs text-[var(--muted)]">Meal session</label>
-                <select
-                  value={mealSession}
-                  onChange={(e) => setMealSession(e.target.value)}
-                  className="form-select w-full mt-1 px-3 py-2.5 rounded-lg text-sm"
-                >
-                  {MEAL_SESSIONS.map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
-                  ))}
-                </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <div>
+                <label className="text-xs text-[var(--muted)]">Service date</label>
+                <input
+                  type="date"
+                  value={columnDate}
+                  onChange={(e) => setColumnDate(e.target.value)}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                />
               </div>
-              <div className="lg:col-span-7">
+              <div>
+                <label className="text-xs text-[var(--muted)]">Session label (Excel row 4)</label>
+                <input
+                  type="text"
+                  value={sessionLabel}
+                  onChange={(e) => setSessionLabel(e.target.value)}
+                  placeholder={sessionLabelOptions(mealSession)}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--muted)]">Pax</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={columnPax}
+                  onChange={(e) => setColumnPax(e.target.value)}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--muted)]">Time from ({mealSession})</label>
+                <input
+                  type="time"
+                  value={sessionTimeFrom}
+                  onChange={(e) => setSessionTimeFrom(e.target.value)}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--muted)]">Time to ({mealSession})</label>
+                <input
+                  type="time"
+                  value={sessionTimeTo}
+                  onChange={(e) => setSessionTimeTo(e.target.value)}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+              <div className="lg:col-span-10">
                 <DishSearchSelect
                   dishes={dishes}
                   value={dishId}
@@ -330,14 +407,19 @@ export function OrderDetailView({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-          {renderCategoryColumn(colLeft)}
-          {renderCategoryColumn(colRight)}
-        </div>
-
-        {menuItems.length === 0 && (
-          <p className="text-center text-[var(--muted)] py-6 text-sm border-t border-[var(--border)] mt-6">
-            Use the session buttons above to add breakfast, lunch, dinner, and other services to this event.
+        {menuColumns.length > 0 || menuItems.length > 0 ? (
+          <>
+            <OrderExcelHeader order={order} />
+            <OrderExcelMenuGrid
+              order={order}
+              extras={extras}
+              menuItems={menuItems}
+              onRefresh={onRefresh}
+            />
+          </>
+        ) : (
+          <p className="text-center text-[var(--muted)] py-10 text-sm">
+            No menu items yet. Choose a session, set date, pax, and time, then add dishes — columns appear like the Excel menu sheet.
           </p>
         )}
 
@@ -409,42 +491,48 @@ export function OrderDetailView({
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-[var(--order-accent)] mb-3">Time for each meal session</p>
-              <div className="space-y-3">
-                {MEAL_SESSIONS.map((s) => (
-                  <div key={s.id} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
-                    <span className="font-medium text-[var(--foreground)]">{s.label}</span>
-                    <input
-                      type="time"
-                      value={draftSchedule.sessions[s.id]?.timeFrom ?? ''}
-                      onChange={(e) =>
-                        setDraftSchedule({
-                          ...draftSchedule,
-                          sessions: {
-                            ...draftSchedule.sessions,
-                            [s.id]: { ...draftSchedule.sessions[s.id], timeFrom: e.target.value },
-                          },
-                        })
-                      }
-                      className="form-input px-3 py-2 rounded-lg"
-                    />
-                    <input
-                      type="time"
-                      value={draftSchedule.sessions[s.id]?.timeTo ?? ''}
-                      onChange={(e) =>
-                        setDraftSchedule({
-                          ...draftSchedule,
-                          sessions: {
-                            ...draftSchedule.sessions,
-                            [s.id]: { ...draftSchedule.sessions[s.id], timeTo: e.target.value },
-                          },
-                        })
-                      }
-                      className="form-input px-3 py-2 rounded-lg"
-                    />
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs font-semibold text-[var(--order-accent)] mb-3">
+                Meal times (only sessions on this order)
+              </p>
+              {orderedSessions.length === 0 ? (
+                <p className="text-[var(--muted)] text-sm">Add menu items first, then set times above or here.</p>
+              ) : (
+                <div className="space-y-3">
+                  {orderedSessions.map((session) => (
+                    <div key={session} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                      <span className="font-medium text-[var(--foreground)]">{session}</span>
+                      <input
+                        type="time"
+                        value={draftSchedule.sessions[session]?.timeFrom ?? ''}
+                        onChange={(e) =>
+                          setDraftSchedule({
+                            ...draftSchedule,
+                            sessions: {
+                              ...draftSchedule.sessions,
+                              [session]: { ...draftSchedule.sessions[session], timeFrom: e.target.value },
+                            },
+                          })
+                        }
+                        className="form-input px-3 py-2 rounded-lg"
+                      />
+                      <input
+                        type="time"
+                        value={draftSchedule.sessions[session]?.timeTo ?? ''}
+                        onChange={(e) =>
+                          setDraftSchedule({
+                            ...draftSchedule,
+                            sessions: {
+                              ...draftSchedule.sessions,
+                              [session]: { ...draftSchedule.sessions[session], timeTo: e.target.value },
+                            },
+                          })
+                        }
+                        className="form-input px-3 py-2 rounded-lg"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -458,7 +546,7 @@ export function OrderDetailView({
             <div>
               <p className="text-xs font-semibold text-[var(--order-accent)] mb-2">Meal times</p>
               {scheduleSummary.sessionLines.length === 0 ? (
-                <p className="text-[var(--muted)]">Using default times — click Edit to adjust each session</p>
+                <p className="text-[var(--muted)]">Set times when adding each meal session</p>
               ) : (
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[var(--foreground)]">
                   {scheduleSummary.sessionLines.map((line) => (
@@ -470,7 +558,7 @@ export function OrderDetailView({
           </div>
         )}
         <p className="text-xs text-[var(--muted)] mt-4">
-          Same event can span several days. Set times separately for breakfast, lunch, dinner, snacks, coffee, etc.
+          Only meal sessions with dishes are shown. Set date range for multi-day events; enter times manually per session.
         </p>
       </div>
 

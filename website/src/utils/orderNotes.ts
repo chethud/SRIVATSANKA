@@ -8,6 +8,16 @@ export type MealSessionSchedule = {
   timeTo: string | null;
 };
 
+export type MenuColumn = {
+  id: string;
+  date: string;
+  sessionLabel: string;
+  baseSession: string;
+  pax: number | null;
+  timeFrom: string | null;
+  timeTo: string | null;
+};
+
 export type OrderExtras = {
   dietary: string[];
   liveCounters: string[];
@@ -19,6 +29,10 @@ export type OrderExtras = {
   /** @deprecated use mealSchedules */
   scheduleTimeTo?: string | null;
   mealSchedules?: Record<string, MealSessionSchedule>;
+  /** Excel-style columns: date + session label + pax/time per column */
+  menuColumns?: MenuColumn[];
+  /** Maps enquiry dish line id → menu column id */
+  dishColumns?: Record<string, string>;
   primaryWorkerId?: string | null;
   dispatchPhase?: DispatchPhase;
   itemDispatch?: Record<string, DispatchItemStatus>;
@@ -48,6 +62,8 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'scheduleTimeFrom' in parsed ||
     'scheduleTimeTo' in parsed ||
     'mealSchedules' in parsed ||
+    'menuColumns' in parsed ||
+    'dishColumns' in parsed ||
     'primaryWorkerId' in parsed ||
     'dispatchPhase' in parsed ||
     'itemDispatch' in parsed
@@ -68,6 +84,8 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         scheduleTimeFrom: parsed.scheduleTimeFrom ?? null,
         scheduleTimeTo: parsed.scheduleTimeTo ?? null,
         mealSchedules: parsed.mealSchedules ?? {},
+        menuColumns: parsed.menuColumns ?? [],
+        dishColumns: parsed.dishColumns ?? {},
         primaryWorkerId: parsed.primaryWorkerId ?? null,
         dispatchPhase: parsed.dispatchPhase ?? 'planned',
         itemDispatch: parsed.itemDispatch ?? {},
