@@ -34,8 +34,15 @@ export function OrderMenuItem({
 
   async function remove() {
     if (!confirm(`Remove ${dish.dishName} from this order?`)) return;
-    await deleteOrderDish(orderId, dish.id);
-    onUpdated();
+    setSaving(true);
+    try {
+      await deleteOrderDish(orderId, dish.id);
+      onUpdated();
+    } catch {
+      alert('Could not remove this item. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (editing) {
@@ -78,24 +85,28 @@ export function OrderMenuItem({
   }
 
   return (
-    <li className="flex items-center gap-2 py-1.5 text-sm group">
-      <span className="flex-1 text-[var(--foreground)] min-w-0">{dish.dishName}</span>
-      <div className="flex gap-0.5 opacity-70 group-hover:opacity-100 shrink-0">
+    <li className="flex items-start gap-2 py-2 text-[15px] leading-snug border-b border-[var(--border)] last:border-0">
+      <span className="flex-1 text-[var(--foreground)] min-w-0 pt-0.5">{dish.dishName}</span>
+      <div className="flex gap-1 shrink-0">
         <button
           type="button"
           onClick={startEdit}
-          className="p-1.5 rounded-md hover:bg-[var(--sidebar-hover)] text-[var(--muted)] hover:text-[var(--primary)]"
-          title="Edit item"
+          disabled={saving}
+          className="p-2 rounded-md border border-[var(--border)] hover:bg-[var(--sidebar-hover)] text-[var(--muted)] hover:text-[var(--primary)]"
+          title="Edit meal session"
+          aria-label={`Edit ${dish.dishName}`}
         >
-          <Pencil size={14} />
+          <Pencil size={16} />
         </button>
         <button
           type="button"
           onClick={remove}
-          className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--muted)] hover:text-red-600"
-          title="Remove item"
+          disabled={saving}
+          className="p-2 rounded-md border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+          title="Remove from menu"
+          aria-label={`Remove ${dish.dishName}`}
         >
-          <Trash2 size={14} />
+          <Trash2 size={16} />
         </button>
       </div>
     </li>

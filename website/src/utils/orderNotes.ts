@@ -16,6 +16,8 @@ export type MenuColumn = {
   pax: number | null;
   timeFrom: string | null;
   timeTo: string | null;
+  /** Total amount for this session column (not per dish). */
+  amount: number | null;
 };
 
 export type OrderExtras = {

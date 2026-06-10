@@ -3,6 +3,7 @@ import { BrandLogo } from './BrandLogo';
 import { parseOrderNotes } from '../utils/orderNotes';
 import {
   dishesForColumn,
+  formatColumnAmount,
   formatPaxTimeLine,
   resolveMenuColumns,
 } from '../utils/orderMenuGrid';
@@ -67,6 +68,18 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
               </div>
             ))}
           </div>
+          {copyType === 'billing' && (
+            <div
+              className="grid border-b border-[var(--border-strong)] bg-[var(--order-cream)]"
+              style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(180px, 1fr))` }}
+            >
+              {columns.map((col) => (
+                <div key={col.id} className="px-2 py-2 border-r border-[var(--border)] last:border-r-0 text-center font-bold">
+                  {formatColumnAmount(col.amount) || '—'}
+                </div>
+              ))}
+            </div>
+          )}
           <div
             className="grid items-start"
             style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(180px, 1fr))` }}

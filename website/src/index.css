@@ -179,7 +179,11 @@ body {
 
 .excel-menu-grid {
   font-family: Verdana, Geneva, Tahoma, sans-serif;
-  font-size: 11px;
+  font-size: 14px;
+}
+
+.order-view .excel-menu-grid {
+  font-size: 15px;
 }
 
 .order-view .rounded-2xl.bg-\[var\(--card\)\] {

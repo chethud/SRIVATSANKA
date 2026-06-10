@@ -27,6 +27,22 @@ function menuItemsOnly(dishes: EnquiryDish[]): EnquiryDish[] {
   return dishes.filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
 }
 
+function mapColumn(
+  c: MenuColumn,
+  extras: OrderExtras,
+): MenuColumn {
+  return {
+    id: c.id,
+    date: c.date,
+    sessionLabel: c.sessionLabel,
+    baseSession: c.baseSession,
+    pax: c.pax ?? null,
+    timeFrom: c.timeFrom ?? extras.mealSchedules?.[c.baseSession]?.timeFrom ?? null,
+    timeTo: c.timeTo ?? extras.mealSchedules?.[c.baseSession]?.timeTo ?? null,
+    amount: c.amount ?? null,
+  };
+}
+
 /** Build Excel-style columns from saved metadata or infer from existing dishes. */
 export function resolveMenuColumns(
   extras: OrderExtras,
@@ -36,15 +52,7 @@ export function resolveMenuColumns(
   const items = menuItemsOnly(dishes);
   const saved = extras.menuColumns ?? [];
   if (saved.length > 0) {
-    return saved.map((c) => ({
-      id: c.id,
-      date: c.date,
-      sessionLabel: c.sessionLabel,
-      baseSession: c.baseSession,
-      pax: c.pax ?? null,
-      timeFrom: c.timeFrom ?? extras.mealSchedules?.[c.baseSession]?.timeFrom ?? null,
-      timeTo: c.timeTo ?? extras.mealSchedules?.[c.baseSession]?.timeTo ?? null,
-    }));
+    return saved.map((c) => mapColumn(c, extras));
   }
 
   const fallbackDate = defaultDate(extras, order);
@@ -64,6 +72,7 @@ export function resolveMenuColumns(
       pax: order.guestCount || null,
       timeFrom: schedule?.timeFrom ?? null,
       timeTo: schedule?.timeTo ?? null,
+      amount: null,
     });
   }
 
@@ -127,6 +136,7 @@ export function findOrCreateColumn(
     pax: draft.pax,
     timeFrom: draft.timeFrom || null,
     timeTo: draft.timeTo || null,
+    amount: null,
   };
   return { columns: [...columns, col], columnId: col.id };
 }
@@ -142,19 +152,44 @@ export function assignDishColumn(
   };
 }
 
+export function updateColumnAmount(
+  extras: OrderExtras,
+  columns: MenuColumn[],
+  columnId: string,
+  amount: number | null,
+): OrderExtras {
+  const updated = columns.map((c) => (c.id === columnId ? { ...c, amount } : c));
+  return {
+    ...extras,
+    menuColumns: stripMenuColumnsForSave(updated),
+  };
+}
+
 export function sessionLabelOptions(baseSession: string): string {
   const match = MEAL_SESSIONS.find((s) => s.id === baseSession);
   return match?.label ?? baseSession;
 }
 
 export function stripMenuColumnsForSave(columns: MenuColumn[]): MenuColumn[] {
-  return columns.map(({ id, date, sessionLabel, baseSession, pax, timeFrom, timeTo }) => ({
-    id,
-    date,
-    sessionLabel,
-    baseSession,
-    pax,
-    timeFrom,
-    timeTo,
-  }));
+  return columns.map(
+    ({ id, date, sessionLabel, baseSession, pax, timeFrom, timeTo, amount }) => ({
+      id,
+      date,
+      sessionLabel,
+      baseSession,
+      pax,
+      timeFrom,
+      timeTo,
+      amount: amount ?? null,
+    }),
+  );
+}
+
+export function formatColumnAmount(amount: number | null | undefined): string {
+  if (amount == null || Number.isNaN(amount)) return '';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }

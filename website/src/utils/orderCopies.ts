@@ -2,6 +2,7 @@ import { formatDate, type Enquiry } from '../api/client';
 import { parseOrderNotes } from './orderNotes';
 import {
   dishesForColumn,
+  formatColumnAmount,
   formatPaxTimeLine,
   resolveMenuColumns,
 } from './orderMenuGrid';
@@ -27,6 +28,9 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
       <tr style="background:#eef2ee;font-weight:bold;">
         ${columns.map((c) => `<td style="border:1px solid #cbd5cb;padding:8px;text-align:center;">${formatPaxTimeLine(c)}</td>`).join('')}
       </tr>
+      ${copyType === 'billing' ? `<tr style="background:#faf8f5;font-weight:bold;">
+        ${columns.map((c) => `<td style="border:1px solid #cbd5cb;padding:8px;text-align:center;">${formatColumnAmount(c.amount) || '—'}</td>`).join('')}
+      </tr>` : ''}
       <tr>
         ${columns
           .map((col) => {
