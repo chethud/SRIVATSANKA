@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { updateOrderDish, deleteOrderDish, type EnquiryDish } from '../../api/client';
-import { CustomizationInput } from './CustomizationInput';
 import { MEAL_SESSIONS } from '../../utils/mealSessions';
 
 export function OrderMenuItem({
@@ -15,22 +14,17 @@ export function OrderMenuItem({
 }) {
   const [editing, setEditing] = useState(false);
   const [session, setSession] = useState(dish.category);
-  const [custom, setCustom] = useState(dish.customizations ?? '');
   const [saving, setSaving] = useState(false);
 
   function startEdit() {
     setSession(dish.category);
-    setCustom(dish.customizations ?? '');
     setEditing(true);
   }
 
   async function save() {
     setSaving(true);
     try {
-      await updateOrderDish(orderId, dish.id, {
-        category: session,
-        customizations: custom || undefined,
-      });
+      await updateOrderDish(orderId, dish.id, { category: session });
       setEditing(false);
       onUpdated();
     } finally {
@@ -61,15 +55,6 @@ export function OrderMenuItem({
               ))}
             </select>
           </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="text-[10px] uppercase text-[var(--muted)]">Customization</label>
-            <CustomizationInput
-              id={`edit-custom-${dish.id}`}
-              value={custom}
-              onChange={setCustom}
-              className="form-input w-full mt-0.5 px-2 py-1 rounded text-sm"
-            />
-          </div>
           <button
             type="button"
             onClick={save}
@@ -94,12 +79,7 @@ export function OrderMenuItem({
 
   return (
     <li className="flex items-center gap-2 py-1.5 text-sm group">
-      <span className="flex-1 text-[var(--foreground)] min-w-0">
-        {dish.dishName}
-        {dish.customizations && (
-          <span className="block text-xs text-[var(--muted)] truncate">{dish.customizations}</span>
-        )}
-      </span>
+      <span className="flex-1 text-[var(--foreground)] min-w-0">{dish.dishName}</span>
       <div className="flex gap-0.5 opacity-70 group-hover:opacity-100 shrink-0">
         <button
           type="button"

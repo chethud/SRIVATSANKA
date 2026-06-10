@@ -20,6 +20,23 @@ export const MEAL_SESSION_ORDER: string[] = [
 
 export const PREFERENCE_CATEGORIES = new Set(['Meal Preference', 'Cuisine Preference']);
 
+/** Default service windows per meal session (matches typical wedding menus). */
+export const DEFAULT_MEAL_TIMES: Record<string, { timeFrom: string; timeTo: string }> = {
+  Breakfast: { timeFrom: '08:00', timeTo: '11:00' },
+  Lunch: { timeFrom: '12:00', timeTo: '15:00' },
+  Dinner: { timeFrom: '19:00', timeTo: '22:00' },
+  'Reception Dinner': { timeFrom: '19:00', timeTo: '23:00' },
+  Snacks: { timeFrom: '16:30', timeTo: '18:00' },
+  Coffee: { timeFrom: '06:00', timeTo: '11:00' },
+  Tea: { timeFrom: '15:00', timeTo: '18:00' },
+  Juice: { timeFrom: '10:00', timeTo: '17:00' },
+  Dessert: { timeFrom: '20:00', timeTo: '22:00' },
+};
+
+export function allMealSessionIds(): string[] {
+  return MEAL_SESSIONS.map((s) => s.id);
+}
+
 export function isMenuSessionCategory(category: string): boolean {
   return !PREFERENCE_CATEGORIES.has(category);
 }
