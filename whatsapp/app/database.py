@@ -122,6 +122,23 @@ async def _migrate_sqlite_columns() -> None:
             for sql in alters:
                 connection.execute(sa.text(sql))
 
+            if "Dish" in tables:
+                from app.data.meal_sessions import OLD_DISH_ENUM_MAP, OLD_ENQUIRY_CATEGORY_MAP
+
+                for old_val, new_val in OLD_DISH_ENUM_MAP.items():
+                    connection.execute(
+                        sa.text("UPDATE Dish SET category = :new WHERE category = :old"),
+                        {"old": old_val, "new": new_val},
+                    )
+            if "EnquiryDish" in tables:
+                from app.data.meal_sessions import OLD_ENQUIRY_CATEGORY_MAP
+
+                for old_val, new_val in OLD_ENQUIRY_CATEGORY_MAP.items():
+                    connection.execute(
+                        sa.text("UPDATE EnquiryDish SET category = :new WHERE category = :old"),
+                        {"old": old_val, "new": new_val},
+                    )
+
         await conn.run_sync(run)
 
 

@@ -25,12 +25,15 @@ class NotificationType(str, enum.Enum):
 
 
 class DishCategory(str, enum.Enum):
-    SOUTH_INDIAN = "SOUTH_INDIAN"
-    NORTH_INDIAN = "NORTH_INDIAN"
-    CHINESE = "CHINESE"
+    BREAKFAST = "BREAKFAST"
+    LUNCH = "LUNCH"
+    DINNER = "DINNER"
+    RECEPTION_DINNER = "RECEPTION_DINNER"
+    COFFEE = "COFFEE"
+    TEA = "TEA"
+    JUICE = "JUICE"
+    DESSERT = "DESSERT"
     SNACKS = "SNACKS"
-    DESSERTS = "DESSERTS"
-    BEVERAGES = "BEVERAGES"
 
 
 class Enquiry(Base):

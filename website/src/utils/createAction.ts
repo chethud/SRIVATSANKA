@@ -20,7 +20,7 @@ export function getCreateButtonLabel(pathname: string): string {
     case 'worker':
       return 'New worker';
     case 'dish':
-      return 'New cuisine item';
+      return 'New menu item';
     default:
       return 'Create';
   }

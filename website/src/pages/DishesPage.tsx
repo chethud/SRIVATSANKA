@@ -4,25 +4,18 @@ import { useAppData } from '../context/AppDataContext';
 import { createDish } from '../api/client';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { SearchInput, FilterChips } from '../components/ui';
+import { MEAL_SESSIONS } from '../utils/mealSessions';
 
-const CATEGORIES = [
-  { id: 'ALL', label: 'All' },
-  { id: 'South Indian', label: 'South Indian' },
-  { id: 'North Indian', label: 'North Indian' },
-  { id: 'Chinese', label: 'Chinese' },
-  { id: 'Snacks', label: 'Snacks' },
-  { id: 'Desserts', label: 'Desserts' },
-  { id: 'Beverages', label: 'Beverages' },
-];
+const CATEGORIES = [{ id: 'ALL', label: 'All' }, ...MEAL_SESSIONS];
 
-const ADD_CATEGORIES = CATEGORIES.filter((c) => c.id !== 'ALL');
+const ADD_CATEGORIES = MEAL_SESSIONS;
 
 export default function DishesPage() {
   const { dishes, refresh } = useAppData();
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('ALL');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', category: 'South Indian', description: '' });
+  const [form, setForm] = useState({ name: '', category: 'Breakfast' as string, description: '' });
 
   useCreateActionListener('dish', () => setShowForm(true));
 
@@ -47,14 +40,14 @@ export default function DishesPage() {
       price: 0,
       description: form.description || undefined,
     });
-    setForm({ name: '', category: 'South Indian', description: '' });
+    setForm({ name: '', category: 'Breakfast', description: '' });
     setShowForm(false);
     refresh();
   }
 
   return (
     <>
-      <PageHeader title="Cuisine" description={`${dishes.length} menu items — use header New cuisine item to add`} />
+      <PageHeader title="Menu" description={`${dishes.length} dishes — add by meal session (breakfast, lunch, dinner, etc.)`} />
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">

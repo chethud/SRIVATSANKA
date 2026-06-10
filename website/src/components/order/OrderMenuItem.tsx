@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { updateOrderDish, deleteOrderDish, type EnquiryDish } from '../../api/client';
-import { formatQuantityDisplay, normalizeQuantityUnit } from '../../utils/quantityUnits';
-import { QuantityUnitFields } from './QuantityUnitFields';
 import { CustomizationInput } from './CustomizationInput';
+import { MEAL_SESSIONS } from '../../utils/mealSessions';
 
 export function OrderMenuItem({
   orderId,
@@ -15,14 +14,12 @@ export function OrderMenuItem({
   onUpdated: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [qty, setQty] = useState(dish.quantity);
-  const [qtyUnit, setQtyUnit] = useState<string>(normalizeQuantityUnit(dish.quantityUnit));
+  const [session, setSession] = useState(dish.category);
   const [custom, setCustom] = useState(dish.customizations ?? '');
   const [saving, setSaving] = useState(false);
 
   function startEdit() {
-    setQty(dish.quantity);
-    setQtyUnit(normalizeQuantityUnit(dish.quantityUnit));
+    setSession(dish.category);
     setCustom(dish.customizations ?? '');
     setEditing(true);
   }
@@ -31,8 +28,7 @@ export function OrderMenuItem({
     setSaving(true);
     try {
       await updateOrderDish(orderId, dish.id, {
-        quantity: qty,
-        quantityUnit: qtyUnit,
+        category: session,
         customizations: custom || undefined,
       });
       setEditing(false);
@@ -53,16 +49,17 @@ export function OrderMenuItem({
       <li className="py-2 border-b border-[var(--border)] last:border-0">
         <p className="text-sm font-medium text-[var(--foreground)] mb-2">{dish.dishName}</p>
         <div className="flex flex-wrap gap-2 items-end">
-          <div className="grid grid-cols-2 gap-2 w-48">
-            <QuantityUnitFields
-              idPrefix={`menu-${dish.id}`}
-              quantity={qty}
-              unit={qtyUnit}
-              onQuantityChange={setQty}
-              onUnitChange={setQtyUnit}
-              quantityClassName="form-input w-full mt-0.5 px-2 py-1 rounded text-sm"
-              unitClassName="form-select w-full mt-0.5 px-2 py-1 rounded text-sm"
-            />
+          <div className="min-w-[140px]">
+            <label className="text-[10px] uppercase text-[var(--muted)]">Meal session</label>
+            <select
+              value={session}
+              onChange={(e) => setSession(e.target.value)}
+              className="form-select w-full mt-0.5 px-2 py-1 rounded text-sm"
+            >
+              {MEAL_SESSIONS.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
           </div>
           <div className="flex-1 min-w-[140px]">
             <label className="text-[10px] uppercase text-[var(--muted)]">Customization</label>
@@ -102,9 +99,6 @@ export function OrderMenuItem({
         {dish.customizations && (
           <span className="block text-xs text-[var(--muted)] truncate">{dish.customizations}</span>
         )}
-      </span>
-      <span className="text-[var(--muted)] tabular-nums shrink-0">
-        {formatQuantityDisplay(dish.quantity, dish.quantityUnit)}
       </span>
       <div className="flex gap-0.5 opacity-70 group-hover:opacity-100 shrink-0">
         <button

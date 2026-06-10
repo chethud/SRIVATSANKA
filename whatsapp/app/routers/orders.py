@@ -9,6 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.data.meal_sessions import (
+    LABEL_TO_DISH_CATEGORY,
+    MEAL_SESSION_LABELS,
+    OLD_DISH_ENUM_MAP,
+    OLD_ENQUIRY_CATEGORY_MAP,
+    normalize_meal_session_label,
+)
 from app.data.seed_dishes import CATEGORY_LABELS
 from app.database import get_db
 from app.models import Dish, DishCategory, Enquiry, EnquiryDish, EnquiryStatus, InvoiceUpload
@@ -30,15 +37,7 @@ router = APIRouter(prefix="/api", tags=["orders"])
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-LABEL_TO_CATEGORY: dict[str, DishCategory] = {v: k for k, v in CATEGORY_LABELS.items()}
-LABEL_TO_CATEGORY.update({
-    "South Indian": DishCategory.SOUTH_INDIAN,
-    "North Indian": DishCategory.NORTH_INDIAN,
-    "Chinese": DishCategory.CHINESE,
-    "Snacks": DishCategory.SNACKS,
-    "Desserts": DishCategory.DESSERTS,
-    "Beverages": DishCategory.BEVERAGES,
-})
+LABEL_TO_CATEGORY: dict[str, DishCategory] = dict(LABEL_TO_DISH_CATEGORY)
 
 
 def _dish_out(d: EnquiryDish) -> EnquiryDishOut:
@@ -115,11 +114,18 @@ async def add_order_dish(
     if not menu or not menu.isActive:
         raise HTTPException(404, "Dish not found in menu")
 
+    if payload.category:
+        session_label = normalize_meal_session_label(payload.category)
+        if not session_label:
+            raise HTTPException(400, "Invalid meal session")
+    else:
+        session_label = CATEGORY_LABELS.get(menu.category, MEAL_SESSION_LABELS[DishCategory.LUNCH])
+
     item = EnquiryDish(
         enquiryId=enquiry.id,
         dishId=menu.id,
         dishName=menu.name,
-        category=CATEGORY_LABELS.get(menu.category, str(menu.category)),
+        category=session_label,
         customizations=payload.customizations,
         notes=payload.notes,
         quantity=normalize_quantity(payload.quantity),
@@ -146,6 +152,11 @@ async def update_order_dish(
         raise HTTPException(404, "Order dish not found")
 
     data = payload.model_dump(exclude_unset=True)
+    if "category" in data and data["category"] is not None:
+        session_label = normalize_meal_session_label(data["category"])
+        if not session_label:
+            raise HTTPException(400, "Invalid meal session")
+        data["category"] = session_label
     if "quantity" in data:
         data["quantity"] = normalize_quantity(data["quantity"])
     if "quantityUnit" in data:

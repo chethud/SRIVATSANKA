@@ -1,59 +1,78 @@
 """Default menu items seeded on first run."""
 
+from app.data.meal_sessions import MEAL_SESSION_LABELS
 from app.models import Dish, DishCategory
 
-DEFAULT_DISHES: list[tuple[str, DishCategory, float]] = [
-    # South Indian
-    ("Sambar Rice", DishCategory.SOUTH_INDIAN, 80),
-    ("Lemon Rice", DishCategory.SOUTH_INDIAN, 70),
-    ("Coconut Rice", DishCategory.SOUTH_INDIAN, 75),
-    ("Vegetable Biryani", DishCategory.SOUTH_INDIAN, 120),
-    ("Masala Dosa", DishCategory.SOUTH_INDIAN, 60),
-    ("Idli Sambar", DishCategory.SOUTH_INDIAN, 50),
-    ("Pongal", DishCategory.SOUTH_INDIAN, 65),
-    ("Curd Rice", DishCategory.SOUTH_INDIAN, 55),
-    # North Indian
-    ("Paneer Butter Masala", DishCategory.NORTH_INDIAN, 180),
-    ("Dal Makhani", DishCategory.NORTH_INDIAN, 140),
-    ("Veg Biryani", DishCategory.NORTH_INDIAN, 130),
-    ("Naan", DishCategory.NORTH_INDIAN, 40),
-    ("Roti", DishCategory.NORTH_INDIAN, 25),
-    ("Palak Paneer", DishCategory.NORTH_INDIAN, 160),
-    ("Chole Bhature", DishCategory.NORTH_INDIAN, 120),
-    # Chinese
-    ("Veg Fried Rice", DishCategory.CHINESE, 110),
-    ("Noodles", DishCategory.CHINESE, 100),
-    ("Manchurian", DishCategory.CHINESE, 130),
-    ("Spring Rolls", DishCategory.CHINESE, 90),
-    ("Gobi Manchurian", DishCategory.CHINESE, 120),
-    # Snacks
-    ("Samosa", DishCategory.SNACKS, 30),
-    ("Veg Cutlet", DishCategory.SNACKS, 40),
-    ("Pakora", DishCategory.SNACKS, 50),
-    ("Sandwich", DishCategory.SNACKS, 60),
-    ("Puffs", DishCategory.SNACKS, 35),
-    # Desserts
-    ("Gulab Jamun", DishCategory.DESSERTS, 50),
-    ("Rasmalai", DishCategory.DESSERTS, 60),
-    ("Ice Cream", DishCategory.DESSERTS, 45),
-    ("Kheer", DishCategory.DESSERTS, 55),
-    ("Jalebi", DishCategory.DESSERTS, 40),
-    # Beverages
-    ("Filter Coffee", DishCategory.BEVERAGES, 30),
-    ("Tea", DishCategory.BEVERAGES, 20),
-    ("Fresh Juice", DishCategory.BEVERAGES, 50),
-    ("Buttermilk", DishCategory.BEVERAGES, 25),
-    ("Soft Drink", DishCategory.BEVERAGES, 35),
-]
+# Re-export for existing imports
+CATEGORY_LABELS = MEAL_SESSION_LABELS
 
-CATEGORY_LABELS: dict[DishCategory, str] = {
-    DishCategory.SOUTH_INDIAN: "South Indian",
-    DishCategory.NORTH_INDIAN: "North Indian",
-    DishCategory.CHINESE: "Chinese",
-    DishCategory.SNACKS: "Snacks",
-    DishCategory.DESSERTS: "Desserts",
-    DishCategory.BEVERAGES: "Beverages",
-}
+DEFAULT_DISHES: list[tuple[str, DishCategory, float]] = [
+    # Breakfast
+    ("Thari Idly", DishCategory.BREAKFAST, 0),
+    ("Thatte Idly", DishCategory.BREAKFAST, 0),
+    ("Rave Idly", DishCategory.BREAKFAST, 0),
+    ("Rava Idli", DishCategory.BREAKFAST, 0),
+    ("Masala Dosa", DishCategory.BREAKFAST, 0),
+    ("Mulbhaglu Dose", DishCategory.BREAKFAST, 0),
+    ("Idli Sambar", DishCategory.BREAKFAST, 0),
+    ("Pongal", DishCategory.BREAKFAST, 0),
+    ("Khara Pongal", DishCategory.BREAKFAST, 0),
+    ("Vade", DishCategory.BREAKFAST, 0),
+    ("Paddu", DishCategory.BREAKFAST, 0),
+    ("Bonda", DishCategory.BREAKFAST, 0),
+    ("Shavige Bath", DishCategory.BREAKFAST, 0),
+    ("Akki Thari coconut Upma", DishCategory.BREAKFAST, 0),
+    ("Gojju Avalakki", DishCategory.BREAKFAST, 0),
+    # Lunch
+    ("Sambar Rice", DishCategory.LUNCH, 0),
+    ("Lemon Rice", DishCategory.LUNCH, 0),
+    ("Coconut Rice", DishCategory.LUNCH, 0),
+    ("Curd Rice", DishCategory.LUNCH, 0),
+    ("Raw Mango Rice", DishCategory.LUNCH, 0),
+    ("Tomato Peas Bath", DishCategory.LUNCH, 0),
+    ("Vegetable Biryani", DishCategory.LUNCH, 0),
+    ("Veg Biryani", DishCategory.LUNCH, 0),
+    ("Dal Makhani", DishCategory.LUNCH, 0),
+    ("Chole Bhature", DishCategory.LUNCH, 0),
+    ("Kabul Usli", DishCategory.LUNCH, 0),
+    # Dinner / reception
+    ("Paneer Butter Masala", DishCategory.DINNER, 0),
+    ("Palak Paneer", DishCategory.DINNER, 0),
+    ("Naan", DishCategory.DINNER, 0),
+    ("Roti", DishCategory.DINNER, 0),
+    ("Veg Fried Rice", DishCategory.RECEPTION_DINNER, 0),
+    ("Noodles", DishCategory.RECEPTION_DINNER, 0),
+    ("Manchurian", DishCategory.RECEPTION_DINNER, 0),
+    ("Gobi Manchurian", DishCategory.RECEPTION_DINNER, 0),
+    # Snacks
+    ("Samosa", DishCategory.SNACKS, 0),
+    ("Pakora", DishCategory.SNACKS, 0),
+    ("Mangalore Bajji", DishCategory.SNACKS, 0),
+    ("Aloo Tikki", DishCategory.SNACKS, 0),
+    ("Spring Rolls", DishCategory.SNACKS, 0),
+    ("Veg Cutlet", DishCategory.SNACKS, 0),
+    ("Sandwich", DishCategory.SNACKS, 0),
+    ("Puffs", DishCategory.SNACKS, 0),
+    ("Ambode", DishCategory.SNACKS, 0),
+    # Dessert
+    ("Gulab Jamun", DishCategory.DESSERT, 0),
+    ("Angoor Jamun", DishCategory.DESSERT, 0),
+    ("Ashoka Halwa", DishCategory.DESSERT, 0),
+    ("Carrot Halwa", DishCategory.DESSERT, 0),
+    ("Badam Halwa", DishCategory.DESSERT, 0),
+    ("Jangiri", DishCategory.DESSERT, 0),
+    ("Shavige payasa", DishCategory.DESSERT, 0),
+    ("Kheer", DishCategory.DESSERT, 0),
+    ("Rasmalai", DishCategory.DESSERT, 0),
+    ("Jalebi", DishCategory.DESSERT, 0),
+    # Coffee / tea / juice
+    ("Filter Coffee", DishCategory.COFFEE, 0),
+    ("Coffee Sugarless", DishCategory.COFFEE, 0),
+    ("Tea Coffee", DishCategory.COFFEE, 0),
+    ("Tea", DishCategory.TEA, 0),
+    ("Fresh Juice", DishCategory.JUICE, 0),
+    ("Buttermilk", DishCategory.JUICE, 0),
+]
 
 CUSTOMIZATION_OPTIONS: list[tuple[str, str]] = [
     ("1", "No Milk"),

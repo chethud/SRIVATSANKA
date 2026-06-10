@@ -22,7 +22,7 @@ import {
   statusLabel,
   type OrderExtras,
 } from '../../utils/orderNotes';
-import { QuantityUnitFields } from './QuantityUnitFields';
+import { MEAL_SESSIONS, PREFERENCE_CATEGORIES } from '../../utils/mealSessions';
 
 function splitCategories(categories: string[]): [string[], string[]] {
   const mid = Math.ceil(categories.length / 2);
@@ -43,8 +43,7 @@ export function OrderDetailView({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingExtras, setEditingExtras] = useState(false);
   const [dishId, setDishId] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [quantityUnit, setQuantityUnit] = useState('pcs');
+  const [mealSession, setMealSession] = useState('Breakfast');
   const [customization, setCustomization] = useState('');
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState('');
@@ -53,11 +52,11 @@ export function OrderDetailView({
   const [draftExtras, setDraftExtras] = useState<OrderExtras>(extras);
 
   const menuItems = useMemo(
-    () => (order.dishes ?? []).filter((d) => d.category !== 'Cuisine Preference'),
+    () => (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category)),
     [order.dishes],
   );
-  const cuisinePrefs = useMemo(
-    () => (order.dishes ?? []).filter((d) => d.category === 'Cuisine Preference'),
+  const mealPrefs = useMemo(
+    () => (order.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
     [order.dishes],
   );
 
@@ -88,17 +87,18 @@ export function OrderDetailView({
       setAddError('Select a menu item first.');
       return;
     }
+    if (!mealSession) {
+      setAddError('Choose a meal session (breakfast, lunch, etc.).');
+      return;
+    }
     setSaving(true);
     try {
       await addOrderDish(order.id, {
         dishId,
-        quantity,
-        quantityUnit,
+        category: mealSession,
         customizations: customization || undefined,
       });
       setDishId('');
-      setQuantity(1);
-      setQuantityUnit('pcs');
       setCustomization('');
       setShowAddForm(false);
       await onRefresh();
@@ -217,22 +217,25 @@ export function OrderDetailView({
 
         {showAddForm && (
           <div className="mb-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]">
-            <p className="text-sm text-[var(--muted)] mb-4">Search the menu, set quantity and unit (pieces, kg, liters, etc.).</p>
+            <p className="text-sm text-[var(--muted)] mb-4">Pick the meal session, then search and add dish names — like your Excel menu sheets.</p>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
               <div className="lg:col-span-3">
+                <label className="text-xs text-[var(--muted)]">Meal session</label>
+                <select
+                  value={mealSession}
+                  onChange={(e) => setMealSession(e.target.value)}
+                  className="form-select w-full mt-1 px-3 py-2.5 rounded-lg text-sm"
+                >
+                  {MEAL_SESSIONS.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="lg:col-span-4">
                 <DishSearchSelect
                   dishes={dishes}
                   value={dishId}
                   onChange={setDishId}
-                />
-              </div>
-              <div className="lg:col-span-4 grid grid-cols-2 gap-2">
-                <QuantityUnitFields
-                  idPrefix={`add-${order.id}`}
-                  quantity={quantity}
-                  unit={quantityUnit}
-                  onQuantityChange={setQuantity}
-                  onUnitChange={setQuantityUnit}
                 />
               </div>
               <div className="lg:col-span-3">
@@ -264,11 +267,11 @@ export function OrderDetailView({
           </div>
         )}
 
-        {cuisinePrefs.length > 0 && (
+        {mealPrefs.length > 0 && (
           <div className="mt-8 pt-6 border-t border-[var(--border)]">
-            <h4 className="text-sm font-semibold text-[var(--order-accent)] mb-2">Cuisine style (from enquiry)</h4>
+            <h4 className="text-sm font-semibold text-[var(--order-accent)] mb-2">Meal services (from enquiry)</h4>
             <ul className="text-sm space-y-1">
-              {cuisinePrefs.map((d) => (
+              {mealPrefs.map((d) => (
                 <li key={d.id} className="flex justify-between gap-4">
                   <span>{d.dishName}</span>
                 </li>

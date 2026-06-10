@@ -51,6 +51,7 @@ class EnquiryDishOut(BaseModel):
 
 class OrderDishIn(BaseModel):
     dishId: str
+    category: str | None = None
     quantity: float = 1
     quantityUnit: str = "pcs"
     customizations: str | None = None
@@ -59,6 +60,7 @@ class OrderDishIn(BaseModel):
 
 
 class OrderDishUpdate(BaseModel):
+    category: str | None = None
     customizations: str | None = None
     notes: str | None = None
     quantity: float | None = None

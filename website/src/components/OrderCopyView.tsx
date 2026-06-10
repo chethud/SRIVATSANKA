@@ -1,6 +1,5 @@
 import { formatDate, type Enquiry } from '../api/client';
 import { BrandLogo } from './BrandLogo';
-import { formatQuantityDisplay } from '../utils/quantityUnits';
 
 export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: 'kitchen' | 'billing' }) {
   const lines = enquiry.dishes ?? [];
@@ -22,28 +21,16 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
       {lines.length === 0 ? (
         <p className="text-[var(--muted)] text-sm">No dishes on this order yet.</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b-2 border-[var(--primary-dark)]">
-              <th className="text-left py-2">Dish</th>
-              <th className="text-left py-2">Quantity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((l) => (
-              <tr key={l.id} className="border-b border-[var(--border)]">
-                <td className="py-3">
-                  {l.dishName}
-                  {l.served && <span className="text-[var(--logo-forest)] text-xs ml-1">✓ served</span>}
-                  {l.customizations && <span className="block text-xs text-[var(--muted)] mt-0.5">{l.customizations}</span>}
-                </td>
-                <td className="py-3 text-[var(--muted)]">{formatQuantityDisplay(l.quantity, l.quantityUnit)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="space-y-2 text-sm">
+          {lines.map((l) => (
+            <li key={l.id} className="py-2 border-b border-[var(--border)]">
+              {l.dishName}
+              {l.served && <span className="text-[var(--logo-forest)] text-xs ml-1">✓ served</span>}
+              {l.customizations && <span className="block text-xs text-[var(--muted)] mt-0.5">{l.customizations}</span>}
+            </li>
+          ))}
+        </ul>
       )}
-      <p className="text-xs text-[var(--muted)] mt-8">Menu quantities only — no pricing on this copy.</p>
     </div>
   );
 }

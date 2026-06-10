@@ -1,3 +1,5 @@
+import { MEAL_SESSION_ORDER, PREFERENCE_CATEGORIES } from './mealSessions';
+
 export type DispatchItemStatus = 'pending' | 'packed' | 'dispatched' | 'served';
 export type DispatchPhase = 'planned' | 'preparing' | 'out_for_delivery' | 'completed';
 
@@ -52,23 +54,13 @@ export function formatOrderId(id: string): string {
   return `ORD-${tail || '000'}`;
 }
 
-const CATEGORY_ORDER = [
-  'Snacks',
-  'Snacks & Starters',
-  'South Indian',
-  'North Indian',
-  'Chinese',
-  'Multi Cuisine',
-  'Desserts',
-  'Beverages',
-  'Cuisine Preference',
-];
-
 export function groupMenuItems(dishes: { category: string }[]): string[] {
-  const cats = [...new Set(dishes.map((d) => d.category))];
+  const cats = [...new Set(dishes.map((d) => d.category))].filter(
+    (c) => !PREFERENCE_CATEGORIES.has(c),
+  );
   return cats.sort((a, b) => {
-    const ia = CATEGORY_ORDER.indexOf(a);
-    const ib = CATEGORY_ORDER.indexOf(b);
+    const ia = MEAL_SESSION_ORDER.indexOf(a);
+    const ib = MEAL_SESSION_ORDER.indexOf(b);
     if (ia === -1 && ib === -1) return a.localeCompare(b);
     if (ia === -1) return 1;
     if (ib === -1) return -1;

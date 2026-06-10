@@ -8,7 +8,6 @@ import {
   type OrderExtras,
   serializeOrderNotes,
 } from '../../utils/orderNotes';
-import { formatQuantityDisplay } from '../../utils/quantityUnits';
 
 const PHASES: { id: DispatchPhase; label: string }[] = [
   { id: 'planned', label: 'Planned' },
@@ -107,9 +106,6 @@ export function OrderDispatchSection({
                 return (
                   <li key={d.id} className="flex flex-wrap items-center gap-2 text-sm py-1">
                     <span className="flex-1 min-w-[120px] text-[var(--foreground)]">{d.dishName}</span>
-                    <span className="text-[var(--muted)] tabular-nums shrink-0">
-                      {formatQuantityDisplay(d.quantity, d.quantityUnit)}
-                    </span>
                     <button
                       type="button"
                       disabled={saving}

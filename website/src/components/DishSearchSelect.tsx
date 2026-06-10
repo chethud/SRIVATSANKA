@@ -42,7 +42,7 @@ export function DishSearchSelect({
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
         <input
           type="search"
-          value={open ? query : selected ? `${selected.name} (${selected.category})` : query}
+          value={open ? query : selected ? selected.name : query}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
