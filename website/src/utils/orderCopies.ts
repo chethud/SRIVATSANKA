@@ -76,12 +76,21 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
     </div>`
       : '';
 
+  const regionalStyle = extras.regionalStyle?.trim();
+  const regionalHtml = regionalStyle
+    ? `<div style="margin-top:24px;border:1px solid #cbd5cb;overflow:hidden;">
+      <div style="background:#f8faf8;font-weight:bold;font-size:16px;padding:10px 12px;text-align:center;border-bottom:1px solid #cbd5cb;">Regional / cuisine style</div>
+      <div style="padding:14px 12px;text-align:center;font-weight:bold;font-size:18px;">${regionalStyle}</div>
+    </div>`
+    : '';
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Verdana,Geneva,Tahoma,sans-serif;padding:24px;max-width:720px;margin:0 auto;font-size:17px;">
     <h1 style="color:#0b6b3a;font-size:22px;">SRIVATSANKA</h1>
     <h2 style="font-size:16px;color:#64748b;">${title}</h2>
     <p style="font-weight:bold;font-size:18px;">Client : ${enquiry.customerName}${enquiry.eventType ? ` · ${enquiry.eventType}` : ''}</p>
     <p style="font-weight:bold;font-size:18px;">${enquiry.eventLocation}</p>
     <div style="margin-top:12px;">${columnHtml}</div>
+    ${regionalHtml}
     ${extrasHtml}
   </body></html>`;
 }

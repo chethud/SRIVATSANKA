@@ -45,6 +45,8 @@ export type OrderExtras = {
   /** Optional wedding extras (paniyaram, thambula, sweet box, etc.) */
   extrasEnabled?: boolean;
   extraItems?: OrderExtraItem[];
+  /** Regional cuisine style — printed on kitchen and billing copies */
+  regionalStyle?: string | null;
   primaryWorkerId?: string | null;
   dispatchPhase?: DispatchPhase;
   itemDispatch?: Record<string, DispatchItemStatus>;
@@ -78,6 +80,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'dishColumns' in parsed ||
     'extrasEnabled' in parsed ||
     'extraItems' in parsed ||
+    'regionalStyle' in parsed ||
     'primaryWorkerId' in parsed ||
     'dispatchPhase' in parsed ||
     'itemDispatch' in parsed
@@ -102,6 +105,7 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         dishColumns: parsed.dishColumns ?? {},
         extrasEnabled: parsed.extrasEnabled ?? false,
         extraItems: Array.isArray(parsed.extraItems) ? parsed.extraItems : [],
+        regionalStyle: parsed.regionalStyle ?? null,
         primaryWorkerId: parsed.primaryWorkerId ?? null,
         dispatchPhase: parsed.dispatchPhase ?? 'planned',
         itemDispatch: parsed.itemDispatch ?? {},

@@ -14,6 +14,7 @@ import { DishSearchSelect } from '../DishSearchSelect';
 import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderExtrasSection } from './OrderExtrasSection';
+import { OrderRegionalStyleSection } from './OrderRegionalStyleSection';
 import { OrderExcelHeader, OrderExcelMenuGrid } from './OrderExcelMenuGrid';
 import {
   formatOrderId,
@@ -321,6 +322,8 @@ export function OrderDetailView({
           <FileText size={16} /> Order copy
         </Link>
       </div>
+
+      <OrderRegionalStyleSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
