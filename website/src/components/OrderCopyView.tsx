@@ -8,6 +8,7 @@ import {
   resolveMenuColumns,
 } from '../utils/orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
+import { OrderExtrasTable } from './order/OrderExtrasSection';
 
 export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: 'kitchen' | 'billing' }) {
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
@@ -73,6 +74,10 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
             );
           })}
         </div>
+      )}
+
+      {copyType === 'billing' && extras.extrasEnabled && (
+        <OrderExtrasTable items={extras.extraItems ?? []} />
       )}
     </div>
   );

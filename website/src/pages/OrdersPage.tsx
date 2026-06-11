@@ -29,7 +29,7 @@ export default function OrdersPage() {
                 <div>
                   <h3 className="font-semibold">{e.customerName}</h3>
                   <p className="text-sm text-[var(--muted)]">
-                    {e.eventType} · {e.guestCount} guests · {formatDate(e.eventDate)}
+                    {e.eventType} · {formatDate(e.eventDate)}
                   </p>
                   <p className="text-xs text-[var(--muted)] mt-1">
                     {(e.dishes?.length ?? 0)} menu items

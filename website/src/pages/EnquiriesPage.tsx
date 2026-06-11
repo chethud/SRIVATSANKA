@@ -35,7 +35,6 @@ const emptyForm = () => ({
   eventType: EVENT_TYPES[0],
   eventDate: defaultEventDate(),
   eventLocation: '',
-  guestCount: 50,
   preferredCallbackAt: defaultCallbackAt(),
 });
 
@@ -83,7 +82,7 @@ export default function EnquiriesPage() {
         eventType: form.eventType,
         eventDate: new Date(`${form.eventDate}T12:00:00`).toISOString(),
         eventLocation: form.eventLocation,
-        guestCount: form.guestCount,
+        guestCount: 0,
         preferredCallbackAt: new Date(form.preferredCallbackAt).toISOString(),
         notes: 'Created manually by owner',
       });
@@ -148,16 +147,7 @@ export default function EnquiriesPage() {
               onChange={(e) => setForm({ ...form, eventLocation: e.target.value })}
               className="form-input px-3 py-2 rounded-lg md:col-span-2"
             />
-            <input
-              required
-              type="number"
-              min={1}
-              placeholder="Guest count"
-              value={form.guestCount}
-              onChange={(e) => setForm({ ...form, guestCount: Number(e.target.value) })}
-              className="form-input px-3 py-2 rounded-lg"
-            />
-            <div>
+            <div className="md:col-span-2">
               <label className="text-xs text-[var(--muted)] block mb-1">Preferred callback</label>
               <input
                 required
@@ -195,7 +185,6 @@ export default function EnquiriesPage() {
                 <tr>
                   <th className="text-left p-4">Customer</th>
                   <th className="text-left p-4">Event</th>
-                  <th className="text-left p-4">Guests</th>
                   <th className="text-left p-4">Status</th>
                 </tr>
               </thead>
@@ -213,7 +202,6 @@ export default function EnquiriesPage() {
                       <div className="text-[var(--muted)] text-xs">{e.phoneNumber}</div>
                     </td>
                     <td className="p-4">{e.eventType}</td>
-                    <td className="p-4">{e.guestCount}</td>
                     <td className="p-4" onClick={(ev) => ev.stopPropagation()}>
                       <select
                         value={e.status}
@@ -240,8 +228,8 @@ export default function EnquiriesPage() {
                   <div><dt className="text-[var(--muted)]">Event</dt><dd>{detail.eventType}</dd></div>
                   <div><dt className="text-[var(--muted)]">Date</dt><dd>{formatDate(detail.eventDate)}</dd></div>
                   <div><dt className="text-[var(--muted)]">Location</dt><dd>{detail.eventLocation}</dd></div>
-                  <div><dt className="text-[var(--muted)]">Guests</dt><dd>{detail.guestCount}</dd></div>
                   <div><dt className="text-[var(--muted)]">Callback</dt><dd>{formatDateTime(detail.preferredCallbackAt)}</dd></div>
+                  <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
                 </dl>
                 {detail.dishes?.length > 0 && (
                   <div className="mt-4 pt-4 border-t">

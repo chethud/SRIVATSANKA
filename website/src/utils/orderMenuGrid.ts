@@ -85,7 +85,7 @@ export function resolveMenuColumns(
       date: fallbackDate,
       sessionLabel: dish.category,
       baseSession: dish.category,
-      pax: order.guestCount || null,
+      pax: null,
       timeFrom: schedule?.timeFrom ?? null,
       timeTo: schedule?.timeTo ?? null,
       amount: null,
@@ -179,6 +179,31 @@ export function updateColumnAmount(
     ...extras,
     menuColumns: stripMenuColumnsForSave(updated),
   };
+}
+
+export function updateColumnPax(
+  extras: OrderExtras,
+  columns: MenuColumn[],
+  columnId: string,
+  pax: number | null,
+): OrderExtras {
+  const updated = columns.map((c) => (c.id === columnId ? { ...c, pax } : c));
+  return {
+    ...extras,
+    menuColumns: stripMenuColumnsForSave(updated),
+  };
+}
+
+export function findColumnForSession(
+  columns: MenuColumn[],
+  date: string,
+  baseSession: string,
+  sessionLabel?: string,
+): MenuColumn | undefined {
+  const label = (sessionLabel?.trim() || sessionLabelOptions(baseSession));
+  return columns.find(
+    (c) => c.date === date && c.baseSession === baseSession && c.sessionLabel === label,
+  );
 }
 
 export function sessionLabelOptions(baseSession: string): string {

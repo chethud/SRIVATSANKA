@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, ChefHat, Clock, MapPin, Phone, Plus, Pencil, FileText, User, Calendar,
+  ArrowLeft, ChefHat, Clock, MapPin, Phone, Plus, Pencil, FileText, UtensilsCrossed, Calendar,
 } from 'lucide-react';
 import type { Dish, Enquiry, EnquiryDish, Worker } from '../../api/client';
 import {
@@ -13,6 +13,7 @@ import {
 import { DishSearchSelect } from '../DishSearchSelect';
 import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
+import { OrderExtrasSection } from './OrderExtrasSection';
 import { OrderExcelHeader, OrderExcelMenuGrid } from './OrderExcelMenuGrid';
 import {
   formatOrderId,
@@ -89,7 +90,7 @@ export function OrderDetailView({
   const [sessionTimeFrom, setSessionTimeFrom] = useState(() => sessionTimesFromExtras(extras, 'Breakfast').timeFrom);
   const [sessionTimeTo, setSessionTimeTo] = useState(() => sessionTimesFromExtras(extras, 'Breakfast').timeTo);
   const [columnDate, setColumnDate] = useState(() => extras.scheduleDateFrom ?? defaultEventDate);
-  const [columnPax, setColumnPax] = useState(String(order.guestCount || ''));
+  const [columnPax, setColumnPax] = useState('');
   const [sessionLabel, setSessionLabel] = useState('');
 
   const menuItems = useMemo(
@@ -132,12 +133,22 @@ export function OrderDetailView({
     return { datePart, sessionLines };
   }, [extras, orderedSessions]);
 
+  const sessionPaxSummary = useMemo(() => {
+    const cols = resolveMenuColumns(extras, order, menuItems);
+    const withPax = cols.filter((c) => c.pax != null && c.pax > 0);
+    if (withPax.length === 0) return 'Set per session when adding menu';
+    return withPax.map((c) => `${c.sessionLabel} ${c.pax}`).join(' · ');
+  }, [extras, order, menuItems]);
+
   function pickMealSession(session: string) {
     setMealSession(session);
     const times = sessionTimesFromExtras(extras, session);
     setSessionTimeFrom(times.timeFrom);
     setSessionTimeTo(times.timeTo);
     setSessionLabel('');
+    const cols = resolveMenuColumns(extras, order, menuItems);
+    const existing = cols.find((c) => c.date === columnDate && c.baseSession === session);
+    setColumnPax(existing?.pax != null ? String(existing.pax) : '');
   }
 
   async function handleAdd() {
@@ -154,16 +165,24 @@ export function OrderDetailView({
       setAddError('Pick the service date for this column (like Excel row 3).');
       return;
     }
+    if (!columnPax.trim()) {
+      setAddError('Enter pax for this session (e.g. 60 for breakfast, 100 for lunch).');
+      return;
+    }
+    const paxNum = Number(columnPax);
+    if (Number.isNaN(paxNum) || paxNum < 1) {
+      setAddError('Enter a valid pax count for this session.');
+      return;
+    }
     setSaving(true);
     try {
       const currentColumns = resolveMenuColumns(extras, order, menuItems);
       const label = sessionLabel.trim() || sessionLabelOptions(mealSession);
-      const paxNum = columnPax.trim() ? Number(columnPax) : order.guestCount || null;
       const { columns, columnId } = findOrCreateColumn(currentColumns, {
         date: columnDate,
         baseSession: mealSession,
         sessionLabel: label,
-        pax: paxNum && !Number.isNaN(paxNum) ? paxNum : null,
+        pax: paxNum,
         timeFrom: sessionTimeFrom,
         timeTo: sessionTimeTo,
       });
@@ -273,7 +292,7 @@ export function OrderDetailView({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { icon: Clock, label: 'Date & time', value: formatDateTime(order.eventDate) },
-          { icon: User, label: 'PAX', value: `${order.guestCount} guests` },
+          { icon: UtensilsCrossed, label: 'Session pax', value: sessionPaxSummary },
           { icon: MapPin, label: 'Venue', value: order.eventLocation },
           { icon: Phone, label: 'Contact', value: order.phoneNumber },
         ].map(({ icon: Icon, label, value }) => (
@@ -322,7 +341,7 @@ export function OrderDetailView({
         {showAddForm && (
           <div className="mb-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]">
             <p className="text-sm text-[var(--muted)] mb-4">
-              Each column = one Excel block (date → session name → pax & time → dishes). Set details, then add dish names.
+              Set pax per session (breakfast, lunch, coffee, etc.) — each can be different. Then add dish names.
             </p>
             <div className="flex flex-wrap gap-2 mb-4">
               {MEAL_SESSIONS.map((s) => (
@@ -361,12 +380,14 @@ export function OrderDetailView({
                 />
               </div>
               <div>
-                <label className="text-xs text-[var(--muted)]">Pax</label>
+                <label className="text-xs text-[var(--muted)]">Pax for {mealSession} *</label>
                 <input
                   type="number"
                   min={1}
+                  required
                   value={columnPax}
                   onChange={(e) => setColumnPax(e.target.value)}
+                  placeholder="e.g. 60 or 100"
                   className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
                 />
               </div>
@@ -691,6 +712,8 @@ export function OrderDetailView({
           </div>
         )}
       </div>
+
+      <OrderExtrasSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
     </div>
   );
 }

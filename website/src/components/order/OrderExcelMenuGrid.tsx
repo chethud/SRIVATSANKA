@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { Enquiry, EnquiryDish } from '../../api/client';
 import { formatCurrency, formatDate, updateEnquiry } from '../../api/client';
-import { serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
+import { formatScheduleTime, serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
 import {
   dishesForColumn,
-  formatPaxTimeLine,
   resolveMenuColumns,
   updateColumnAmount,
+  updateColumnPax,
   type MenuColumn,
 } from '../../utils/orderMenuGrid';
 import { OrderMenuItem } from './OrderMenuItem';
@@ -79,10 +79,21 @@ function SessionBlock({
       <div className="px-4 py-2.5 border-b border-[var(--border-strong)] text-center">
         <p className="text-sm font-bold text-[var(--foreground)]">{column.sessionLabel}</p>
       </div>
-      <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--background-alt)] text-center">
-        <p className="text-sm font-bold text-[var(--foreground)] leading-snug">
-          {formatPaxTimeLine(column) || 'Set pax & time when adding items'}
-        </p>
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background-alt)]">
+        <div className="flex flex-wrap items-end justify-center gap-4 max-w-md mx-auto">
+          <SessionPaxField
+            column={column}
+            columns={columns}
+            extras={extras}
+            orderId={orderId}
+            onRefresh={onRefresh}
+          />
+          {column.timeFrom && column.timeTo && (
+            <p className="text-sm font-bold text-[var(--foreground)] pb-2">
+              {formatScheduleTime(column.timeFrom)} – {formatScheduleTime(column.timeTo)}
+            </p>
+          )}
+        </div>
       </div>
       <div className="px-4 py-3 min-h-[80px]">
         {items.length === 0 ? (
@@ -106,6 +117,65 @@ function SessionBlock({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function SessionPaxField({
+  column,
+  columns,
+  extras,
+  orderId,
+  onRefresh,
+}: {
+  column: MenuColumn;
+  columns: MenuColumn[];
+  extras: OrderExtras;
+  orderId: string;
+  onRefresh: () => void;
+}) {
+  const [value, setValue] = useState(column.pax != null ? String(column.pax) : '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(column.pax != null ? String(column.pax) : '');
+  }, [column.pax]);
+
+  async function savePax() {
+    const trimmed = value.trim();
+    const parsed = trimmed ? Number(trimmed.replace(/,/g, '')) : null;
+    if (parsed != null && (Number.isNaN(parsed) || parsed < 1)) return;
+    if (parsed === column.pax || (parsed == null && column.pax == null)) return;
+
+    setSaving(true);
+    try {
+      const merged = updateColumnPax(extras, columns, column.id, parsed);
+      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      await onRefresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="min-w-[120px]">
+      <label className="block text-xs uppercase tracking-wide text-[var(--order-accent)] font-semibold mb-1">
+        Pax
+      </label>
+      <input
+        type="number"
+        min={1}
+        step={1}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={savePax}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        disabled={saving}
+        placeholder="e.g. 60"
+        className="form-input w-full px-3 py-2 rounded text-base font-bold text-center"
+      />
     </div>
   );
 }

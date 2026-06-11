@@ -116,7 +116,7 @@ export function UpcomingEventsList({ events }: { events: Enquiry[] }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-medium text-sm truncate">{e.customerName}</p>
-            <p className="text-xs text-[var(--muted)]">{e.eventType} · {e.guestCount} guests</p>
+            <p className="text-xs text-[var(--muted)]">{e.eventType}</p>
             <p className="text-xs text-[var(--primary)] mt-0.5">{formatDate(e.eventDate)}</p>
           </div>
         </li>
@@ -272,7 +272,7 @@ export function TodaysEventsWidget({ events }: { events: Enquiry[] }) {
       {events.map((e) => (
         <li key={e.id} className="text-sm p-3 rounded-xl bg-[var(--accent-soft)] border border-[var(--border)]">
           <span className="font-semibold">{e.customerName}</span>
-          <span className="text-[var(--muted)]"> — {e.eventType}, {e.guestCount} pax</span>
+          <span className="text-[var(--muted)]"> — {e.eventType}</span>
         </li>
       ))}
     </ul>

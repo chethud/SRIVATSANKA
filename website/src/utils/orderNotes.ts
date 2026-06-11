@@ -8,6 +8,13 @@ export type MealSessionSchedule = {
   timeTo: string | null;
 };
 
+export type OrderExtraItem = {
+  id: string;
+  title: string;
+  description: string;
+  quantity: string;
+};
+
 export type MenuColumn = {
   id: string;
   date: string;
@@ -35,6 +42,9 @@ export type OrderExtras = {
   menuColumns?: MenuColumn[];
   /** Maps enquiry dish line id → menu column id */
   dishColumns?: Record<string, string>;
+  /** Optional wedding extras (paniyaram, thambula, sweet box, etc.) */
+  extrasEnabled?: boolean;
+  extraItems?: OrderExtraItem[];
   primaryWorkerId?: string | null;
   dispatchPhase?: DispatchPhase;
   itemDispatch?: Record<string, DispatchItemStatus>;
@@ -66,6 +76,8 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'mealSchedules' in parsed ||
     'menuColumns' in parsed ||
     'dishColumns' in parsed ||
+    'extrasEnabled' in parsed ||
+    'extraItems' in parsed ||
     'primaryWorkerId' in parsed ||
     'dispatchPhase' in parsed ||
     'itemDispatch' in parsed
@@ -88,6 +100,8 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         mealSchedules: parsed.mealSchedules ?? {},
         menuColumns: parsed.menuColumns ?? [],
         dishColumns: parsed.dishColumns ?? {},
+        extrasEnabled: parsed.extrasEnabled ?? false,
+        extraItems: Array.isArray(parsed.extraItems) ? parsed.extraItems : [],
         primaryWorkerId: parsed.primaryWorkerId ?? null,
         dispatchPhase: parsed.dispatchPhase ?? 'planned',
         itemDispatch: parsed.itemDispatch ?? {},

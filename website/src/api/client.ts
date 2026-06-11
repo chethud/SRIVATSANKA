@@ -278,7 +278,7 @@ export async function createEnquiry(data: {
   eventType: string;
   eventDate: string;
   eventLocation: string;
-  guestCount: number;
+  guestCount?: number;
   preferredCallbackAt: string;
   notes?: string;
 }): Promise<Enquiry> {

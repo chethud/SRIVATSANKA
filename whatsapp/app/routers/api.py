@@ -135,7 +135,7 @@ async def create_enquiry(
         eventType=payload.eventType.strip(),
         eventDate=payload.eventDate,
         eventLocation=payload.eventLocation.strip(),
-        guestCount=max(1, payload.guestCount),
+        guestCount=max(0, payload.guestCount),
         preferredCallbackAt=payload.preferredCallbackAt,
         status=EnquiryStatus.NEW,
         notes=payload.notes or "Created manually by owner",

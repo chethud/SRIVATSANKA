@@ -50,7 +50,6 @@ def _format_confirmation(session: ConversationSession) -> str:
         f"• Event: {f.event_type}",
         f"• Date: {f.event_date}",
         f"• Location: {f.event_location}",
-        f"• Guests: {f.guest_count}",
         f"• Callback: {f.preferred_callback}",
         "",
     ]

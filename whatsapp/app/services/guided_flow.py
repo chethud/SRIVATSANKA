@@ -1,7 +1,6 @@
 """Structured WhatsApp enquiry flow before cuisine selection."""
 
 import logging
-import re
 
 from app.data.company_knowledge import (
     COMPANY,
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 DETAIL_STEPS: list[tuple[str, str]] = [
     ("event_date", "When is your event? (e.g. 15 June 2026)"),
     ("event_location", "Which area or venue in Bengaluru will the event be held?"),
-    ("guest_count", "Roughly how many guests are you expecting?"),
     (
         "preferred_callback",
         "When should Mr. Kannan's team call you with menu ideas and pricing? (e.g. today 4 PM, tomorrow morning)",
@@ -70,7 +68,7 @@ def _event_showcase_message(event_type: str, *, with_images: bool) -> str:
         f"{details['description']}\n\n"
         f"{image_note}"
         "Ask us anything about our experience, menus, or service — we are happy to chat.\n\n"
-        "When you are ready, reply *ok* and we will note your event date, venue, guest count, "
+        "When you are ready, reply *ok* and we will note your event date, venue, "
         "and the best time for our team to call you."
     )
 
@@ -88,20 +86,8 @@ async def _send_event_images(whatsapp_id: str, event_type: str) -> list[MediaAtt
     return sent
 
 
-def _parse_guest_count(text: str) -> int | None:
-    digits = re.sub(r"[^\d]", "", text)
-    if not digits:
-        return None
-    value = int(digits)
-    return value if 0 < value < 50_000 else None
-
-
 def _store_detail_field(session: ConversationSession, key: str, user_text: str) -> bool:
     value: str | int | None = user_text.strip()
-    if key == "guest_count":
-        value = _parse_guest_count(user_text)
-        if value is None:
-            return False
     if not value:
         return False
     session.fields = EnquiryFields(**{**session.fields.model_dump(), key: value})
@@ -217,8 +203,8 @@ async def process_guided_flow(
                 f"• Event: {session.fields.event_type}\n"
                 f"• Date: {session.fields.event_date}\n"
                 f"• Venue: {session.fields.event_location}\n"
-                f"• Guests: {session.fields.guest_count}\n"
                 f"• Call back: {session.fields.preferred_callback}\n\n"
+                "Pax per meal (breakfast, lunch, etc.) is confirmed when we plan your menu.\n\n"
                 "Next, tell us which *cuisine styles* you prefer (e.g. Multi Cuisine, South Indian)."
             ),
             fields=session.fields,

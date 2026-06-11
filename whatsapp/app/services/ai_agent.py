@@ -31,15 +31,16 @@ INFORMATION TO COLLECT (all required before is_complete=true)
 3. event_type
 4. event_date
 5. event_location
-6. guest_count (integer)
-7. preferred_callback — when Mr. Kannan's team should call
+6. preferred_callback — when Mr. Kannan's team should call
+
+Do NOT ask for guest count — pax varies per meal session and is set when planning the menu.
 
 CONVERSATION RULES
 - Do NOT ask for all fields in one message. Chat naturally; one or two questions at a time.
 - If they share multiple details, thank them and confirm what you understood.
 - Reference our experience when relevant (e.g. "We've catered many weddings in Bengaluru with South Indian & North Indian spreads").
 - If they ask price/menu: say our team customises every menu and will discuss on callback; offer to note their preferences.
-- When all 7 fields are clear, give a warm summary and set is_complete=true.
+- When all 6 fields are clear, give a warm summary and set is_complete=true.
 - If they say "new" / start over, reset mentally and greet fresh.
 
 After is_complete=true the system will ask cuisine *types* only (multi cuisine, South Indian, etc.) — you do not need to list individual dishes.
@@ -53,7 +54,6 @@ Respond ONLY with valid JSON:
     "event_type": null or string,
     "event_date": null or string,
     "event_location": null or string,
-    "guest_count": null or integer,
     "preferred_callback": null or string
   }},
   "is_complete": false or true
@@ -77,7 +77,6 @@ def _all_fields_filled(fields: EnquiryFields) -> bool:
             fields.event_type,
             fields.event_date,
             fields.event_location,
-            fields.guest_count is not None,
             fields.preferred_callback,
         ]
     )
@@ -232,7 +231,6 @@ class AIAgent:
             ("event_type", "What celebration is it? (Wedding, house warming, baby shower, etc.)"),
             ("event_date", "When is the event?"),
             ("event_location", "Which area or venue in Bengaluru?"),
-            ("guest_count", "Roughly how many guests?"),
             ("preferred_callback", "When should Mr. Kannan's team call you? (e.g. today 4 PM)"),
         ]
 
@@ -241,9 +239,6 @@ class AIAgent:
             for key, _ in steps:
                 if getattr(session.fields, key) is None:
                     value: str | int | None = user_text.strip()
-                    if key == "guest_count":
-                        digits = "".join(c for c in user_text if c.isdigit())
-                        value = int(digits) if digits else None
                     if value:
                         session.fields = EnquiryFields(
                             **{**session.fields.model_dump(), key: value}

@@ -50,12 +50,39 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
       ? '<p style="color:#64748b;">No dishes</p>'
       : columns.map((col) => buildSessionHtml(col, copyType, extras, menuItems)).join('');
 
+  const extraRows = (extras.extraItems ?? []).filter(
+    (r) => r.title.trim() || r.description.trim() || r.quantity.trim(),
+  );
+  const extrasHtml =
+    copyType === 'billing' && extras.extrasEnabled && extraRows.length
+      ? `<div style="margin-top:24px;">
+      <p style="font-weight:bold;font-size:16px;margin-bottom:8px;">Extras</p>
+      <table style="width:100%;border-collapse:collapse;font-size:15px;">
+        <tr style="background:#f8faf8;font-weight:bold;">
+          <td style="border:1px solid #cbd5cb;padding:10px;width:30%;">Item</td>
+          <td style="border:1px solid #cbd5cb;padding:10px;">Description</td>
+          <td style="border:1px solid #cbd5cb;padding:10px;width:20%;text-align:center;">Quantity</td>
+        </tr>
+        ${extraRows
+          .map(
+            (r) => `<tr>
+          <td style="border:1px solid #cbd5cb;padding:10px;font-weight:600;vertical-align:top;">${r.title}</td>
+          <td style="border:1px solid #cbd5cb;padding:10px;vertical-align:top;white-space:pre-wrap;">${r.description}</td>
+          <td style="border:1px solid #cbd5cb;padding:10px;font-weight:600;text-align:center;vertical-align:top;">${r.quantity}</td>
+        </tr>`,
+          )
+          .join('')}
+      </table>
+    </div>`
+      : '';
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Verdana,Geneva,Tahoma,sans-serif;padding:24px;max-width:720px;margin:0 auto;font-size:17px;">
     <h1 style="color:#0b6b3a;font-size:22px;">SRIVATSANKA</h1>
     <h2 style="font-size:16px;color:#64748b;">${title}</h2>
     <p style="font-weight:bold;font-size:18px;">Client : ${enquiry.customerName}${enquiry.eventType ? ` · ${enquiry.eventType}` : ''}</p>
     <p style="font-weight:bold;font-size:18px;">${enquiry.eventLocation}</p>
     <div style="margin-top:12px;">${columnHtml}</div>
+    ${extrasHtml}
   </body></html>`;
 }
 
