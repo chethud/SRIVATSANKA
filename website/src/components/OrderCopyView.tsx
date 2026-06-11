@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { formatDate, type Enquiry } from '../api/client';
 import { BrandLogo } from './BrandLogo';
 import { parseOrderNotes } from '../utils/orderNotes';
@@ -6,6 +7,7 @@ import {
   formatColumnAmount,
   formatPaxTimeLine,
   resolveMenuColumns,
+  sumOrderCopyTotals,
 } from '../utils/orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
 import { OrderExtrasTable } from './order/OrderExtrasSection';
@@ -17,6 +19,10 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
   const extras = parseOrderNotes(enquiry.notes);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, enquiry, menuItems);
+  const grandTotal = useMemo(
+    () => (copyType === 'billing' ? sumOrderCopyTotals(columns) : null),
+    [columns, copyType],
+  );
 
   return (
     <div
@@ -68,8 +74,13 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
                   )}
                 </div>
                 {copyType === 'billing' && items.length > 0 && (
-                  <div className="copy-grid-meta font-bold text-center border-t border-[var(--border-strong)] bg-[var(--order-cream)]">
-                    {formatColumnAmount(col.amount) || '—'}
+                  <div className="copy-grid-meta text-center border-t border-[var(--border-strong)] bg-[var(--order-cream)] px-4 py-3">
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--order-accent)] font-semibold mb-1">
+                      Session total
+                    </p>
+                    <p className="font-bold text-lg text-[var(--foreground)]">
+                      {formatColumnAmount(col.amount) || '—'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -80,11 +91,24 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
 
       <OrderRegionalStylePrint style={extras.regionalStyle} />
 
-      {copyType === 'kitchen' && <VenueMapQrPrint mapLink={extras.venueMapLink} />}
-
       {copyType === 'billing' && extras.extrasEnabled && (
         <OrderExtrasTable items={extras.extraItems ?? []} />
       )}
+
+      {copyType === 'billing' && grandTotal != null && (
+        <div className="mt-8 border-2 border-[var(--primary)] rounded-lg overflow-hidden bg-[var(--primary-light)]">
+          <div className="px-4 py-4 text-center">
+            <p className="text-xs uppercase tracking-wider text-[var(--order-accent)] font-semibold mb-1">
+              Overall total
+            </p>
+            <p className="text-2xl font-bold text-[var(--primary-dark)]">
+              {formatColumnAmount(grandTotal)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {copyType === 'kitchen' && <VenueMapQrPrint mapLink={extras.venueMapLink} />}
     </div>
   );
 }

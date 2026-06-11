@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Download, Printer } from 'lucide-react';
 import { Card, Button, EmptyState } from '../components/Layout';
@@ -12,6 +13,7 @@ export default function OrderCopyPage({ copyType }: Props) {
   const { enquiries } = useAppData();
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
+  const [downloading, setDownloading] = useState(false);
 
   if (!order) {
     return (
@@ -22,6 +24,17 @@ export default function OrderCopyPage({ copyType }: Props) {
         <EmptyState message="Order not found." />
       </>
     );
+  }
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await downloadOrderCopy(order!, copyType);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not download PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
@@ -40,11 +53,12 @@ export default function OrderCopyPage({ copyType }: Props) {
           </Button>
           <Button
             type="button"
-            onClick={() => void downloadOrderCopy(order, copyType)}
+            onClick={() => void handleDownload()}
+            disabled={downloading}
             className="flex items-center gap-2"
           >
             <Download size={16} />
-            Download
+            {downloading ? 'Preparing PDF…' : 'Download PDF'}
           </Button>
         </div>
       </div>

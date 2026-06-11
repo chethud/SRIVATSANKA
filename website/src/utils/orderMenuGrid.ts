@@ -234,3 +234,11 @@ export function formatColumnAmount(amount: number | null | undefined): string {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
+export function sumOrderCopyTotals(columns: MenuColumn[]): number | null {
+  const amounts = columns
+    .map((c) => c.amount)
+    .filter((a): a is number => a != null && !Number.isNaN(a));
+  if (amounts.length === 0) return null;
+  return amounts.reduce((sum, amount) => sum + amount, 0);
+}
