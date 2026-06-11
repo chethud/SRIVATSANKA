@@ -264,63 +264,57 @@ export function OrderDetailView({
         Back to orders
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+      <div className="order-hero">
         <div>
           <h1 className="order-view-title text-3xl md:text-4xl text-[var(--foreground)] tracking-tight">
             {order.customerName}
           </h1>
-          <p className="text-sm text-[var(--muted)] mt-1 font-mono">{formatOrderId(order.id)}</p>
+          <p className="text-sm text-[var(--muted)] mt-1.5 font-mono tracking-wide">{formatOrderId(order.id)}</p>
+          {order.eventType && (
+            <p className="text-sm text-[var(--order-accent)] font-medium mt-2">{order.eventType}</p>
+          )}
         </div>
-        <span className="px-4 py-1.5 rounded-full text-sm font-medium bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/25">
-          {statusLabel(order.status)}
-        </span>
+        <span className="order-status-badge">{statusLabel(order.status)}</span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="order-stat-grid">
         {[
           { icon: Clock, label: 'Date & time', value: formatDateTime(order.eventDate) },
           { icon: UtensilsCrossed, label: 'Session pax', value: sessionPaxSummary },
           { icon: MapPin, label: 'Venue', value: order.eventLocation },
           { icon: Phone, label: 'Contact', value: order.phoneNumber },
         ].map(({ icon: Icon, label, value }) => (
-          <div
-            key={label}
-            className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow-sm)]"
-          >
-            <Icon size={18} className="text-[var(--order-accent)] mb-2" />
-            <p className="text-[10px] uppercase tracking-wider text-[var(--order-accent)] font-medium">{label}</p>
-            <p className="text-sm font-semibold text-[var(--foreground)] mt-1 leading-snug">{value}</p>
+          <div key={label} className="order-stat-card">
+            <div className="order-stat-icon">
+              <Icon size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="order-stat-label">{label}</p>
+              <p className="order-stat-value">{value}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Link
-          to={`/orders/${order.id}/kitchen`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-[var(--sidebar-hover)]"
-        >
-          <FileText size={16} /> Kitchen copy
+      <div className="order-copy-bar">
+        <Link to={`/orders/${order.id}/kitchen`} className="order-copy-btn">
+          <FileText size={18} /> Kitchen copy
         </Link>
-        <Link
-          to={`/orders/${order.id}/billing`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-[var(--sidebar-hover)]"
-        >
-          <FileText size={16} /> Order copy
+        <Link to={`/orders/${order.id}/billing`} className="order-copy-btn">
+          <FileText size={18} /> Order copy
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-2">
-            <Calendar size={22} className="text-[var(--order-accent)]" />
-            <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)]">Event schedule</h2>
+      <div className="order-section">
+        <div className="order-section-head">
+          <div className="order-section-title">
+            <span className="order-section-icon order-section-icon--gold">
+              <Calendar size={18} />
+            </span>
+            Event schedule
           </div>
           {!editingSchedule ? (
-            <button
-              type="button"
-              onClick={startEditSchedule}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] hover:bg-[var(--sidebar-hover)] text-[var(--foreground)]"
-            >
+            <button type="button" onClick={startEditSchedule} className="order-btn-ghost">
               <Pencil size={14} /> Edit
             </button>
           ) : (
@@ -331,7 +325,7 @@ export function OrderDetailView({
               <button
                 type="button"
                 onClick={() => setEditingSchedule(false)}
-                className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg"
+                className="order-btn-ghost"
               >
                 Cancel
               </button>
@@ -420,32 +414,34 @@ export function OrderDetailView({
               {scheduleSummary.sessionLines.length === 0 ? (
                 <p className="text-[var(--muted)]">Set times when adding each meal session</p>
               ) : (
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[var(--foreground)]">
+                <div className="flex flex-wrap gap-2">
                   {scheduleSummary.sessionLines.map((line) => (
-                    <li key={line}>{line}</li>
+                    <span key={line} className="order-schedule-pill">{line}</span>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           </div>
         )}
-        <p className="text-xs text-[var(--muted)] mt-4">
+        <p className="text-xs text-[var(--muted)] mt-4 pt-4 border-t border-[var(--border)]">
           Only meal sessions with dishes are shown. Set date range for multi-day events; enter times manually per session.
         </p>
       </div>
 
       <OrderRegionalStyleSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-2">
-            <ChefHat size={22} className="text-[var(--order-accent)]" />
-            <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)]">Menu breakdown</h2>
+      <div className="order-section">
+        <div className="order-section-head">
+          <div className="order-section-title">
+            <span className="order-section-icon">
+              <ChefHat size={18} />
+            </span>
+            Menu breakdown
           </div>
           <button
             type="button"
             onClick={() => setShowAddForm((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-medium hover:bg-[var(--primary-hover)]"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)]"
           >
             <Plus size={18} />
             Add menu item
@@ -453,7 +449,7 @@ export function OrderDetailView({
         </div>
 
         {showAddForm && (
-          <div className="mb-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]">
+          <div className="order-add-panel">
             <p className="text-sm text-[var(--muted)] mb-4">
               Set pax per session (breakfast, lunch, coffee, etc.) — each can be different. Then add dish names.
             </p>
@@ -581,15 +577,16 @@ export function OrderDetailView({
         onRefresh={onRefresh}
       />
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)]">
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)]">Customizations</h2>
+      <div className="order-section">
+        <div className="order-section-head">
+          <div className="order-section-title">
+            <span className="order-section-icon order-section-icon--gold">
+              <Pencil size={16} />
+            </span>
+            Customizations
+          </div>
           {!editingExtras ? (
-            <button
-              type="button"
-              onClick={startEditExtras}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] hover:bg-[var(--sidebar-hover)] text-[var(--foreground)]"
-            >
+            <button type="button" onClick={startEditExtras} className="order-btn-ghost">
               <Pencil size={14} /> Edit
             </button>
           ) : (
@@ -597,11 +594,7 @@ export function OrderDetailView({
               <Button type="button" onClick={saveExtras} disabled={saving} className="!py-1.5 !px-3 text-xs">
                 Save
               </Button>
-              <button
-                type="button"
-                onClick={() => setEditingExtras(false)}
-                className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg"
-              >
+              <button type="button" onClick={() => setEditingExtras(false)} className="order-btn-ghost">
                 Cancel
               </button>
             </div>

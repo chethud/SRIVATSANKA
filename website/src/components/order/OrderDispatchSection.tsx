@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Truck, User, X } from 'lucide-react';
 import type { Worker } from '../../api/client';
 import { updateEnquiry } from '../../api/client';
+import { WorkerSearchSelect } from '../WorkerSearchSelect';
 import { type OrderExtras, resolveAssignedWorkerIds, serializeOrderNotes } from '../../utils/orderNotes';
 
 export function OrderDispatchSection({
@@ -49,12 +50,16 @@ export function OrderDispatchSection({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <Truck size={22} className="text-[var(--order-accent)]" />
-        <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)]">Dispatch management</h2>
+    <div className="order-section">
+      <div className="order-section-head">
+        <div className="order-section-title">
+          <span className="order-section-icon">
+            <Truck size={18} />
+          </span>
+          Dispatch management
+        </div>
       </div>
-      <p className="text-sm text-[var(--muted)] mb-6">
+      <p className="order-section-sub">
         Assign one or more workers to this order. You can add as many as you need.
       </p>
 
@@ -63,14 +68,16 @@ export function OrderDispatchSection({
       </label>
 
       {assignedWorkers.length === 0 ? (
-        <p className="text-sm text-[var(--muted)] mb-4">No workers assigned yet.</p>
+        <p className="text-sm text-[var(--muted)] mb-4 py-4 text-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--background-alt)]">
+          No workers assigned yet.
+        </p>
       ) : (
         <ul className="space-y-2 mb-4">
           {assignedWorkers.map((worker) => (
-            <li
-              key={worker.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3"
-            >
+            <li key={worker.id} className="order-worker-card">
+              <div className="order-worker-avatar" aria-hidden>
+                {worker.name.charAt(0).toUpperCase()}
+              </div>
               <div className="flex-1 min-w-[160px]">
                 <p className="text-sm font-semibold text-[var(--foreground)]">{worker.name}</p>
                 <p className="text-xs text-[var(--muted)]">
@@ -82,7 +89,7 @@ export function OrderDispatchSection({
                 type="button"
                 disabled={saving}
                 onClick={() => removeWorker(worker.id)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-300"
+                className="order-btn-ghost text-red-600 hover:text-red-700 hover:border-red-200"
               >
                 <X size={14} /> Remove
               </button>
@@ -92,26 +99,15 @@ export function OrderDispatchSection({
       )}
 
       {availableWorkers.length > 0 ? (
-        <div>
-          <label className="text-xs font-medium text-[var(--muted)] mb-1 block">Add worker</label>
-          <select
-            value=""
-            disabled={saving}
-            onChange={(e) => addWorker(e.target.value)}
-            className="form-select w-full max-w-md px-3 py-2.5 rounded-lg text-sm"
-          >
-            <option value="">Choose a worker…</option>
-            {availableWorkers.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} — {w.role}
-              </option>
-            ))}
-          </select>
-        </div>
+        <WorkerSearchSelect
+          workers={availableWorkers}
+          disabled={saving}
+          onSelect={(worker) => addWorker(worker.id)}
+        />
+      ) : sortedWorkers.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">Add workers under Workers in the sidebar first.</p>
       ) : (
-        sortedWorkers.length === 0 && (
-          <p className="text-sm text-[var(--muted)]">Add workers under Workers in the sidebar first.</p>
-        )
+        <p className="text-sm text-[var(--muted)]">All workers are already assigned to this order.</p>
       )}
     </div>
   );

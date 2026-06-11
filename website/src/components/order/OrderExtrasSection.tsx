@@ -119,11 +119,7 @@ export function OrderExtrasSection({
     return (
       <div
         key={row.id}
-        className={`rounded-xl border p-4 transition-colors ${
-          checked
-            ? 'border-[var(--primary)]/40 bg-[var(--background)]'
-            : 'border-[var(--border)] bg-[var(--card)]'
-        }`}
+        className={`order-extra-row ${checked ? 'order-extra-row--active' : ''}`}
       >
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input
@@ -191,7 +187,7 @@ export function OrderExtrasSection({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
+    <div className="order-section">
       <label className="flex items-start gap-3 cursor-pointer select-none">
         <input
           type="checkbox"

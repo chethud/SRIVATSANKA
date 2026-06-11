@@ -85,28 +85,28 @@ export function OrderMenuItem({
   }
 
   return (
-    <li className="flex items-start gap-2 py-2.5 text-lg leading-snug border-b border-[var(--border)] last:border-0">
-      <span className="flex-1 text-[var(--foreground)] min-w-0 pt-0.5 text-[19px] font-semibold">{dish.dishName}</span>
-      <div className="flex gap-1 shrink-0">
+    <li className="order-menu-item">
+      <span className="order-menu-item-name">{dish.dishName}</span>
+      <div className="order-menu-item-actions">
         <button
           type="button"
           onClick={startEdit}
           disabled={saving}
-          className="p-2 rounded-md border border-[var(--border)] hover:bg-[var(--sidebar-hover)] text-[var(--muted)] hover:text-[var(--primary)]"
+          className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--card)] text-[var(--muted)] hover:text-[var(--primary)]"
           title="Edit meal session"
           aria-label={`Edit ${dish.dishName}`}
         >
-          <Pencil size={16} />
+          <Pencil size={15} />
         </button>
         <button
           type="button"
           onClick={remove}
           disabled={saving}
-          className="p-2 rounded-md border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+          className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400"
           title="Remove from menu"
           aria-label={`Remove ${dish.dishName}`}
         >
-          <Trash2 size={16} />
+          <Trash2 size={15} />
         </button>
       </div>
     </li>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MapPin } from 'lucide-react';
 import { updateEnquiry } from '../../api/client';
 import { serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
 import { Button } from '../Layout';
@@ -42,11 +43,16 @@ export function OrderRegionalStyleSection({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
-      <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)] mb-1">
-        Regional / cuisine style
-      </h2>
-      <p className="text-sm text-[var(--muted)] mb-4">
+    <div className="order-section">
+      <div className="order-section-head">
+        <div className="order-section-title">
+          <span className="order-section-icon order-section-icon--gold">
+            <MapPin size={18} />
+          </span>
+          Regional / cuisine style
+        </div>
+      </div>
+      <p className="order-section-sub">
         Set the style the client wants — printed at the bottom of both kitchen copy and order copy.
       </p>
 
@@ -56,18 +62,14 @@ export function OrderRegionalStyleSection({
             key={preset}
             type="button"
             onClick={() => setValue(preset)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              value === preset
-                ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
-                : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]'
-            }`}
+            className={`order-preset-chip ${value === preset ? 'order-preset-chip--active' : ''}`}
           >
             {preset}
           </button>
         ))}
       </div>
 
-      <label className="block text-xs font-medium text-[var(--order-accent)] mb-1">
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-1.5">
         Style (type or pick above)
       </label>
       <input

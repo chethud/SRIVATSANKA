@@ -72,32 +72,26 @@ function SessionBlock({
   const items = dishesForColumn(column, menuItems, extras);
 
   return (
-    <div className="border border-[var(--border-strong)] rounded-lg overflow-hidden bg-[var(--card)]">
-      <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--table-header-bg)] text-center">
-        <p className="text-sm font-bold text-[var(--foreground)]">{formatDate(column.date)}</p>
+    <div className="border border-[var(--border-strong)] rounded-lg overflow-hidden bg-[var(--card)] excel-session-block">
+      <div className="excel-session-date">{formatDate(column.date)}</div>
+      <div className="excel-session-label">{column.sessionLabel}</div>
+      <div className="excel-session-meta">
+        <SessionPaxField
+          column={column}
+          columns={columns}
+          extras={extras}
+          orderId={orderId}
+          onRefresh={onRefresh}
+        />
+        {column.timeFrom && column.timeTo && (
+          <p className="text-sm font-bold text-[var(--foreground)]">
+            {formatScheduleTime(column.timeFrom)} – {formatScheduleTime(column.timeTo)}
+          </p>
+        )}
       </div>
-      <div className="px-4 py-2.5 border-b border-[var(--border-strong)] text-center">
-        <p className="text-sm font-bold text-[var(--foreground)]">{column.sessionLabel}</p>
-      </div>
-      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background-alt)]">
-        <div className="flex flex-wrap items-end justify-center gap-4 max-w-md mx-auto">
-          <SessionPaxField
-            column={column}
-            columns={columns}
-            extras={extras}
-            orderId={orderId}
-            onRefresh={onRefresh}
-          />
-          {column.timeFrom && column.timeTo && (
-            <p className="text-sm font-bold text-[var(--foreground)] pb-2">
-              {formatScheduleTime(column.timeFrom)} – {formatScheduleTime(column.timeTo)}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="px-4 py-3 min-h-[80px]">
+      <div className="excel-session-dishes">
         {items.length === 0 ? (
-          <p className="text-sm text-[var(--muted)] italic text-center py-4">No dishes yet for this session</p>
+          <p className="text-sm text-[var(--muted)] italic text-center py-6">No dishes yet for this session</p>
         ) : (
           <ul>
             {items.map((d) => (
@@ -107,7 +101,7 @@ function SessionBlock({
         )}
       </div>
       {items.length > 0 && (
-        <div className="border-t border-[var(--border-strong)] bg-[var(--order-cream)] px-4 py-3">
+        <div className="excel-session-total">
           <SessionAmountField
             column={column}
             columns={columns}
@@ -246,12 +240,12 @@ function SessionAmountField({
 
 export function OrderExcelHeader({ order }: { order: Enquiry }) {
   return (
-    <div className="mb-6 space-y-1 border-b border-[var(--border)] pb-4">
-      <p className="text-base font-bold text-[var(--foreground)]">
+    <div className="order-client-header">
+      <p>
         Client : {order.customerName}
         {order.eventType ? ` · ${order.eventType}` : ''}
       </p>
-      <p className="text-base font-bold text-[var(--foreground)]">{order.eventLocation}</p>
+      <p>{order.eventLocation}</p>
     </div>
   );
 }
