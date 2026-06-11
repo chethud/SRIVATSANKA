@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Clock } from 'lucide-react';
 import type { Enquiry, EnquiryDish } from '../../api/client';
 import { formatCurrency, formatDate, updateEnquiry } from '../../api/client';
 import { formatScheduleTime, serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
@@ -33,8 +34,8 @@ export function OrderExcelMenuGrid({
   }
 
   return (
-    <div className="excel-menu-grid -mx-2 px-2">
-      <div className="space-y-6">
+    <div className="excel-menu-grid">
+      <div className="excel-menu-stack">
         {columns.map((col) => (
           <SessionBlock
             key={col.id}
@@ -47,8 +48,8 @@ export function OrderExcelMenuGrid({
           />
         ))}
       </div>
-      <p className="text-xs text-[var(--muted)] mt-4">
-        Each meal session stacks below the previous one. After all dishes are added, enter the session total at the bottom of that block.
+      <p className="excel-menu-hint">
+        Each meal session stacks below the previous one. Enter the session total after all dishes are added.
       </p>
     </div>
   );
@@ -70,11 +71,15 @@ function SessionBlock({
   onRefresh: () => void;
 }) {
   const items = dishesForColumn(column, menuItems, extras);
+  const hasTime = Boolean(column.timeFrom && column.timeTo);
 
   return (
-    <div className="border border-[var(--border-strong)] rounded-lg overflow-hidden bg-[var(--card)] excel-session-block">
-      <div className="excel-session-date">{formatDate(column.date)}</div>
-      <div className="excel-session-label">{column.sessionLabel}</div>
+    <article className="excel-session-block">
+      <header className="excel-session-head">
+        <p className="excel-session-date">{formatDate(column.date)}</p>
+        <h3 className="excel-session-title">{column.sessionLabel}</h3>
+      </header>
+
       <div className="excel-session-meta">
         <SessionPaxField
           column={column}
@@ -83,25 +88,31 @@ function SessionBlock({
           orderId={orderId}
           onRefresh={onRefresh}
         />
-        {column.timeFrom && column.timeTo && (
-          <p className="text-sm font-bold text-[var(--foreground)]">
-            {formatScheduleTime(column.timeFrom)} – {formatScheduleTime(column.timeTo)}
-          </p>
+        {hasTime && (
+          <div className="excel-meta-field excel-meta-field--time">
+            <span className="excel-meta-label">Time</span>
+            <span className="excel-meta-chip">
+              <Clock size={14} aria-hidden />
+              {formatScheduleTime(column.timeFrom!)} – {formatScheduleTime(column.timeTo!)}
+            </span>
+          </div>
         )}
       </div>
+
       <div className="excel-session-dishes">
         {items.length === 0 ? (
-          <p className="text-sm text-[var(--muted)] italic text-center py-6">No dishes yet for this session</p>
+          <p className="excel-session-empty">No dishes yet for this session</p>
         ) : (
-          <ul>
+          <ul className="excel-dish-list">
             {items.map((d) => (
               <OrderMenuItem key={d.id} orderId={orderId} dish={d} onUpdated={onRefresh} />
             ))}
           </ul>
         )}
       </div>
+
       {items.length > 0 && (
-        <div className="excel-session-total">
+        <footer className="excel-session-total">
           <SessionAmountField
             column={column}
             columns={columns}
@@ -109,9 +120,9 @@ function SessionBlock({
             orderId={orderId}
             onRefresh={onRefresh}
           />
-        </div>
+        </footer>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -152,11 +163,12 @@ function SessionPaxField({
   }
 
   return (
-    <div className="min-w-[120px]">
-      <label className="block text-xs uppercase tracking-wide text-[var(--order-accent)] font-semibold mb-1">
+    <div className="excel-meta-field">
+      <label className="excel-meta-label" htmlFor={`pax-${column.id}`}>
         Pax
       </label>
       <input
+        id={`pax-${column.id}`}
         type="number"
         min={1}
         step={1}
@@ -167,8 +179,8 @@ function SessionPaxField({
           if (e.key === 'Enter') e.currentTarget.blur();
         }}
         disabled={saving}
-        placeholder="e.g. 60"
-        className="form-input w-full px-3 py-2 rounded text-base font-bold text-center"
+        placeholder="—"
+        className="excel-meta-input"
       />
     </div>
   );
@@ -187,15 +199,22 @@ function SessionAmountField({
   orderId: string;
   onRefresh: () => void;
 }) {
-  const [value, setValue] = useState(column.amount != null ? String(column.amount) : '');
+  const [rawValue, setRawValue] = useState(column.amount != null ? String(column.amount) : '');
+  const [focused, setFocused] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setValue(column.amount != null ? String(column.amount) : '');
+    setRawValue(column.amount != null ? String(column.amount) : '');
   }, [column.amount]);
 
+  const displayValue = focused
+    ? rawValue
+    : rawValue.trim() && !Number.isNaN(Number(rawValue.replace(/,/g, '')))
+      ? formatCurrency(Number(rawValue.replace(/,/g, '')))
+      : rawValue;
+
   async function saveAmount() {
-    const trimmed = value.trim();
+    const trimmed = rawValue.trim();
     const parsed = trimmed ? Number(trimmed.replace(/,/g, '')) : null;
     if (parsed != null && (Number.isNaN(parsed) || parsed < 0)) return;
     if (parsed === column.amount || (parsed == null && column.amount == null)) return;
@@ -210,30 +229,46 @@ function SessionAmountField({
     }
   }
 
+  function handleChange(next: string) {
+    setRawValue(next.replace(/[^\d]/g, ''));
+  }
+
+  function handleFocus() {
+    setFocused(true);
+  }
+
+  function handleBlur() {
+    setFocused(false);
+    void saveAmount();
+  }
+
   return (
-    <div className="max-w-xs mx-auto">
-      <label className="block text-xs uppercase tracking-wide text-[var(--order-accent)] font-semibold mb-1.5 text-center">
+    <div className="excel-session-amount">
+      <label className="excel-meta-label" htmlFor={`amount-${column.id}`}>
         Session total
       </label>
-      <input
-        type="number"
-        min={0}
-        step={1}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={saveAmount}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-        }}
-        disabled={saving}
-        placeholder="e.g. 15000"
-        className="form-input w-full px-3 py-2 rounded text-base font-bold text-center"
-      />
-      {column.amount != null && column.amount > 0 && (
-        <p className="text-sm text-[var(--primary)] font-semibold text-center mt-2">
-          {formatCurrency(column.amount)}
-        </p>
-      )}
+      <div className="excel-session-amount-wrap">
+        {!focused && displayValue.startsWith('₹') ? null : (
+          <span className="excel-session-amount-prefix" aria-hidden>
+            ₹
+          </span>
+        )}
+        <input
+          id={`amount-${column.id}`}
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          onChange={(e) => handleChange(e.target.value)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+          }}
+          disabled={saving}
+          placeholder="Enter amount"
+          className="excel-session-amount-input"
+        />
+      </div>
     </div>
   );
 }
