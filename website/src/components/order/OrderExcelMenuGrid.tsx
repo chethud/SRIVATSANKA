@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Trash2 } from 'lucide-react';
 import type { Enquiry, EnquiryDish } from '../../api/client';
-import { formatCurrency, formatDate, updateEnquiry } from '../../api/client';
+import { deleteOrderDish, formatCurrency, formatDate, updateEnquiry } from '../../api/client';
 import { formatScheduleTime, serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
 import {
   dishesForColumn,
+  removeMenuColumn,
   resolveMenuColumns,
   updateColumnAmount,
   updateColumnPax,
@@ -72,10 +73,44 @@ function SessionBlock({
 }) {
   const items = dishesForColumn(column, menuItems, extras);
   const hasTime = Boolean(column.timeFrom && column.timeTo);
+  const [deleting, setDeleting] = useState(false);
+
+  async function removeSession() {
+    const sessionLabel = `${column.sessionLabel} · ${formatDate(column.date)}`;
+    const message =
+      items.length > 0
+        ? `Remove ${sessionLabel} and all ${items.length} dish item(s) in this session?`
+        : `Remove ${sessionLabel}?`;
+    if (!confirm(message)) return;
+
+    setDeleting(true);
+    try {
+      for (const dish of items) {
+        await deleteOrderDish(orderId, dish.id);
+      }
+      const merged = removeMenuColumn(extras, columns, column.id);
+      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      await onRefresh();
+    } catch {
+      alert('Could not remove this session. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <article className="excel-session-block">
       <header className="excel-session-head">
+        <button
+          type="button"
+          onClick={() => void removeSession()}
+          disabled={deleting}
+          className="excel-session-delete"
+          title="Remove session"
+          aria-label={`Remove ${column.sessionLabel} session`}
+        >
+          <Trash2 size={15} />
+        </button>
         <p className="excel-session-date">{formatDate(column.date)}</p>
         <h3 className="excel-session-title">{column.sessionLabel}</h3>
       </header>

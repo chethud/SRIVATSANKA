@@ -194,6 +194,24 @@ export function updateColumnPax(
   };
 }
 
+export function removeMenuColumn(
+  extras: OrderExtras,
+  columns: MenuColumn[],
+  columnId: string,
+): OrderExtras {
+  const updatedColumns = columns.filter((c) => c.id !== columnId);
+  const dishColumns = { ...(extras.dishColumns ?? {}) };
+  for (const [dishId, colId] of Object.entries(dishColumns)) {
+    if (colId === columnId) delete dishColumns[dishId];
+  }
+
+  return {
+    ...extras,
+    menuColumns: stripMenuColumnsForSave(updatedColumns),
+    dishColumns: Object.keys(dishColumns).length > 0 ? dishColumns : {},
+  };
+}
+
 export function findColumnForSession(
   columns: MenuColumn[],
   date: string,
