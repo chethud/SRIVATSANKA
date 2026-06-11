@@ -236,6 +236,12 @@ body {
   margin-top: 0.25rem;
 }
 
+.copy-regional-style {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+}
+
 .copy-empty {
   text-align: center;
   color: var(--muted);

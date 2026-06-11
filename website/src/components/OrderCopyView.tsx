@@ -39,6 +39,8 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         <p className="copy-client-line">{enquiry.eventLocation}</p>
       </div>
 
+      <OrderRegionalStylePrint style={extras.regionalStyle} />
+
       {columns.length === 0 ? (
         <p className="copy-empty">No dishes on this order yet.</p>
       ) : (
@@ -77,8 +79,6 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
           })}
         </div>
       )}
-
-      <OrderRegionalStylePrint style={extras.regionalStyle} />
 
       {copyType === 'billing' && extras.extrasEnabled && (
         <OrderExtrasTable items={extras.extraItems ?? []} />

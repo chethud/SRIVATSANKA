@@ -53,7 +53,7 @@ export function OrderRegionalStyleSection({
         </div>
       </div>
       <p className="order-section-sub">
-        Set the style the client wants — printed at the bottom of both kitchen copy and order copy.
+        Set the style the client wants — printed above the menu on both kitchen copy and order copy.
       </p>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -92,7 +92,7 @@ export function OrderRegionalStylePrint({ style }: { style: string | null | unde
   if (!text) return null;
 
   return (
-    <div className="mt-8 border border-[var(--border-strong)] overflow-hidden">
+    <div className="copy-regional-style">
       <div className="copy-grid-meta font-bold text-center border-b border-[var(--border)] bg-[var(--table-header-bg)]">
         Regional / cuisine style
       </div>
