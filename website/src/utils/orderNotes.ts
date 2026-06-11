@@ -13,7 +13,70 @@ export type OrderExtraItem = {
   title: string;
   description: string;
   quantity: string;
+  /** Client selected this extra — checkbox on order page */
+  enabled?: boolean;
+  /** User-added row (not from preset list) */
+  isCustom?: boolean;
 };
+
+/** Preset extras from wedding Excel sheets — each has its own checkbox on the order. */
+export const DEFAULT_ORDER_EXTRA_PRESETS = [
+  'Tat Paniyaram',
+  'Vratha Paniyaram Box',
+  'Kobri Design',
+  'Gopura',
+  'Theratti Paal',
+  'Sweet Box',
+  'Thambula',
+  'Banana for Varapooje',
+  'Thambula for Gents',
+] as const;
+
+function extraItemEnabled(row: OrderExtraItem): boolean {
+  if (row.enabled === true) return true;
+  if (row.enabled === false) return false;
+  return Boolean(row.description.trim() || row.quantity.trim());
+}
+
+export function mergeOrderExtraItems(saved: OrderExtraItem[] | undefined): OrderExtraItem[] {
+  const savedRows = saved ?? [];
+  const byTitle = new Map(savedRows.map((row) => [row.title.trim().toLowerCase(), row]));
+  const presetTitles = new Set(DEFAULT_ORDER_EXTRA_PRESETS.map((t) => t.toLowerCase()));
+
+  const presets = DEFAULT_ORDER_EXTRA_PRESETS.map((title, index) => {
+    const existing = byTitle.get(title.toLowerCase());
+    if (existing) {
+      return {
+        ...existing,
+        title,
+        enabled: extraItemEnabled(existing),
+        isCustom: false,
+      };
+    }
+    return {
+      id: `preset_${index}`,
+      title,
+      description: '',
+      quantity: '',
+      enabled: false,
+      isCustom: false,
+    };
+  });
+
+  const custom = savedRows
+    .filter((row) => !presetTitles.has(row.title.trim().toLowerCase()))
+    .map((row) => ({
+      ...row,
+      enabled: extraItemEnabled(row),
+      isCustom: true,
+    }));
+
+  return [...presets, ...custom];
+}
+
+export function activeOrderExtraItems(items: OrderExtraItem[] | undefined): OrderExtraItem[] {
+  return mergeOrderExtraItems(items).filter((row) => row.enabled && row.title.trim());
+}
 
 export type MenuColumn = {
   id: string;
@@ -47,10 +110,22 @@ export type OrderExtras = {
   extraItems?: OrderExtraItem[];
   /** Regional cuisine style — printed on kitchen and billing copies */
   regionalStyle?: string | null;
+  /** @deprecated use assignedWorkerIds */
   primaryWorkerId?: string | null;
+  assignedWorkerIds?: string[];
   dispatchPhase?: DispatchPhase;
   itemDispatch?: Record<string, DispatchItemStatus>;
 };
+
+export function resolveAssignedWorkerIds(extras: OrderExtras): string[] {
+  const ids = Array.isArray(extras.assignedWorkerIds)
+    ? extras.assignedWorkerIds.filter(Boolean)
+    : [];
+  if (ids.length === 0 && extras.primaryWorkerId) {
+    return [extras.primaryWorkerId];
+  }
+  return ids;
+}
 
 const EMPTY: OrderExtras = {
   dietary: [],
@@ -62,6 +137,7 @@ const EMPTY: OrderExtras = {
   scheduleTimeTo: null,
   mealSchedules: {},
   primaryWorkerId: null,
+  assignedWorkerIds: [],
   dispatchPhase: 'planned',
   itemDispatch: {},
 };
@@ -82,6 +158,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'extraItems' in parsed ||
     'regionalStyle' in parsed ||
     'primaryWorkerId' in parsed ||
+    'assignedWorkerIds' in parsed ||
     'dispatchPhase' in parsed ||
     'itemDispatch' in parsed
   );
@@ -107,6 +184,11 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         extraItems: Array.isArray(parsed.extraItems) ? parsed.extraItems : [],
         regionalStyle: parsed.regionalStyle ?? null,
         primaryWorkerId: parsed.primaryWorkerId ?? null,
+        assignedWorkerIds: Array.isArray(parsed.assignedWorkerIds)
+          ? parsed.assignedWorkerIds.filter(Boolean)
+          : parsed.primaryWorkerId
+            ? [parsed.primaryWorkerId]
+            : [],
         dispatchPhase: parsed.dispatchPhase ?? 'planned',
         itemDispatch: parsed.itemDispatch ?? {},
       };

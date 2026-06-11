@@ -1,5 +1,5 @@
 import { formatDate, type Enquiry, type EnquiryDish } from '../api/client';
-import { parseOrderNotes } from './orderNotes';
+import { activeOrderExtraItems, parseOrderNotes } from './orderNotes';
 import {
   dishesForColumn,
   formatColumnAmount,
@@ -50,9 +50,7 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
       ? '<p style="color:#64748b;">No dishes</p>'
       : columns.map((col) => buildSessionHtml(col, copyType, extras, menuItems)).join('');
 
-  const extraRows = (extras.extraItems ?? []).filter(
-    (r) => r.title.trim() || r.description.trim() || r.quantity.trim(),
-  );
+  const extraRows = activeOrderExtraItems(extras.extraItems);
   const extrasHtml =
     copyType === 'billing' && extras.extrasEnabled && extraRows.length
       ? `<div style="margin-top:24px;">

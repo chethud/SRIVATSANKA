@@ -22,9 +22,9 @@ export default function OrdersPage() {
       {orders.length === 0 ? (
         <EmptyState message="No converted orders yet. Mark an enquiry as CONVERTED on the Enquiries page after the client confirms." />
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-4">
           {orders.map((e) => (
-            <Link key={e.id} to={`/orders/${e.id}`}>
+            <Link key={e.id} to={`/orders/${e.id}`} className="block">
               <Card className="p-5 hover:border-[var(--primary)] transition-colors flex items-center justify-between gap-4">
                 <div>
                   <h3 className="font-semibold">{e.customerName}</h3>

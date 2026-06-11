@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft, ChefHat, Clock, MapPin, Phone, Plus, Pencil, FileText, UtensilsCrossed, Calendar,
 } from 'lucide-react';
-import type { Dish, Enquiry, EnquiryDish, Worker } from '../../api/client';
+import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
   addOrderDish,
   formatDate,
@@ -35,11 +35,6 @@ import {
   sessionLabelOptions,
   stripMenuColumnsForSave,
 } from '../../utils/orderMenuGrid';
-
-function splitCategories(categories: string[]): [string[], string[]] {
-  const mid = Math.ceil(categories.length / 2);
-  return [categories.slice(0, mid), categories.slice(mid)];
-}
 
 function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
   return {
@@ -103,16 +98,7 @@ export function OrderDetailView({
     [order.dishes],
   );
 
-  const byCategory = useMemo(() => {
-    const map: Record<string, EnquiryDish[]> = {};
-    for (const d of menuItems) {
-      (map[d.category] ||= []).push(d);
-    }
-    return map;
-  }, [menuItems]);
-
   const orderedSessions = useMemo(() => groupMenuItems(menuItems), [menuItems]);
-  const [colLeft, colRight] = splitCategories(orderedSessions);
 
   const displayDietary = extras.dietary;
 
@@ -323,6 +309,131 @@ export function OrderDetailView({
         </Link>
       </div>
 
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2">
+            <Calendar size={22} className="text-[var(--order-accent)]" />
+            <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)]">Event schedule</h2>
+          </div>
+          {!editingSchedule ? (
+            <button
+              type="button"
+              onClick={startEditSchedule}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] hover:bg-[var(--sidebar-hover)] text-[var(--foreground)]"
+            >
+              <Pencil size={14} /> Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <Button type="button" onClick={saveSchedule} disabled={scheduleSaving} className="!py-1.5 !px-3 text-xs">
+                Save
+              </Button>
+              <button
+                type="button"
+                onClick={() => setEditingSchedule(false)}
+                className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+
+        {editingSchedule ? (
+          <div className="space-y-6 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-[var(--order-accent)]">Event date from</label>
+                <input
+                  type="date"
+                  value={draftSchedule.dateFrom}
+                  onChange={(e) => setDraftSchedule({ ...draftSchedule, dateFrom: e.target.value })}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[var(--order-accent)]">Event date to</label>
+                <input
+                  type="date"
+                  value={draftSchedule.dateTo}
+                  min={draftSchedule.dateFrom}
+                  onChange={(e) => setDraftSchedule({ ...draftSchedule, dateTo: e.target.value })}
+                  className="form-input w-full mt-1 px-3 py-2 rounded-lg"
+                />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--order-accent)] mb-3">
+                Meal times (only sessions on this order)
+              </p>
+              {orderedSessions.length === 0 ? (
+                <p className="text-[var(--muted)] text-sm">Add menu items first, then set times above or here.</p>
+              ) : (
+                <div className="space-y-3">
+                  {orderedSessions.map((session) => (
+                    <div key={session} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                      <span className="font-medium text-[var(--foreground)]">{session}</span>
+                      <input
+                        type="time"
+                        value={draftSchedule.sessions[session]?.timeFrom ?? ''}
+                        onChange={(e) =>
+                          setDraftSchedule({
+                            ...draftSchedule,
+                            sessions: {
+                              ...draftSchedule.sessions,
+                              [session]: { ...draftSchedule.sessions[session], timeFrom: e.target.value },
+                            },
+                          })
+                        }
+                        className="form-input px-3 py-2 rounded-lg"
+                      />
+                      <input
+                        type="time"
+                        value={draftSchedule.sessions[session]?.timeTo ?? ''}
+                        onChange={(e) =>
+                          setDraftSchedule({
+                            ...draftSchedule,
+                            sessions: {
+                              ...draftSchedule.sessions,
+                              [session]: { ...draftSchedule.sessions[session], timeTo: e.target.value },
+                            },
+                          })
+                        }
+                        className="form-input px-3 py-2 rounded-lg"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="text-xs font-semibold text-[var(--order-accent)] mb-1">Event dates</p>
+              <p className="text-[var(--foreground)]">
+                {scheduleSummary.datePart || 'Not set — click Edit for multi-day booking'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--order-accent)] mb-2">Meal times</p>
+              {scheduleSummary.sessionLines.length === 0 ? (
+                <p className="text-[var(--muted)]">Set times when adding each meal session</p>
+              ) : (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[var(--foreground)]">
+                  {scheduleSummary.sessionLines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-[var(--muted)] mt-4">
+          Only meal sessions with dishes are shown. Set date range for multi-day events; enter times manually per session.
+        </p>
+      </div>
+
       <OrderRegionalStyleSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
@@ -461,137 +572,10 @@ export function OrderDetailView({
         )}
       </div>
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-[var(--shadow-sm)] mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-2">
-            <Calendar size={22} className="text-[var(--order-accent)]" />
-            <h2 className="order-view-title text-xl font-semibold text-[var(--foreground)]">Event schedule</h2>
-          </div>
-          {!editingSchedule ? (
-            <button
-              type="button"
-              onClick={startEditSchedule}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] hover:bg-[var(--sidebar-hover)] text-[var(--foreground)]"
-            >
-              <Pencil size={14} /> Edit
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <Button type="button" onClick={saveSchedule} disabled={scheduleSaving} className="!py-1.5 !px-3 text-xs">
-                Save
-              </Button>
-              <button
-                type="button"
-                onClick={() => setEditingSchedule(false)}
-                className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-
-        {editingSchedule ? (
-          <div className="space-y-6 text-sm">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-[var(--order-accent)]">Event date from</label>
-                <input
-                  type="date"
-                  value={draftSchedule.dateFrom}
-                  onChange={(e) => setDraftSchedule({ ...draftSchedule, dateFrom: e.target.value })}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[var(--order-accent)]">Event date to</label>
-                <input
-                  type="date"
-                  value={draftSchedule.dateTo}
-                  min={draftSchedule.dateFrom}
-                  onChange={(e) => setDraftSchedule({ ...draftSchedule, dateTo: e.target.value })}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg"
-                />
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--order-accent)] mb-3">
-                Meal times (only sessions on this order)
-              </p>
-              {orderedSessions.length === 0 ? (
-                <p className="text-[var(--muted)] text-sm">Add menu items first, then set times above or here.</p>
-              ) : (
-                <div className="space-y-3">
-                  {orderedSessions.map((session) => (
-                    <div key={session} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
-                      <span className="font-medium text-[var(--foreground)]">{session}</span>
-                      <input
-                        type="time"
-                        value={draftSchedule.sessions[session]?.timeFrom ?? ''}
-                        onChange={(e) =>
-                          setDraftSchedule({
-                            ...draftSchedule,
-                            sessions: {
-                              ...draftSchedule.sessions,
-                              [session]: { ...draftSchedule.sessions[session], timeFrom: e.target.value },
-                            },
-                          })
-                        }
-                        className="form-input px-3 py-2 rounded-lg"
-                      />
-                      <input
-                        type="time"
-                        value={draftSchedule.sessions[session]?.timeTo ?? ''}
-                        onChange={(e) =>
-                          setDraftSchedule({
-                            ...draftSchedule,
-                            sessions: {
-                              ...draftSchedule.sessions,
-                              [session]: { ...draftSchedule.sessions[session], timeTo: e.target.value },
-                            },
-                          })
-                        }
-                        className="form-input px-3 py-2 rounded-lg"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 text-sm">
-            <div>
-              <p className="text-xs font-semibold text-[var(--order-accent)] mb-1">Event dates</p>
-              <p className="text-[var(--foreground)]">
-                {scheduleSummary.datePart || 'Not set — click Edit for multi-day booking'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--order-accent)] mb-2">Meal times</p>
-              {scheduleSummary.sessionLines.length === 0 ? (
-                <p className="text-[var(--muted)]">Set times when adding each meal session</p>
-              ) : (
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[var(--foreground)]">
-                  {scheduleSummary.sessionLines.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
-        <p className="text-xs text-[var(--muted)] mt-4">
-          Only meal sessions with dishes are shown. Set date range for multi-day events; enter times manually per session.
-        </p>
-      </div>
+      <OrderExtrasSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
 
       <OrderDispatchSection
         orderId={order.id}
-        menuItems={menuItems}
-        byCategory={byCategory}
-        colLeft={colLeft}
-        colRight={colRight}
         workers={workers}
         extras={extras}
         onRefresh={onRefresh}
@@ -715,8 +699,6 @@ export function OrderDetailView({
           </div>
         )}
       </div>
-
-      <OrderExtrasSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
     </div>
   );
 }
