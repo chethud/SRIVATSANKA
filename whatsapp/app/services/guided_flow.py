@@ -13,10 +13,11 @@ from app.data.company_knowledge import (
 )
 from app.schemas import AgentTurnResult, EnquiryFields, MediaAttachment
 from app.services.guided_conversation import (
+    answer_details_question,
     answer_showcase_question,
-    customer_is_asking,
     customer_wants_to_proceed,
 )
+from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.session_store import ConversationSession, GuidedStep
 from app.services.whatsapp_client import normalize_phone, send_whatsapp_image
 
@@ -160,22 +161,18 @@ async def process_guided_flow(
         if customer_wants_to_proceed(text):
             return _start_detail_collection(session)
 
-        if customer_is_asking(text) or len(text) > 8:
-            reply = await answer_showcase_question(session, text)
-            return AgentTurnResult(reply=reply, fields=session.fields)
-
-        return AgentTurnResult(
-            reply=(
-                "Please ask any question about our catering, menus, or past events — "
-                "or reply *ok* when you are ready to share your event date and callback time."
-            ),
-            fields=session.fields,
-        )
+        reply = await answer_showcase_question(session, text)
+        return AgentTurnResult(reply=reply, fields=session.fields)
 
     if step == GuidedStep.COLLECT_DETAILS:
-        for key, _ in DETAIL_STEPS:
+        for key, prompt in DETAIL_STEPS:
             if getattr(session.fields, key) is not None:
                 continue
+
+            if looks_like_question(text) and not is_likely_field_answer(text, key):
+                reply = await answer_details_question(session, text, prompt)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
             if not _store_detail_field(session, key, text):
                 retry = dict(DETAIL_STEPS)[key]
                 return AgentTurnResult(

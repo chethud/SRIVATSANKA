@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import SessionLocal, init_db
 from app.middleware.auth import AuthMiddleware
 from app.routers import api, auth, dev, orders, resources, webhook
+from app.services.gemini_conversation import is_gemini_configured
 from app.services.scheduler import start_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -29,6 +30,14 @@ async def lifespan(_app: FastAPI):
             result = await seed_demo_data(session, force=settings.seed_demo_on_startup or count == 0)
             logging.getLogger(__name__).info("Demo data seeded on startup: %s", result)
     start_scheduler()
+    log = logging.getLogger(__name__)
+    if is_gemini_configured():
+        log.info("Gemini AI enabled for WhatsApp conversations (model=%s)", settings.gemini_model)
+    else:
+        log.warning(
+            "GEMINI_API_KEY not configured — WhatsApp will use template replies. "
+            "Set GEMINI_API_KEY in whatsapp/.env"
+        )
     yield
 
 

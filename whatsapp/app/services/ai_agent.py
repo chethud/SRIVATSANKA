@@ -7,6 +7,7 @@ import google.generativeai as genai
 from app.config import settings
 from app.data.company_knowledge import COMPANY, WEBSITE_URL, build_agent_context
 from app.schemas import AgentTurnResult, EnquiryFields
+from app.services.gemini_conversation import is_gemini_configured
 from app.services.session_store import ConversationSession
 
 AGENT_SYSTEM_PROMPT = f"""You are a warm, professional *human catering consultant* for SRIVATSANKA on WhatsApp — NOT a rigid bot.
@@ -188,7 +189,7 @@ class AIAgent:
                 f"Customer: {user_text}"
             )
 
-        if not settings.gemini_api_key or settings.gemini_api_key.startswith("paste-your"):
+        if not settings.gemini_api_key or not is_gemini_configured():
             return self._fallback_reply(session, agent_input)
 
         try:
