@@ -31,20 +31,23 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         <p className="copy-doc-title">{title}</p>
       </header>
 
-      <div className="copy-client-block">
-        <p className="copy-client-line">
-          Client : {enquiry.customerName}
-          {enquiry.eventType ? ` · ${enquiry.eventType}` : ''}
-        </p>
-        <p className="copy-client-line">{enquiry.eventLocation}</p>
+      <div className="copy-intro">
+        <div className="copy-client-block">
+          <p className="copy-client-line">
+            Client : {enquiry.customerName}
+            {enquiry.eventType ? ` · ${enquiry.eventType}` : ''}
+          </p>
+          <p className="copy-client-line">{enquiry.eventLocation}</p>
+        </div>
+
+        {copyType === 'kitchen' && <OrderRegionalStylePrint style={extras.regionalStyle} />}
       </div>
 
-      <OrderRegionalStylePrint style={extras.regionalStyle} />
-
-      {columns.length === 0 ? (
-        <p className="copy-empty">No dishes on this order yet.</p>
-      ) : (
-        <div className="copy-sessions">
+      <div className="copy-menu">
+        {columns.length === 0 ? (
+          <p className="copy-empty">No dishes on this order yet.</p>
+        ) : (
+          <div className="copy-sessions">
           {columns.map((col) => {
             const items = dishesForColumn(col, menuItems, extras);
             const paxLine = formatPaxTimeLine(col);
@@ -77,8 +80,9 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
               </section>
             );
           })}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {copyType === 'billing' && extras.extrasEnabled && (
         <OrderExtrasTable items={extras.extraItems ?? []} />

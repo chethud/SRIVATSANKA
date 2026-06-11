@@ -108,7 +108,7 @@ export type OrderExtras = {
   /** Optional wedding extras (paniyaram, thambula, sweet box, etc.) */
   extrasEnabled?: boolean;
   extraItems?: OrderExtraItem[];
-  /** Regional cuisine style — printed on kitchen and billing copies */
+  /** Regional cuisine style — printed on kitchen copy before the menu */
   regionalStyle?: string | null;
   /** Google Maps link — QR printed at bottom of kitchen copy only */
   venueMapLink?: string | null;

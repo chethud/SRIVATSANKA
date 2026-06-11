@@ -53,7 +53,7 @@ export function OrderRegionalStyleSection({
         </div>
       </div>
       <p className="order-section-sub">
-        Set the style the client wants — printed above the menu on both kitchen copy and order copy.
+        Set the style the client wants — printed on the kitchen copy after client details and before the menu.
       </p>
 
       <div className="flex flex-wrap gap-2 mb-4">
