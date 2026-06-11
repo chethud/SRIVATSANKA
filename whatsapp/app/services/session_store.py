@@ -33,6 +33,7 @@ class ConversationSession:
     selected_dishes: list[SelectedDishItem] = field(default_factory=list)
     customization_dish_index: int = 0
     welcome_media_sent: bool = False
+    sent_gallery_urls: list[str] = field(default_factory=list)
     guided_step: GuidedStep = GuidedStep.AWAIT_HI
     _saved: bool = False
 

@@ -5,10 +5,9 @@ import logging
 from app.data.company_knowledge import (
     COMPANY,
     EVENT_TYPE_DETAILS,
-    GALLERY_IMAGE_URLS,
+    GALLERY_ITEMS,
     SERVICES,
     WEBSITE_URL,
-    WELCOME_IMAGE_CAPTIONS,
     match_event_type,
 )
 from app.schemas import AgentTurnResult, EnquiryFields, MediaAttachment
@@ -19,7 +18,8 @@ from app.services.guided_conversation import (
 )
 from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.session_store import ConversationSession, GuidedStep
-from app.services.whatsapp_client import normalize_phone, send_whatsapp_image
+from app.services.website_gallery import customer_wants_photos, mark_gallery_sent, prepare_gallery_photos
+from app.services.whatsapp_client import normalize_phone
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +74,16 @@ def _event_showcase_message(event_type: str, *, with_images: bool) -> str:
     )
 
 
-async def _send_event_images(whatsapp_id: str, event_type: str) -> list[MediaAttachment]:
+def _prepare_event_images(event_type: str, session: ConversationSession) -> list[MediaAttachment]:
     details = EVENT_TYPE_DETAILS.get(event_type, EVENT_TYPE_DETAILS["General"])
-    captions = details.get("image_captions") or WELCOME_IMAGE_CAPTIONS
-    sent: list[MediaAttachment] = []
-    for i, url in enumerate(GALLERY_IMAGE_URLS[:3]):
-        cap = captions[i] if i < len(captions) else details["title"]
-        ok = await send_whatsapp_image(whatsapp_id, url, caption=cap)
-        sent.append(MediaAttachment(url=url, caption=cap))
-        if not ok:
-            logger.warning("Event gallery image failed: %s", url)
-    return sent
+    captions = details.get("image_captions") or [item["caption"] for item in GALLERY_ITEMS[:3]]
+    attachments: list[MediaAttachment] = []
+    for i, item in enumerate(GALLERY_ITEMS[:3]):
+        url = item["url"]
+        cap = captions[i] if i < len(captions) else item.get("caption") or details["title"]
+        attachments.append(MediaAttachment(url=url, caption=cap))
+        mark_gallery_sent(session, [url])
+    return attachments
 
 
 def _store_detail_field(session: ConversationSession, key: str, user_text: str) -> bool:
@@ -149,7 +148,7 @@ async def process_guided_flow(
     if step == GuidedStep.AWAIT_EVENT_TYPE:
         event_type = match_event_type(text)
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
-        media = await _send_event_images(whatsapp_id, event_type)
+        media = _prepare_event_images(event_type, session)
         session.guided_step = GuidedStep.AWAIT_POST_SHOWCASE
         return AgentTurnResult(
             reply=_event_showcase_message(event_type, with_images=bool(media)),
@@ -161,13 +160,20 @@ async def process_guided_flow(
         if customer_wants_to_proceed(text):
             return _start_detail_collection(session)
 
-        reply = await answer_showcase_question(session, text)
-        return AgentTurnResult(reply=reply, fields=session.fields)
+        wants_photos = customer_wants_photos(text)
+        media = prepare_gallery_photos(session, limit=4) if wants_photos else []
+        reply = await answer_showcase_question(session, text, sharing_photos=wants_photos)
+        return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
     if step == GuidedStep.COLLECT_DETAILS:
         for key, prompt in DETAIL_STEPS:
             if getattr(session.fields, key) is not None:
                 continue
+
+            if customer_wants_photos(text):
+                media = prepare_gallery_photos(session, limit=4)
+                reply = await answer_showcase_question(session, text, sharing_photos=True)
+                return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
             if looks_like_question(text) and not is_likely_field_answer(text, key):
                 reply = await answer_details_question(session, text, prompt)

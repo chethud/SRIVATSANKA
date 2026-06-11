@@ -50,18 +50,71 @@ SOCIAL_PROOF = [
     "5-star feedback on food quality, presentation, and stress-free execution",
 ]
 
-# Public gallery images (from company website) — used in WhatsApp welcome
-GALLERY_IMAGE_URLS = [
-    "https://kannansharangapani.com/wp-content/uploads/2024/11/1620985900177-1.jpeg",
-    "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534695-1.png",
-    "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534700-1.png",
+WEBSITE_ABOUT = (
+    "We believe great stories are told of celebrations in every family — weddings, house warmings, "
+    "naming ceremonies, upanayanam, and baby showers filled with joy, satisfaction, and lifelong memories. "
+    "Srivatsanka Events and Services Pvt Ltd is a one-stop solution for wedding catering, decor, pooja setup, "
+    "and venues. We execute with operational excellence, outstanding hospitality, innovative menus, and a "
+    "traditional touch. Our vision is to make your celebration an ecstatic event in reality."
+)
+
+WEBSITE_VIDEOS = [
+    "Wedding Serving Attire & Style — see our professional service on our website gallery",
 ]
 
-WELCOME_IMAGE_CAPTIONS = [
-    "A glimpse of our celebration catering 🍽️",
-    "Elegant food presentation for your special day ✨",
-    "Traditional touch with premium hospitality 💚",
+POPULAR_DISHES = [
+    "Dumrot",
+    "Badam Puri",
+    "Pal Payasam",
+    "Pani Puri & chaat counters",
+    "Live dosa and counter specials",
+    "South Indian, North Indian & Kerala wedding spreads",
+    "Multi-cuisine pure veg menus",
 ]
+
+# Full-size gallery from https://kannansharangapani.com/ (website gallery section)
+GALLERY_ITEMS: list[dict[str, str]] = [
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1620985900177-1.jpeg",
+        "caption": "Wedding feast — pure veg celebration spread 🍽️",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534695-1.png",
+        "caption": "Elegant plating & live counter setup ✨",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534700-1.png",
+        "caption": "Traditional touch with premium hospitality 💚",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534703-1.png",
+        "caption": "Beautiful food presentation at a family celebration",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1714968534705-1.png",
+        "caption": "Grand reception-style veg spread",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1657811033159-1.png",
+        "caption": "Past event — guests enjoying our catering",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1657811142282-1.png",
+        "caption": "Live counter & festive wedding service",
+    },
+    {
+        "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1694611435098-1.png",
+        "caption": "Another glimpse from events we have catered",
+    },
+]
+
+GALLERY_IMAGE_URLS = [item["url"] for item in GALLERY_ITEMS]
+
+WELCOME_IMAGE_CAPTIONS = [item["caption"] for item in GALLERY_ITEMS[:3]]
+
+
+def gallery_urls() -> list[str]:
+    return list(GALLERY_IMAGE_URLS)
 
 EVENT_TYPE_DETAILS: dict[str, dict] = {
     "Wedding": {
@@ -170,14 +223,20 @@ def build_agent_context() -> str:
     events = ", ".join(EVENT_TYPES)
     specialties = "\n".join(f"- {s}" for s in SPECIALTIES)
     proof = "\n".join(f"- {s}" for s in SOCIAL_PROOF)
+    dishes = ", ".join(POPULAR_DISHES)
+    videos = "; ".join(WEBSITE_VIDEOS)
 
     return f"""
-COMPANY (official: {WEBSITE_URL})
-- {COMPANY['legal_name']} ({COMPANY['brand_name']}), est. {COMPANY['established']}
+COMPANY (official website: {WEBSITE_URL})
+- {COMPANY['legal_name']} ({COMPANY['brand_name']}), established {COMPANY['established']}
 - Managing Director: {COMPANY['managing_director']}
+- Tagline: {COMPANY['tagline']}
 - Pure vegetarian catering & events — Bengaluru
-- Contact: {COMPANY['phone']} | {COMPANY['email']}
-- {COMPANY['address']}
+- Contact: {COMPANY['phone']} | WhatsApp {COMPANY['whatsapp']} | {COMPANY['email']}
+- Address: {COMPANY['address']}
+
+ABOUT US (from website)
+{WEBSITE_ABOUT}
 
 WHAT WE DO
 {services}
@@ -185,11 +244,22 @@ WHAT WE DO
 EVENTS WE SPECIALISE IN
 {events}
 
+POPULAR MENU HIGHLIGHTS
+{dishes}
+
 OUR STRENGTHS
 {specialties}
 
-WHAT WE HAVE ACHIEVED (speak naturally, not as a list dump)
+EXPERIENCE & REPUTATION
 {proof}
 
-WEBSITE: Share {WEBSITE_URL} when customers want photos, menu, or reviews.
+GALLERY & VIDEOS
+- We have {len(GALLERY_ITEMS)} event photos from past weddings and celebrations on our website.
+- When customers ask for photos, our WhatsApp system shares real gallery images from past events automatically.
+- Website gallery & videos: {WEBSITE_URL} — includes "{videos}".
+
+WHATSAPP CAPABILITIES
+- You CAN share event photos directly on WhatsApp — the system sends gallery images when customers ask.
+- Never say you cannot share photos on WhatsApp. Say you are sharing sample photos from past events now.
+- Also share {WEBSITE_URL} for the full gallery, feedback, and enquiry form.
 """.strip()
