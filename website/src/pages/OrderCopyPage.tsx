@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Download, Printer } from 'lucide-react';
-import { Card, Button, EmptyState } from '../components/Layout';
+import { Button, EmptyState } from '../components/Layout';
 import { OrderCopyView } from '../components/OrderCopyView';
 import { useAppData } from '../context/AppDataContext';
 import { downloadOrderCopy } from '../utils/orderCopies';
@@ -63,9 +63,9 @@ export default function OrderCopyPage({ copyType }: Props) {
         </div>
       </div>
 
-      <Card className="p-8 print:border-0 print:shadow-none">
+      <div className="print:border-0 print:shadow-none print:p-0 bg-white">
         <OrderCopyView enquiry={order} copyType={copyType} />
-      </Card>
+      </div>
 
       <p className="text-center text-sm text-[var(--muted)] mt-6 print:hidden">{title} for {order.customerName}</p>
     </>

@@ -186,29 +186,196 @@ body {
   font-size: 16px;
 }
 
-#order-copy-print {
-  font-size: 17px;
-}
-
-#order-copy-print .copy-client-line {
-  font-size: 18px;
-}
-
-#order-copy-print .copy-grid-meta {
+#order-copy-print,
+.order-copy-print {
+  box-sizing: border-box;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
   font-size: 16px;
-  padding: 10px 14px;
+  color: var(--foreground);
+  background: #ffffff;
+}
+
+.copy-header {
+  text-align: center;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 3px solid var(--accent);
+}
+
+.copy-logo {
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+.copy-doc-title {
+  margin-top: 1rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.copy-client-block {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.copy-client-line {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.copy-client-line + .copy-client-line {
+  margin-top: 0.25rem;
+}
+
+.copy-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 2rem 0;
+}
+
+.copy-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.copy-session-block {
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.copy-session-date,
+.copy-session-label,
+.copy-session-pax {
+  text-align: center;
+  font-weight: 700;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+.copy-session-date {
+  background: var(--table-header-bg);
+  font-size: 1rem;
+}
+
+.copy-session-label {
+  font-size: 1rem;
+  border-bottom-color: var(--border-strong);
+}
+
+.copy-session-pax {
+  background: var(--background-alt);
+  font-size: 0.9375rem;
+}
+
+.copy-dish-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.875rem 1rem;
+  text-align: center;
+}
+
+.copy-dish-list li {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.55;
+  padding: 0.3rem 0;
+}
+
+.copy-dish-empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.copy-session-total {
+  text-align: center;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-strong);
+  background: var(--order-cream);
+}
+
+.copy-session-total-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--order-accent);
+}
+
+.copy-session-total-amount {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.copy-overall-total {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+  border-radius: 0.5rem;
+}
+
+.copy-overall-total-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--order-accent);
+}
+
+.copy-overall-total-amount {
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+/* Legacy aliases used by footer sections */
+#order-copy-print .copy-grid-meta {
+  font-size: 1rem;
+  padding: 0.625rem 0.875rem;
+  text-align: center;
+  font-weight: 700;
 }
 
 #order-copy-print .copy-dish-name {
-  font-size: 22px;
+  font-size: 1.25rem;
   font-weight: 600;
-  line-height: 1.45;
-  padding: 6px 0;
+  line-height: 1.55;
+  padding: 0.3rem 0;
+  text-align: center;
 }
 
 @media print {
+  .order-copy-print {
+    max-width: 100%;
+  }
+
+  .copy-dish-list li,
   #order-copy-print .copy-dish-name {
-    font-size: 20px;
+    font-size: 1.125rem;
+  }
+
+  .copy-session-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
 

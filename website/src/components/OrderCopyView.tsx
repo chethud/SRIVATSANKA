@@ -25,65 +25,54 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
   );
 
   return (
-    <div
-      className="max-w-3xl mx-auto bg-white print:shadow-none excel-menu-grid order-copy-print"
-      id="order-copy-print"
-    >
-      <div className="-mx-8 -mt-8 mb-6 px-6 pt-6 pb-4 border-b-4 border-[var(--accent)]">
-        <BrandLogo variant="card" className="mx-auto max-w-[220px]" />
-        <p className="text-center text-lg font-semibold text-[var(--primary)] mt-4">{title}</p>
-      </div>
+    <div id="order-copy-print" className="order-copy-print">
+      <header className="copy-header">
+        <BrandLogo variant="card" className="copy-logo" />
+        <p className="copy-doc-title">{title}</p>
+      </header>
 
-      <div className="mb-6 space-y-1 border-b border-[var(--border)] pb-4">
-        <p className="copy-client-line font-bold">
+      <div className="copy-client-block">
+        <p className="copy-client-line">
           Client : {enquiry.customerName}
           {enquiry.eventType ? ` · ${enquiry.eventType}` : ''}
         </p>
-        <p className="copy-client-line font-bold">{enquiry.eventLocation}</p>
+        <p className="copy-client-line">{enquiry.eventLocation}</p>
       </div>
 
       {columns.length === 0 ? (
-        <p className="text-[var(--muted)] text-lg">No dishes on this order yet.</p>
+        <p className="copy-empty">No dishes on this order yet.</p>
       ) : (
-        <div className="space-y-6">
+        <div className="copy-sessions">
           {columns.map((col) => {
             const items = dishesForColumn(col, menuItems, extras);
+            const paxLine = formatPaxTimeLine(col);
+
             return (
-              <div key={col.id} className="border border-[var(--border-strong)] overflow-hidden">
-                <div className="copy-grid-meta font-bold text-center border-b border-[var(--border)] bg-[var(--table-header-bg)]">
-                  {formatDate(col.date)}
-                </div>
-                <div className="copy-grid-meta font-bold text-center border-b border-[var(--border-strong)]">
-                  {col.sessionLabel}
-                </div>
-                <div className="copy-grid-meta font-bold text-center border-b border-[var(--border)] bg-[var(--background-alt)]">
-                  {formatPaxTimeLine(col)}
-                </div>
-                <div className="px-4 py-4 min-h-[80px]">
+              <section key={col.id} className="copy-session-block">
+                <div className="copy-session-date">{formatDate(col.date)}</div>
+                <div className="copy-session-label">{col.sessionLabel}</div>
+                {paxLine && <div className="copy-session-pax">{paxLine}</div>}
+
+                <ul className="copy-dish-list">
                   {items.length === 0 ? (
-                    <span className="text-[var(--muted)] text-lg">—</span>
+                    <li className="copy-dish-empty">—</li>
                   ) : (
-                    <ul className="space-y-1 list-none m-0 p-0">
-                      {items.map((l) => (
-                        <li key={l.id} className="copy-dish-name">
-                          {l.dishName}
-                          {l.served && <span className="text-[var(--logo-forest)]"> ✓</span>}
-                        </li>
-                      ))}
-                    </ul>
+                    items.map((d) => (
+                      <li key={d.id}>
+                        {d.dishName}
+                        {d.served && copyType === 'kitchen' ? ' ✓' : ''}
+                      </li>
+                    ))
                   )}
-                </div>
+                </ul>
+
                 {copyType === 'billing' && items.length > 0 && (
-                  <div className="copy-grid-meta text-center border-t border-[var(--border-strong)] bg-[var(--order-cream)] px-4 py-3">
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--order-accent)] font-semibold mb-1">
-                      Session total
-                    </p>
-                    <p className="font-bold text-lg text-[var(--foreground)]">
-                      {formatColumnAmount(col.amount) || '—'}
-                    </p>
+                  <div className="copy-session-total">
+                    <p className="copy-session-total-label">Session total</p>
+                    <p className="copy-session-total-amount">{formatColumnAmount(col.amount) || '—'}</p>
                   </div>
                 )}
-              </div>
+              </section>
             );
           })}
         </div>
@@ -96,15 +85,9 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
       )}
 
       {copyType === 'billing' && grandTotal != null && (
-        <div className="mt-8 border-2 border-[var(--primary)] rounded-lg overflow-hidden bg-[var(--primary-light)]">
-          <div className="px-4 py-4 text-center">
-            <p className="text-xs uppercase tracking-wider text-[var(--order-accent)] font-semibold mb-1">
-              Overall total
-            </p>
-            <p className="text-2xl font-bold text-[var(--primary-dark)]">
-              {formatColumnAmount(grandTotal)}
-            </p>
-          </div>
+        <div className="copy-overall-total">
+          <p className="copy-overall-total-label">Overall total</p>
+          <p className="copy-overall-total-amount">{formatColumnAmount(grandTotal)}</p>
         </div>
       )}
 

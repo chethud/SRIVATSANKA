@@ -33,6 +33,7 @@ export async function downloadOrderCopy(enquiry: Enquiry, copyType: 'kitchen' | 
 
   const filename = `${sanitizeFilename(enquiry.customerName)}-${copyType}-copy.pdf`;
   const html2pdf = (await import('html2pdf.js')).default;
+  const width = element.offsetWidth || 680;
 
   await html2pdf()
     .set({
@@ -41,6 +42,8 @@ export async function downloadOrderCopy(enquiry: Enquiry, copyType: 'kitchen' | 
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
         scale: 2,
+        width,
+        windowWidth: width,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
