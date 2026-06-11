@@ -119,13 +119,13 @@ async def handle_dish_flow(
 
     labels = _resolve_session_selections(user_text)
     session.selected_dishes = _preferences_to_items(labels)
-    session.phase = ConversationPhase.COMPLETE
+    session.phase = ConversationPhase.DONE
+    session.completed = True
     reply = _format_confirmation(session)
     session.history.append({"role": "assistant", "content": reply})
     return AgentTurnResult(
         reply=reply,
         fields=session.fields,
+        is_complete=True,
         enquiry_fields_complete=True,
-        enquiry_complete=True,
-        selected_dishes=session.selected_dishes,
     )
