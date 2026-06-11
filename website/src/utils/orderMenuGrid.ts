@@ -194,6 +194,22 @@ export function updateColumnPax(
   };
 }
 
+export function updateColumnTime(
+  extras: OrderExtras,
+  columns: MenuColumn[],
+  columnId: string,
+  timeFrom: string | null,
+  timeTo: string | null,
+): OrderExtras {
+  const updated = columns.map((c) =>
+    c.id === columnId ? { ...c, timeFrom: timeFrom || null, timeTo: timeTo || null } : c,
+  );
+  return {
+    ...extras,
+    menuColumns: stripMenuColumnsForSave(updated),
+  };
+}
+
 export function removeMenuColumn(
   extras: OrderExtras,
   columns: MenuColumn[],

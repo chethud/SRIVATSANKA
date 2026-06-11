@@ -756,6 +756,30 @@ body {
   flex-shrink: 0;
 }
 
+.excel-meta-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.excel-meta-time-input {
+  width: 7.25rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.excel-meta-time-sep {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .excel-session-dishes {
   padding: 0;
   background: var(--card);

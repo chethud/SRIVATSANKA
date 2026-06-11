@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Clock, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { Enquiry, EnquiryDish } from '../../api/client';
 import { deleteOrderDish, formatCurrency, formatDate, updateEnquiry } from '../../api/client';
-import { formatScheduleTime, serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
+import { serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
 import {
   dishesForColumn,
   removeMenuColumn,
   resolveMenuColumns,
   updateColumnAmount,
   updateColumnPax,
+  updateColumnTime,
   type MenuColumn,
 } from '../../utils/orderMenuGrid';
 import { OrderMenuItem } from './OrderMenuItem';
@@ -72,7 +73,6 @@ function SessionBlock({
   onRefresh: () => void;
 }) {
   const items = dishesForColumn(column, menuItems, extras);
-  const hasTime = Boolean(column.timeFrom && column.timeTo);
   const [deleting, setDeleting] = useState(false);
 
   async function removeSession() {
@@ -123,15 +123,13 @@ function SessionBlock({
           orderId={orderId}
           onRefresh={onRefresh}
         />
-        {hasTime && (
-          <div className="excel-meta-field excel-meta-field--time">
-            <span className="excel-meta-label">Time</span>
-            <span className="excel-meta-chip">
-              <Clock size={14} aria-hidden />
-              {formatScheduleTime(column.timeFrom!)} – {formatScheduleTime(column.timeTo!)}
-            </span>
-          </div>
-        )}
+        <SessionTimeField
+          column={column}
+          columns={columns}
+          extras={extras}
+          orderId={orderId}
+          onRefresh={onRefresh}
+        />
       </div>
 
       <div className="excel-session-dishes">
@@ -217,6 +215,80 @@ function SessionPaxField({
         placeholder="—"
         className="excel-meta-input"
       />
+    </div>
+  );
+}
+
+function SessionTimeField({
+  column,
+  columns,
+  extras,
+  orderId,
+  onRefresh,
+}: {
+  column: MenuColumn;
+  columns: MenuColumn[];
+  extras: OrderExtras;
+  orderId: string;
+  onRefresh: () => void;
+}) {
+  const [timeFrom, setTimeFrom] = useState(column.timeFrom ?? '');
+  const [timeTo, setTimeTo] = useState(column.timeTo ?? '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTimeFrom(column.timeFrom ?? '');
+    setTimeTo(column.timeTo ?? '');
+  }, [column.timeFrom, column.timeTo]);
+
+  async function saveTime(nextFrom: string, nextTo: string) {
+    const from = nextFrom.trim() || null;
+    const to = nextTo.trim() || null;
+    if (from === column.timeFrom && to === column.timeTo) return;
+    if ((from && !to) || (!from && to)) return;
+
+    setSaving(true);
+    try {
+      const merged = updateColumnTime(extras, columns, column.id, from, to);
+      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      await onRefresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleBlur() {
+    void saveTime(timeFrom, timeTo);
+  }
+
+  return (
+    <div className="excel-meta-field excel-meta-field--time">
+      <span className="excel-meta-label">Time</span>
+      <div className="excel-meta-time-row">
+        <input
+          id={`time-from-${column.id}`}
+          type="time"
+          value={timeFrom}
+          onChange={(e) => setTimeFrom(e.target.value)}
+          onBlur={handleBlur}
+          disabled={saving}
+          className="excel-meta-time-input"
+          aria-label={`Start time for ${column.sessionLabel}`}
+        />
+        <span className="excel-meta-time-sep" aria-hidden>
+          –
+        </span>
+        <input
+          id={`time-to-${column.id}`}
+          type="time"
+          value={timeTo}
+          onChange={(e) => setTimeTo(e.target.value)}
+          onBlur={handleBlur}
+          disabled={saving}
+          className="excel-meta-time-input"
+          aria-label={`End time for ${column.sessionLabel}`}
+        />
+      </div>
     </div>
   );
 }
