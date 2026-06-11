@@ -92,38 +92,6 @@ def parse_event_date(text: str) -> datetime:
     return datetime.now() + timedelta(days=7)
 
 
-def parse_callback_time(text: str) -> datetime:
-    lower = text.lower()
-    now = datetime.now()
-
-    import re
-
-    in_minutes = re.search(r"in\s+(\d+)\s*min", lower)
-    if in_minutes:
-        return now + timedelta(minutes=int(in_minutes.group(1)))
-
-    if "tomorrow" in lower:
-        base = now + timedelta(days=1)
-    elif "today" in lower:
-        base = now
-    else:
-        try:
-            return parse_event_date(text)
-        except Exception:
-            return now + timedelta(hours=2)
-
-    match = re.search(r"(\d{1,2})\s*(am|pm)", lower)
-    if match:
-        hour = int(match.group(1))
-        if match.group(2) == "pm" and hour < 12:
-            hour += 12
-        if match.group(2) == "am" and hour == 12:
-            hour = 0
-        return base.replace(hour=hour, minute=0, second=0, microsecond=0)
-
-    return base + timedelta(hours=2)
-
-
 def _build_gemini_history(session: ConversationSession) -> list[dict]:
     history = []
     for msg in session.history[:-1]:

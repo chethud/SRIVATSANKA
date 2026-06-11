@@ -29,6 +29,16 @@ function defaultCallbackAt() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function callbackDisplay(enquiry: { preferredCallbackAt: string; notes?: string | null }) {
+  const when = formatDateTime(enquiry.preferredCallbackAt);
+  const requested = enquiry.notes
+    ?.split('\n')
+    .find((line) => line.startsWith('Callback requested: '))
+    ?.slice('Callback requested: '.length)
+    .trim();
+  return requested ? `${when} (${requested})` : when;
+}
+
 const emptyForm = () => ({
   customerName: '',
   phoneNumber: '',
@@ -228,7 +238,7 @@ export default function EnquiriesPage() {
                   <div><dt className="text-[var(--muted)]">Event</dt><dd>{detail.eventType}</dd></div>
                   <div><dt className="text-[var(--muted)]">Date</dt><dd>{formatDate(detail.eventDate)}</dd></div>
                   <div><dt className="text-[var(--muted)]">Location</dt><dd>{detail.eventLocation}</dd></div>
-                  <div><dt className="text-[var(--muted)]">Callback</dt><dd>{formatDateTime(detail.preferredCallbackAt)}</dd></div>
+                  <div><dt className="text-[var(--muted)]">Callback</dt><dd>{callbackDisplay(detail)}</dd></div>
                   <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
                 </dl>
                 {detail.dishes?.length > 0 && (

@@ -180,9 +180,23 @@ def _is_probable_date(text: str) -> bool:
 
 def _is_probable_callback(text: str) -> bool:
     t = text.lower()
-    if re.search(r"\d{1,2}\s*(am|pm)", t):
+    if re.search(r"\d{1,2}\s*(am|pm|:\d{2})", t):
         return True
-    return any(w in t for w in ("today", "tomorrow", "morning", "evening", "afternoon", "call me"))
+    if re.search(r"\bin\s+\d+\s*(min|hour)", t):
+        return True
+    return any(
+        w in t
+        for w in (
+            "today",
+            "tomorrow",
+            "morning",
+            "evening",
+            "afternoon",
+            "noon",
+            "call me",
+            "tonight",
+        )
+    )
 
 
 def is_likely_field_answer(text: str, field_key: str) -> bool:
