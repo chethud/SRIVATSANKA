@@ -15,6 +15,7 @@ import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderExtrasSection } from './OrderExtrasSection';
 import { OrderRegionalStyleSection } from './OrderRegionalStyleSection';
+import { OrderVenueMapSection } from './OrderVenueMapSection';
 import { OrderExcelHeader, OrderExcelMenuGrid } from './OrderExcelMenuGrid';
 import {
   formatOrderId,
@@ -429,6 +430,8 @@ export function OrderDetailView({
       </div>
 
       <OrderRegionalStyleSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
+
+      <OrderVenueMapSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
 
       <div className="order-section">
         <div className="order-section-head">

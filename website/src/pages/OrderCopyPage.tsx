@@ -38,7 +38,11 @@ export default function OrderCopyPage({ copyType }: Props) {
             <Printer size={16} />
             Print
           </Button>
-          <Button type="button" onClick={() => downloadOrderCopy(order, copyType)} className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => void downloadOrderCopy(order, copyType)}
+            className="flex items-center gap-2"
+          >
             <Download size={16} />
             Download
           </Button>

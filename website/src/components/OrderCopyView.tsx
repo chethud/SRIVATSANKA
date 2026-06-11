@@ -10,6 +10,7 @@ import {
 import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
 import { OrderExtrasTable } from './order/OrderExtrasSection';
 import { OrderRegionalStylePrint } from './order/OrderRegionalStyleSection';
+import { VenueMapQrPrint } from './order/OrderVenueMapSection';
 
 export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: 'kitchen' | 'billing' }) {
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
@@ -78,6 +79,8 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
       )}
 
       <OrderRegionalStylePrint style={extras.regionalStyle} />
+
+      {copyType === 'kitchen' && <VenueMapQrPrint mapLink={extras.venueMapLink} />}
 
       {copyType === 'billing' && extras.extrasEnabled && (
         <OrderExtrasTable items={extras.extraItems ?? []} />

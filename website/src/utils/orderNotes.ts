@@ -110,6 +110,8 @@ export type OrderExtras = {
   extraItems?: OrderExtraItem[];
   /** Regional cuisine style — printed on kitchen and billing copies */
   regionalStyle?: string | null;
+  /** Google Maps link — QR printed at bottom of kitchen copy only */
+  venueMapLink?: string | null;
   /** @deprecated use assignedWorkerIds */
   primaryWorkerId?: string | null;
   assignedWorkerIds?: string[];
@@ -157,6 +159,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'extrasEnabled' in parsed ||
     'extraItems' in parsed ||
     'regionalStyle' in parsed ||
+    'venueMapLink' in parsed ||
     'primaryWorkerId' in parsed ||
     'assignedWorkerIds' in parsed ||
     'dispatchPhase' in parsed ||
@@ -183,6 +186,7 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         extrasEnabled: parsed.extrasEnabled ?? false,
         extraItems: Array.isArray(parsed.extraItems) ? parsed.extraItems : [],
         regionalStyle: parsed.regionalStyle ?? null,
+        venueMapLink: parsed.venueMapLink ?? null,
         primaryWorkerId: parsed.primaryWorkerId ?? null,
         assignedWorkerIds: Array.isArray(parsed.assignedWorkerIds)
           ? parsed.assignedWorkerIds.filter(Boolean)

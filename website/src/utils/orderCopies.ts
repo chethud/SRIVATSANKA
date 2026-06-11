@@ -7,6 +7,7 @@ import {
   resolveMenuColumns,
 } from './orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from './mealSessions';
+import { escapeHtml, normalizeMapUrl, qrCodeDataUrl } from './qrCode';
 
 function buildSessionHtml(
   col: ReturnType<typeof resolveMenuColumns>[number],
@@ -39,7 +40,19 @@ function buildSessionHtml(
     </div>`;
 }
 
-function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
+function buildVenueQrHtml(mapLink: string | null | undefined, qrDataUrl: string | null): string {
+  const url = normalizeMapUrl(mapLink ?? '');
+  if (!url || !qrDataUrl) return '';
+  return `<div style="margin-top:24px;border:1px solid #cbd5cb;overflow:hidden;text-align:center;">
+      <div style="background:#f8faf8;font-weight:bold;font-size:16px;padding:10px 12px;border-bottom:1px solid #cbd5cb;">Venue — scan for directions</div>
+      <div style="padding:20px;">
+        <img src="${qrDataUrl}" alt="Venue QR code" width="220" height="220" style="display:block;margin:0 auto;" />
+        <p style="font-size:11px;color:#64748b;margin-top:12px;word-break:break-all;">${escapeHtml(url)}</p>
+      </div>
+    </div>`;
+}
+
+async function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
   const extras = parseOrderNotes(enquiry.notes);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
@@ -78,23 +91,33 @@ function buildHtml(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const regionalHtml = regionalStyle
     ? `<div style="margin-top:24px;border:1px solid #cbd5cb;overflow:hidden;">
       <div style="background:#f8faf8;font-weight:bold;font-size:16px;padding:10px 12px;text-align:center;border-bottom:1px solid #cbd5cb;">Regional / cuisine style</div>
-      <div style="padding:14px 12px;text-align:center;font-weight:bold;font-size:18px;">${regionalStyle}</div>
+      <div style="padding:14px 12px;text-align:center;font-weight:bold;font-size:18px;">${escapeHtml(regionalStyle)}</div>
     </div>`
     : '';
+
+  let venueQrHtml = '';
+  if (copyType === 'kitchen') {
+    const mapUrl = normalizeMapUrl(extras.venueMapLink ?? '');
+    if (mapUrl) {
+      const qrDataUrl = await qrCodeDataUrl(mapUrl, 220);
+      venueQrHtml = buildVenueQrHtml(extras.venueMapLink, qrDataUrl);
+    }
+  }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Verdana,Geneva,Tahoma,sans-serif;padding:24px;max-width:720px;margin:0 auto;font-size:17px;">
     <h1 style="color:#0b6b3a;font-size:22px;">SRIVATSANKA</h1>
     <h2 style="font-size:16px;color:#64748b;">${title}</h2>
-    <p style="font-weight:bold;font-size:18px;">Client : ${enquiry.customerName}${enquiry.eventType ? ` · ${enquiry.eventType}` : ''}</p>
-    <p style="font-weight:bold;font-size:18px;">${enquiry.eventLocation}</p>
+    <p style="font-weight:bold;font-size:18px;">Client : ${escapeHtml(enquiry.customerName)}${enquiry.eventType ? ` · ${escapeHtml(enquiry.eventType)}` : ''}</p>
+    <p style="font-weight:bold;font-size:18px;">${escapeHtml(enquiry.eventLocation)}</p>
     <div style="margin-top:12px;">${columnHtml}</div>
     ${regionalHtml}
     ${extrasHtml}
+    ${venueQrHtml}
   </body></html>`;
 }
 
-export function downloadOrderCopy(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
-  const html = buildHtml(enquiry, copyType);
+export async function downloadOrderCopy(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
+  const html = await buildHtml(enquiry, copyType);
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
