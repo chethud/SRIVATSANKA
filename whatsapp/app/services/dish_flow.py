@@ -28,44 +28,22 @@ def _parse_numbers(text: str) -> list[str]:
 
 def _format_session_prompt() -> str:
     lines = [
-        "Wonderful — your event details are with our team. 🌿\n",
-        "Which *meal services* do you need? (e.g. breakfast, lunch, reception dinner, coffee)",
-        "Pick any (e.g. *1,3,4* for Breakfast + Dinner + Reception Dinner):\n",
+        "Which meal services do you need? Pick numbers or names (e.g. *1,3* or *breakfast, dinner*):",
+        "",
     ]
     for key, label in MEAL_SESSION_OPTIONS:
         lines.append(f"{key}. {label}")
-    lines.extend([
-        "",
-        "You can also type names, e.g. *breakfast* or *reception dinner*.",
-        "Reply *skip* if you want our team to suggest options on the callback.",
-    ])
+    lines.append("\nReply *skip* to discuss on the call.")
     return "\n".join(lines)
 
 
 def _format_confirmation(session: ConversationSession) -> str:
     f = session.fields
-    lines = [
-        f"Thank you, {f.customer_name}! ✅\n",
-        "*Event Details*",
-        f"• Event: {f.event_type}",
-        f"• Date: {f.event_date}",
-        f"• Location: {f.event_location}",
-        f"• Callback: {f.preferred_callback}",
-        "",
-    ]
-    if session.selected_dishes:
-        lines.append("*Meal services requested*")
-        for d in session.selected_dishes:
-            extra = f" – {d.notes}" if d.notes else ""
-            lines.append(f"• {d.dish_name}{extra}")
-    else:
-        lines.append("*Meals:* Team will discuss menu options on callback")
-    lines.extend([
-        "",
-        "Our team will contact you at your preferred time with a tailored menu.",
-        "Send *new* to start another enquiry.",
-    ])
-    return "\n".join(lines)
+    meals = ", ".join(d.dish_name for d in session.selected_dishes) if session.selected_dishes else "Team will suggest on call"
+    return (
+        f"Thank you, {f.customer_name}! ✅ We'll call you at {f.preferred_callback}.\n"
+        f"Meals: {meals}. Send *new* for another enquiry."
+    )
 
 
 def _resolve_session_selections(text: str) -> list[str]:

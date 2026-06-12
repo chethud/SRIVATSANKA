@@ -119,6 +119,7 @@ def gallery_urls() -> list[str]:
 EVENT_TYPE_DETAILS: dict[str, dict] = {
     "Wedding": {
         "title": "Wedding Catering",
+        "short_reply": "We do lovely pure-veg wedding menus with live counters 🌿",
         "description": (
             "Multi-day wedding menus with South Indian, North Indian & Kerala favourites — "
             "live counters, Dumrot, Badam Puri, chaat, and elegant service for family & guests."
@@ -131,6 +132,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "House Warming": {
         "title": "House Warming",
+        "short_reply": "Warm homely menus for house warming — snacks, meals & sweets 🏠",
         "description": (
             "Warm homely menus with snacks, meals, and desserts — perfect for griha pravesham "
             "with neighbours and close family."
@@ -139,6 +141,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "Baby Shower": {
         "title": "Baby Shower",
+        "short_reply": "Light festive menus perfect for baby showers 🎀",
         "description": (
             "Light, festive menus with snacks, sweets, and refreshing beverages — "
             "beautiful presentation for celebrating the new arrival."
@@ -147,6 +150,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "Reception": {
         "title": "Reception",
+        "short_reply": "Grand veg reception spreads with smooth service for big guest lists ✨",
         "description": (
             "Grand reception dining with multi-cuisine veg spreads, live counters, and "
             "smooth service for large guest lists."
@@ -155,6 +159,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "Corporate events": {
         "title": "Corporate Events",
+        "short_reply": "On-time pure-veg catering for office & corporate events 💼",
         "description": (
             "Professional catering for office lunches, conferences, and team events — "
             "hygienic, on-time, and customisable pure-veg menus."
@@ -163,6 +168,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "Naming Ceremony": {
         "title": "Naming Ceremony",
+        "short_reply": "Traditional naming ceremony menus with homely veg meals 🙏",
         "description": (
             "Traditional naming ceremony menus with homely meals, sweets, and snacks for family and guests."
         ),
@@ -170,6 +176,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "Upanayanam": {
         "title": "Upanayanam",
+        "short_reply": "Sattvic pure-veg meals for upanayanam gatherings 🙏",
         "description": (
             "Sacred ceremony catering with sattvic pure-veg meals prepared with care for family gatherings."
         ),
@@ -177,6 +184,7 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "General": {
         "title": "Celebration Catering",
+        "short_reply": "We plan custom pure-veg menus for all family celebrations 🌿",
         "description": (
             "Custom pure-veg menus for naming ceremonies, upanayanam, birthdays, and family functions — "
             "we plan every detail with you."

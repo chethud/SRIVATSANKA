@@ -5,7 +5,6 @@ import logging
 from app.data.company_knowledge import (
     COMPANY,
     EVENT_TYPE_DETAILS,
-    WEBSITE_URL,
     match_event_type,
 )
 from app.schemas import AgentTurnResult, EnquiryFields, MediaAttachment
@@ -22,44 +21,26 @@ from app.services.whatsapp_client import normalize_phone
 logger = logging.getLogger(__name__)
 
 DETAIL_STEPS: list[tuple[str, str]] = [
-    ("event_date", "When is the event? (e.g. 15 June 2026)"),
-    ("event_location", "Which area or venue in Bengaluru?"),
-    (
-        "preferred_callback",
-        "When should our team call you with menu ideas? (e.g. today 4 PM, tomorrow morning)",
-    ),
+    ("event_date", "When is the event?"),
+    ("event_location", "Which area in Bengaluru?"),
+    ("preferred_callback", "When should we call you?"),
 ]
 
 
 def _welcome_message() -> str:
-    return (
-        f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿\n\n"
-        f"We're a pure veg catering team in Bengaluru — happy to help you plan your event.\n\n"
-        f"May I know your name?"
-    )
+    return f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 What's your name?"
 
 
 def _company_intro_message(name: str) -> str:
-    return (
-        f"Nice to meet you, *{name}*! 😊\n\n"
-        f"What kind of celebration are you planning — wedding, house warming, corporate, or something else?"
-    )
+    return f"Nice to meet you, *{name}*! What event are you planning?"
 
 
 def _event_showcase_message(event_type: str, *, with_images: bool) -> str:
     details = EVENT_TYPE_DETAILS.get(event_type, EVENT_TYPE_DETAILS["General"])
-    photo_note = (
-        "Sharing a few photos from past events 👇\n\n"
-        if with_images
-        else f"If you'd like to see photos, just ask — or visit {WEBSITE_URL}\n\n"
-    )
-    return (
-        f"Lovely — we do a lot of *{details['title']}* events! 💚\n\n"
-        f"{details['description']}\n\n"
-        f"{photo_note}"
-        f"Feel free to ask anything about menu, service, or pricing.\n\n"
-        f"When you're ready, reply *ok* and we'll note your date and call time."
-    )
+    hook = details.get("short_reply") or f"We'd love to help with your {details['title'].lower()}!"
+    if with_images:
+        return f"{hook} Sharing a few photos 👇 Reply *ok* when ready to continue."
+    return f"{hook} Questions? Or reply *ok* to share date & call time."
 
 
 def _store_detail_field(session: ConversationSession, key: str, user_text: str) -> bool:
@@ -86,7 +67,7 @@ def _start_detail_collection(session: ConversationSession) -> AgentTurnResult:
     first_prompt = _next_detail_prompt(session)
     name = session.fields.customer_name or "there"
     return AgentTurnResult(
-        reply=f"Great, *{name}*! {first_prompt}",
+        reply=f"Sure, *{name}*! {first_prompt}",
         fields=session.fields,
     )
 
@@ -111,7 +92,7 @@ async def process_guided_flow(
         skip_names = {"hi", "hello", "hey", "hii", "namaste", "vanakkam", "start", "help"}
         if not name or name.lower() in skip_names:
             return AgentTurnResult(
-                reply="Could you share your name? That helps us assist you better 😊",
+                reply="Your name please? 😊",
                 fields=session.fields,
             )
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": name})
@@ -154,12 +135,12 @@ async def process_guided_flow(
             if not _store_detail_field(session, key, text):
                 retry = dict(DETAIL_STEPS)[key]
                 return AgentTurnResult(
-                    reply=f"Sorry, I didn't catch that — {retry}",
+                    reply=f"Sorry — {retry}",
                     fields=session.fields,
                 )
             next_prompt = _next_detail_prompt(session)
             if next_prompt:
-                return AgentTurnResult(reply=f"Got it, thanks! 👍\n\n{next_prompt}", fields=session.fields)
+                return AgentTurnResult(reply=f"Noted 👍 {next_prompt}", fields=session.fields)
             break
 
         if not _details_complete(session):
@@ -174,13 +155,8 @@ async def process_guided_flow(
         name = session.fields.customer_name or "there"
         return AgentTurnResult(
             reply=(
-                f"Perfect, *{name}* — we've noted everything ✅\n\n"
-                f"• Event: {session.fields.event_type}\n"
-                f"• Date: {session.fields.event_date}\n"
-                f"• Venue: {session.fields.event_location}\n"
-                f"• Call back: {session.fields.preferred_callback}\n\n"
-                f"Our team will reach out at the time you mentioned.\n\n"
-                f"Next — which cuisine styles do you prefer? (e.g. South Indian, Multi Cuisine)"
+                f"All set, *{name}* ✅ Our team will call you then.\n"
+                f"Which meal services do you need? (e.g. breakfast, lunch, dinner)"
             ),
             fields=session.fields,
             enquiry_fields_complete=True,

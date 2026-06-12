@@ -2,17 +2,13 @@
 
 import logging
 
-from app.data.company_knowledge import (
-    COMPANY,
-    EVENT_TYPE_DETAILS,
-    POPULAR_DISHES,
-    WEBSITE_URL,
-)
+from app.data.company_knowledge import COMPANY, EVENT_TYPE_DETAILS, POPULAR_DISHES
 from app.services.gemini_conversation import (
     generate_details_phase_reply,
     generate_showcase_reply,
     is_gemini_configured,
     looks_like_question,
+    trim_whatsapp_reply,
 )
 from app.services.session_store import ConversationSession
 from app.services.website_gallery import customer_wants_photos
@@ -77,47 +73,26 @@ def _fallback_answer(
     name = session.fields.customer_name or "there"
     event = session.fields.event_type or "celebrations"
     details = EVENT_TYPE_DETAILS.get(event, EVENT_TYPE_DETAILS["General"])
+    hook = details.get("short_reply") or "Happy to help!"
     t = user_text.lower()
 
     if sharing_photos or customer_wants_photos(user_text):
-        return (
-            f"Sure, *{name}*! Sharing a few photos from past events now 👇\n\n"
-            f"Ask anything else, or reply *ok* when you'd like us to note your date and call time."
-        )
+        return f"Here are some photos 👇 Reply *ok* when ready to continue."
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
-        return (
-            f"We're *{COMPANY['brand_name']}* — pure veg catering in Bengaluru since {COMPANY['established']}, "
-            f"led by {COMPANY['managing_director']}. Weddings, corporate & family events. "
-            f"More at {WEBSITE_URL}\n\n"
-            f"Anything else, or reply *ok* to continue?"
-        )
+        return f"We're *{COMPANY['brand_name']}* — pure veg catering in Bengaluru since {COMPANY['established']}. Reply *ok* to continue."
 
     if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio", "wedding")):
-        return (
-            f"We've catered hundreds of events across Bengaluru — weddings, receptions, house warmings & more. "
-            f"For *{details['title']}*, {details['description'][:120]}…\n\n"
-            f"Reply *ok* when ready, or ask another question."
-        )
+        return f"We've done hundreds of events in Bengaluru. {hook} Reply *ok* or ask more."
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
-        return (
-            f"Every menu is customised for your guest count and dishes — our team shares pricing on a call, "
-            f"not as a fixed list here.\n\n"
-            f"Reply *ok* to continue, or ask anything else."
-        )
+        return "Pricing depends on menu & guests — our team shares it on a call. Reply *ok* to continue."
 
     if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "service")):
-        dishes = ", ".join(POPULAR_DISHES[:4])
-        return (
-            f"100% pure vegetarian — {dishes}, live counters & more.\n\n"
-            f"Reply *ok* when ready, or ask another question."
-        )
+        dishes = ", ".join(POPULAR_DISHES[:3])
+        return f"100% veg — {dishes} & more. Reply *ok* when ready."
 
-    return (
-        f"Happy to help, *{name}*! We're {COMPANY['brand_name']} — hygienic pure-veg catering with a personal touch.\n\n"
-        f"You're planning *{event}*. What would you like to know? Or reply *ok* when ready for date & call time."
-    )
+    return f"Happy to help, *{name}*! Reply *ok* when ready for date & call time."
 
 
 async def _gemini_or_fallback(
@@ -133,12 +108,14 @@ async def _gemini_or_fallback(
 
     try:
         if next_detail_prompt is not None:
-            return await generate_details_phase_reply(session, user_text, next_detail_prompt)
-        return await generate_showcase_reply(
-            session,
-            user_text,
-            sharing_photos=sharing_photos,
-        )
+            reply = await generate_details_phase_reply(session, user_text, next_detail_prompt)
+        else:
+            reply = await generate_showcase_reply(
+                session,
+                user_text,
+                sharing_photos=sharing_photos or customer_wants_photos(user_text),
+            )
+        return trim_whatsapp_reply(reply)
     except Exception:
         logger.exception("Gemini conversation failed for message: %s", user_text[:80])
         return _fallback_answer(session, user_text, sharing_photos=sharing_photos)

@@ -7,7 +7,7 @@ import google.generativeai as genai
 from app.config import settings
 from app.data.company_knowledge import COMPANY, WEBSITE_URL, build_short_company_context
 from app.schemas import AgentTurnResult, EnquiryFields
-from app.services.gemini_conversation import is_gemini_configured
+from app.services.gemini_conversation import is_gemini_configured, trim_whatsapp_reply
 from app.services.session_store import ConversationSession
 
 AGENT_SYSTEM_PROMPT = f"""You are a warm, professional *human catering consultant* for SRIVATSANKA on WhatsApp.
@@ -18,11 +18,9 @@ Official site: {WEBSITE_URL}
 {build_short_company_context()}
 
 YOUR PERSONALITY
-- Text like a real person — friendly, relaxed, helpful. Never robotic or form-like.
-- Keep messages short (1–3 sentences usually). One question at a time.
-- If they ask about the company: short and sweet — don't dump a brochure.
-- Never say "I am a bot". Say "we" / "our team".
-- Light emoji only when natural.
+- Text like WhatsApp — max 2 short sentences, under 220 characters in "reply".
+- One question at a time. No brochures, no bullet lists, no website links unless asked.
+- Never say "I am a bot". Light emoji at most once.
 
 INFORMATION TO COLLECT (all required before is_complete=true)
 1. customer_name
@@ -107,7 +105,8 @@ def _call_gemini(session: ConversationSession, user_text: str) -> str:
         system_instruction=AGENT_SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            temperature=0.72,
+            temperature=0.65,
+            max_output_tokens=150,
         ),
     )
 
@@ -160,7 +159,7 @@ class AIAgent:
             raw = await asyncio.to_thread(_call_gemini, session, agent_input)
             payload = json.loads(raw)
             result = AgentTurnResult(
-                reply=payload.get("reply", "Thank you for reaching SRIVATSANKA! What celebration are you planning?"),
+                reply=trim_whatsapp_reply(payload.get("reply", "Hi! What event are you planning?")),
                 fields=EnquiryFields(**payload.get("fields", {})),
                 is_complete=bool(payload.get("is_complete", False)),
             )
@@ -181,22 +180,18 @@ class AIAgent:
         """Conversational fallback when Gemini is unavailable."""
         if not session.history or len(session.history) <= 1:
             reply = (
-                f"Vanakkam! Welcome to *{COMPANY['brand_name']}* 🌿\n\n"
-                "We're Srivatsanka Events — pure veg catering in Bengaluru since 2017. "
-                "Weddings, house warmings, naming ceremonies & more, with menus guests still talk about.\n\n"
-                f"See our work: {WEBSITE_URL}\n\n"
-                "What kind of celebration are you planning?"
+                f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 What event are you planning?"
             )
             session.history.append({"role": "assistant", "content": reply})
             return AgentTurnResult(reply=reply, fields=session.fields)
 
         steps = [
-            ("customer_name", "Lovely! May I have your name?"),
-            ("phone_number", "Thank you — and the best number to reach you?"),
-            ("event_type", "What celebration is it? (Wedding, house warming, baby shower, etc.)"),
+            ("customer_name", "Lovely! Your name?"),
+            ("phone_number", "Best number to reach you?"),
+            ("event_type", "What event is it?"),
             ("event_date", "When is the event?"),
-            ("event_location", "Which area or venue in Bengaluru?"),
-            ("preferred_callback", "When should Mr. Kannan's team call you? (e.g. today 4 PM)"),
+            ("event_location", "Which area in Bengaluru?"),
+            ("preferred_callback", "When should we call you?"),
         ]
 
         has_assistant = any(m["role"] == "assistant" for m in session.history)
@@ -216,10 +211,7 @@ class AIAgent:
                 return AgentTurnResult(reply=prompt, fields=session.fields)
 
         return AgentTurnResult(
-            reply=(
-                "Perfect — I have your event details. "
-                "Last step: which cuisine styles interest you? (e.g. Multi Cuisine, South Indian)"
-            ),
+            reply="Got your details ✅ Which meal services do you need?",
             fields=session.fields,
             enquiry_fields_complete=True,
         )
