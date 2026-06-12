@@ -1,4 +1,5 @@
 import { useLayout } from '../context/LayoutContext';
+import { useBrand } from '../context/BrandContext';
 
 type BrandLogoProps = {
   variant?: 'sidebar' | 'card' | 'compact' | 'horizontal';
@@ -8,6 +9,7 @@ type BrandLogoProps = {
 /** Sidebar-only: needs LayoutProvider (dashboard shell). */
 function SidebarBrandLogo({ className = '' }: { className?: string }) {
   const { sidebarCollapsed } = useLayout();
+  const { iconSrc } = useBrand();
 
   return (
     <div
@@ -16,7 +18,7 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
     >
       <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>
         <img
-          src="/brand/logo-icon.svg?v=4"
+          src={iconSrc}
           alt=""
           width={40}
           height={40}
@@ -35,14 +37,13 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
 }
 
 export function BrandLogo({ variant = 'sidebar', className = '' }: BrandLogoProps) {
+  const { iconSrc, horizontalSrc } = useBrand();
+
   if (variant === 'sidebar') {
     return <SidebarBrandLogo className={className} />;
   }
 
-  const src =
-    variant === 'compact'
-      ? '/brand/logo-icon.svg?v=4'
-      : '/brand/logo-horizontal.svg?v=4';
+  const src = variant === 'compact' ? iconSrc : horizontalSrc;
 
   return (
     <div className={`flex items-center justify-center ${className}`}>
