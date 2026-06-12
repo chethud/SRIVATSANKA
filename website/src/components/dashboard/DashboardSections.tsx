@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Bot, Bell, Calendar, ChevronRight, HardHat, Sparkles, Truck, UtensilsCrossed,
+  Bell, Calendar, HardHat, Sparkles, Truck, UtensilsCrossed,
   FileText, Plus, Users,
 } from 'lucide-react';
 import { formatDate } from '../../api/client';
@@ -198,7 +198,6 @@ export function QuickActionsPanel() {
     { to: '/orders', label: 'New order', icon: Plus },
     { to: '/invoices', label: 'Upload bill', icon: FileText },
     { to: '/dishes', label: 'Menu', icon: UtensilsCrossed },
-    { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -246,9 +245,7 @@ export function AiInsightsPanel({ insights }: { insights: string[] }) {
           <h3 className="text-sm font-semibold">AI Business Assistant</h3>
           <p className="text-xs text-[var(--muted)]">Smart recommendations</p>
         </div>
-        <Link to="/ai-assistant" className="ml-auto text-xs font-medium text-[var(--primary)] hover:underline flex items-center gap-0.5">
-          Open <ChevronRight size={14} />
-        </Link>
+        <p className="text-xs text-[var(--muted)] ml-auto">Use the AI chat button ↘</p>
       </div>
       <ul className="space-y-3">
         {insights.map((text, i) => (

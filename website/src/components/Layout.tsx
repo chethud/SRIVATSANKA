@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
-  HardHat, FileText, BarChart3, Bot, Settings, MessageCircle,
+  HardHat, FileText, BarChart3, Settings, MessageCircle,
   PanelLeftClose, PanelLeft, Moon, Sun, LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { CreateActionProvider } from '../context/CreateActionContext';
 import { LayoutProvider, useLayout } from '../context/LayoutContext';
 import { BrandLogo } from './BrandLogo';
 import { TopNav } from './TopNav';
+import { AIChatWidget } from './AIChatWidget';
 
 type AppDataSlice = ReturnType<typeof useAppData>;
 
@@ -30,7 +31,6 @@ const navItems: {
   { to: '/workers', label: 'Workers', icon: HardHat, badge: (d) => d.workers.length },
   { to: '/invoices', label: 'Invoices', icon: FileText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
   { to: '/bot-tester', label: 'WhatsApp Chat', icon: MessageCircle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -47,6 +47,8 @@ function DashboardLayoutInner() {
     logout();
     navigate('/login', { replace: true });
   }
+
+  const isWhatsAppChat = location.pathname === '/bot-tester';
 
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
@@ -141,13 +143,17 @@ function DashboardLayoutInner() {
 
       <motion.main
         layout
-        className="flex-1 min-h-screen px-4 py-4 md:px-6 lg:px-8"
+        className={`flex-1 min-h-screen flex flex-col ${
+          isWhatsAppChat ? 'px-2 py-2 md:px-3' : 'px-4 py-4 md:px-6 lg:px-8'
+        }`}
         style={{ marginLeft: sidebarWidth }}
         transition={{ type: 'spring', stiffness: 380, damping: 32 }}
       >
-        <div className="topnav-root">
-          <TopNav />
-        </div>
+        {!isWhatsAppChat && (
+          <div className="topnav-root">
+            <TopNav />
+          </div>
+        )}
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -155,10 +161,12 @@ function DashboardLayoutInner() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
+            className={isWhatsAppChat ? 'flex-1 min-h-0 flex flex-col' : undefined}
           >
             <Outlet />
           </motion.div>
         </AnimatePresence>
+        {!isWhatsAppChat && <AIChatWidget />}
       </motion.main>
     </div>
   );

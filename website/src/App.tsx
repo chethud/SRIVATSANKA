@@ -13,7 +13,6 @@ import WorkersPage from './pages/WorkersPage';
 import WorkerDetailPage from './pages/WorkerDetailPage';
 import InvoicesPage from './pages/InvoicesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
 import BotTesterPage from './pages/BotTesterPage';
 
@@ -35,7 +34,6 @@ export default function App() {
         <Route path="workers/:workerId" element={<WorkerDetailPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="ai-assistant" element={<AIAssistantPage />} />
         <Route path="bot-tester" element={<BotTesterPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

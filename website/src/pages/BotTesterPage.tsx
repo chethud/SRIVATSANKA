@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MessageCircle, Plus, RefreshCw, Send, User } from 'lucide-react';
-import { PageHeader } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import {
   fetchChatConversations,
@@ -160,27 +159,15 @@ export default function BotTesterPage() {
   const active = conversations.find((c) => c.phoneNumber === selectedPhone);
 
   return (
-    <>
-      <PageHeader
-        title="WhatsApp Chat"
-        description="Live customer conversations by phone — open a thread and reply directly to their WhatsApp"
-      />
-
+    <div className="flex flex-col flex-1 min-h-0 h-[calc(100vh-1rem)]">
       {!connected && (
-        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-2 shrink-0">
           API offline — start the backend on Render or locally, then sign in again.
         </p>
       )}
 
-      <div className="text-sm text-[var(--muted)] mb-4 space-y-1">
-        <p>
-          When a customer messages your Meta business number, their chat appears here with their phone number.
-          Click the conversation, type a message, and choose <strong>Send to customer</strong> — they receive it on WhatsApp.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 h-[min(720px,calc(100vh-280px))]">
-        <aside className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-3 flex-1 min-h-0">
+        <aside className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden min-h-0 h-full">
           <div className="p-4 border-b border-[var(--border)]">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)]">
@@ -258,7 +245,7 @@ export default function BotTesterPage() {
           </div>
         </aside>
 
-        <section className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden">
+        <section className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden min-h-0 h-full">
           {!selectedPhone ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-[var(--muted)]">
               <MessageCircle size={40} className="mb-3 opacity-40" />
@@ -413,6 +400,6 @@ export default function BotTesterPage() {
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }
