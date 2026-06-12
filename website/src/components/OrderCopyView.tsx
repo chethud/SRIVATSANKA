@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { formatDate, type Enquiry } from '../api/client';
 import { BrandLogo } from './BrandLogo';
-import { parseOrderNotes } from '../utils/orderNotes';
+import { parseOrderNotes, sumExtraItemAmounts } from '../utils/orderNotes';
 import {
   dishesForColumn,
   formatColumnAmount,
@@ -19,10 +19,14 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
   const extras = parseOrderNotes(enquiry.notes);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, enquiry, menuItems);
-  const grandTotal = useMemo(
-    () => (copyType === 'billing' ? sumOrderCopyTotals(columns) : null),
-    [columns, copyType],
-  );
+  const grandTotal = useMemo(() => {
+    if (copyType !== 'billing') return null;
+    const sessionTotal = sumOrderCopyTotals(columns);
+    const extrasTotal = extras.extrasEnabled ? sumExtraItemAmounts(extras.extraItems) : null;
+    const parts = [sessionTotal, extrasTotal].filter((a): a is number => a != null);
+    if (parts.length === 0) return null;
+    return parts.reduce((sum, amount) => sum + amount, 0);
+  }, [columns, copyType, extras.extrasEnabled, extras.extraItems]);
 
   return (
     <div id="order-copy-print" className="order-copy-print">

@@ -9,6 +9,7 @@ import {
   type OrderExtras,
 } from '../../utils/orderNotes';
 import { Button } from '../Layout';
+import { formatColumnAmount } from '../../utils/orderMenuGrid';
 
 function newCustomExtraItem(): OrderExtraItem {
   return {
@@ -16,6 +17,7 @@ function newCustomExtraItem(): OrderExtraItem {
     title: '',
     description: '',
     quantity: '',
+    amount: null,
     enabled: true,
     isCustom: true,
   };
@@ -28,6 +30,7 @@ function normalizeForSave(items: OrderExtraItem[]): OrderExtraItem[] {
       title: row.title.trim(),
       description: row.description.trim(),
       quantity: row.quantity.trim(),
+      amount: row.amount != null && !Number.isNaN(row.amount) && row.amount > 0 ? row.amount : null,
       enabled: row.enabled ?? false,
     }))
     .filter((row) => row.isCustom ? row.title || row.description || row.quantity || row.enabled : true);
@@ -88,7 +91,7 @@ export function OrderExtrasSection({
           ? {
               ...row,
               enabled: checked,
-              ...(checked ? {} : { description: '', quantity: '' }),
+              ...(checked ? {} : { description: '', quantity: '', amount: null }),
             }
           : row,
       ),
@@ -157,15 +160,37 @@ export function OrderExtrasSection({
                     className="form-input w-full px-3 py-2 rounded-lg text-sm min-h-[5rem]"
                   />
                 </div>
-                <div className="lg:col-span-4">
-                  <label className="text-xs font-medium text-[var(--order-accent)] mb-1 block">Quantity</label>
-                  <input
-                    value={row.quantity}
-                    onChange={(e) => updateItem(row.id, { quantity: e.target.value })}
-                    placeholder="e.g. 50 Box, 300 pax"
-                    disabled={saving}
-                    className="form-input w-full px-3 py-2 rounded-lg text-sm font-semibold"
-                  />
+                <div className="lg:col-span-4 flex flex-col gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-[var(--order-accent)] mb-1 block">Quantity</label>
+                    <input
+                      value={row.quantity}
+                      onChange={(e) => updateItem(row.id, { quantity: e.target.value })}
+                      placeholder="e.g. 50 Box, 300 pax"
+                      disabled={saving}
+                      className="form-input w-full px-3 py-2 rounded-lg text-sm font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[var(--order-accent)] mb-1 block">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--muted)] pointer-events-none">
+                        ₹
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={row.amount != null ? String(row.amount) : ''}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^\d]/g, '');
+                          updateItem(row.id, { amount: digits ? Number(digits) : null });
+                        }}
+                        placeholder="Enter amount"
+                        disabled={saving}
+                        className="form-input w-full pl-8 pr-3 py-2 rounded-lg text-sm font-semibold"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -234,7 +259,7 @@ export function OrderExtrasSection({
           {activeTab === 'extra' && (
             <div className="space-y-4">
               <p className="text-sm text-[var(--muted)]">
-                Check each extra the client wants, then type the brief description and quantity — like your Excel extras sheet.
+                Check each extra the client wants, then add description, quantity, and amount — like your Excel extras sheet.
               </p>
 
               <div className="space-y-3">
@@ -293,9 +318,10 @@ export function OrderExtrasTable({
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-[var(--table-header-bg)] border-b border-[var(--border-strong)]">
-              <th className="p-3 font-bold border-r border-[var(--border)] w-[30%]">Item</th>
+              <th className="p-3 font-bold border-r border-[var(--border)] w-[22%]">Item</th>
               <th className="p-3 font-bold border-r border-[var(--border)]">Description</th>
-              <th className="p-3 font-bold w-[20%]">Quantity</th>
+              <th className="p-3 font-bold border-r border-[var(--border)] w-[18%]">Quantity</th>
+              <th className="p-3 font-bold w-[16%] text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -303,7 +329,8 @@ export function OrderExtrasTable({
               <tr key={row.id} className="border-b border-[var(--border)] last:border-0 align-top">
                 <td className="p-3 font-semibold border-r border-[var(--border)]">{row.title}</td>
                 <td className="p-3 border-r border-[var(--border)] whitespace-pre-wrap">{row.description}</td>
-                <td className="p-3 font-semibold text-center">{row.quantity}</td>
+                <td className="p-3 font-semibold border-r border-[var(--border)] text-center">{row.quantity}</td>
+                <td className="p-3 font-semibold text-right">{formatColumnAmount(row.amount) || '—'}</td>
               </tr>
             ))}
           </tbody>

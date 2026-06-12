@@ -13,6 +13,8 @@ export type OrderExtraItem = {
   title: string;
   description: string;
   quantity: string;
+  /** Price for this extra line — included in order copy overall total */
+  amount?: number | null;
   /** Client selected this extra — checkbox on order page */
   enabled?: boolean;
   /** User-added row (not from preset list) */
@@ -58,6 +60,7 @@ export function mergeOrderExtraItems(saved: OrderExtraItem[] | undefined): Order
       title,
       description: '',
       quantity: '',
+      amount: null,
       enabled: false,
       isCustom: false,
     };
@@ -76,6 +79,14 @@ export function mergeOrderExtraItems(saved: OrderExtraItem[] | undefined): Order
 
 export function activeOrderExtraItems(items: OrderExtraItem[] | undefined): OrderExtraItem[] {
   return mergeOrderExtraItems(items).filter((row) => row.enabled && row.title.trim());
+}
+
+export function sumExtraItemAmounts(items: OrderExtraItem[] | undefined): number | null {
+  const amounts = activeOrderExtraItems(items)
+    .map((row) => row.amount)
+    .filter((a): a is number => a != null && !Number.isNaN(a) && a > 0);
+  if (amounts.length === 0) return null;
+  return amounts.reduce((sum, amount) => sum + amount, 0);
 }
 
 export type MenuColumn = {
