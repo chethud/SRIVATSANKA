@@ -68,6 +68,10 @@ async def _migrate_sqlite_columns() -> None:
             insp = sa.inspect(connection)
             tables = insp.get_table_names()
             alters: list[str] = []
+            if "Enquiry" in tables:
+                ecols = {c["name"] for c in insp.get_columns("Enquiry")}
+                if "ownerViewedAt" not in ecols:
+                    alters.append("ALTER TABLE Enquiry ADD COLUMN ownerViewedAt DATETIME")
             if "EnquiryDish" in tables:
                 cols = {c["name"] for c in insp.get_columns("EnquiryDish")}
                 if "quantity" not in cols:

@@ -48,6 +48,7 @@ class Enquiry(Base):
     guestCount: Mapped[int] = mapped_column(Integer)
     preferredCallbackAt: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[EnquiryStatus] = mapped_column(Enum(EnquiryStatus), default=EnquiryStatus.NEW)
+    ownerViewedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reminderSent: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

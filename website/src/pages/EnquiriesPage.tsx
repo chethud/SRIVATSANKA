@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
@@ -51,7 +51,7 @@ const emptyForm = () => ({
 });
 
 export default function EnquiriesPage() {
-  const { loading, error, enquiries, refresh } = useAppData();
+  const { loading, error, enquiries, refresh, markEnquiryViewed } = useAppData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selected, setSelected] = useState<string | null>(null);
@@ -77,6 +77,14 @@ export default function EnquiriesPage() {
   }, [enquiries, search, statusFilter]);
 
   const detail = enquiries.find((e) => e.id === selected);
+
+  useEffect(() => {
+    if (!selected) return;
+    const e = enquiries.find((x) => x.id === selected);
+    if (e?.status === 'NEW' && !e.ownerViewedAt) {
+      void markEnquiryViewed(selected);
+    }
+  }, [selected, enquiries, markEnquiryViewed]);
 
   async function changeStatus(id: string, status: string) {
     await updateEnquiryStatus(id, status);

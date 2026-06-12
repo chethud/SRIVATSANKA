@@ -70,7 +70,9 @@ async def _enquiries_above_guests(db: AsyncSession, min_guests: int) -> list[Enq
 async def _enquiry_stats(db: AsyncSession) -> str:
     total = await db.scalar(select(func.count()).select_from(Enquiry)) or 0
     new = await db.scalar(
-        select(func.count()).select_from(Enquiry).where(Enquiry.status == EnquiryStatus.NEW)
+        select(func.count())
+        .select_from(Enquiry)
+        .where(Enquiry.status == EnquiryStatus.NEW, Enquiry.ownerViewedAt.is_(None))
     ) or 0
     upcoming = await db.scalar(
         select(func.count()).select_from(Enquiry).where(Enquiry.eventDate >= datetime.now())

@@ -147,6 +147,7 @@ class EnquiryOut(BaseModel):
     guestCount: int
     preferredCallbackAt: datetime
     status: str
+    ownerViewedAt: datetime | None = None
     notes: str | None = None
     createdAt: datetime
     dishes: list[EnquiryDishOut] = Field(default_factory=list)
@@ -173,6 +174,7 @@ class NotificationOut(BaseModel):
 
 class DashboardStats(BaseModel):
     new_enquiries: int
+    new_orders: int
     total_enquiries: int
     unread_notifications: int
     total_dishes: int

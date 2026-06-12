@@ -38,6 +38,7 @@ def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
         guestCount=e.guestCount,
         preferredCallbackAt=e.preferredCallbackAt,
         status=e.status.value if hasattr(e.status, "value") else str(e.status),
+        ownerViewedAt=e.ownerViewedAt,
         notes=e.notes,
         createdAt=e.createdAt,
         dishes=[
@@ -80,7 +81,14 @@ async def whatsapp_status() -> dict:
 @router.get("/stats", response_model=DashboardStats)
 async def dashboard_stats(db: AsyncSession = Depends(get_db)) -> DashboardStats:
     new_count = await db.scalar(
-        select(func.count()).select_from(Enquiry).where(Enquiry.status == EnquiryStatus.NEW)
+        select(func.count())
+        .select_from(Enquiry)
+        .where(Enquiry.status == EnquiryStatus.NEW, Enquiry.ownerViewedAt.is_(None))
+    )
+    new_orders = await db.scalar(
+        select(func.count())
+        .select_from(Enquiry)
+        .where(Enquiry.status == EnquiryStatus.CONVERTED, Enquiry.ownerViewedAt.is_(None))
     )
     total = await db.scalar(select(func.count()).select_from(Enquiry))
     unread = await db.scalar(
@@ -95,6 +103,7 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)) -> DashboardStats:
     expense_total = await db.scalar(select(func.sum(Expense.amount))) or 0
     return DashboardStats(
         new_enquiries=new_count or 0,
+        new_orders=new_orders or 0,
         total_enquiries=total or 0,
         unread_notifications=unread or 0,
         total_dishes=dish_count or 0,
@@ -190,7 +199,10 @@ async def update_enquiry_status(
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
+    prev_status = enquiry.status
     enquiry.status = new_status
+    if new_status == EnquiryStatus.CONVERTED and prev_status != EnquiryStatus.CONVERTED:
+        enquiry.ownerViewedAt = None
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)
@@ -214,6 +226,26 @@ async def update_enquiry(
         enquiry.notes = payload.notes
     await db.commit()
     await db.refresh(enquiry)
+    return _enquiry_to_out(enquiry)
+
+
+@router.post("/enquiries/{enquiry_id}/viewed", response_model=EnquiryOut)
+async def mark_enquiry_viewed(
+    enquiry_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EnquiryOut:
+    result = await db.execute(
+        select(Enquiry)
+        .options(selectinload(Enquiry.dish_items))
+        .where(Enquiry.id == enquiry_id)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if enquiry.ownerViewedAt is None:
+        enquiry.ownerViewedAt = datetime.now()
+        await db.commit()
+        await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)
 
 

@@ -8,6 +8,7 @@ import {
   fetchWorkers,
   fetchAnalytics,
   checkApiHealth,
+  markEnquiryViewed as markEnquiryViewedApi,
   type DashboardStats,
   type Enquiry,
   type Dish,
@@ -35,6 +36,7 @@ interface AppData {
   refreshEnquiries: () => Promise<void>;
   refreshDishes: () => Promise<void>;
   patchEnquiry: (updated: Enquiry) => void;
+  markEnquiryViewed: (id: string) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppData | null>(null);
@@ -57,6 +59,29 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setEnquiries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
     });
   }, []);
+
+  const markEnquiryViewed = useCallback(async (id: string) => {
+    const current = enquiries.find((e) => e.id === id);
+    if (!current || current.ownerViewedAt) return;
+    try {
+      const updated = await markEnquiryViewedApi(id);
+      patchEnquiry(updated);
+      startTransition(() => {
+        setStats((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            new_enquiries:
+              updated.status === 'NEW' ? Math.max(0, prev.new_enquiries - 1) : prev.new_enquiries,
+            new_orders:
+              updated.status === 'CONVERTED' ? Math.max(0, prev.new_orders - 1) : prev.new_orders,
+          };
+        });
+      });
+    } catch {
+      /* ignore — badge will refresh on next poll */
+    }
+  }, [enquiries, patchEnquiry]);
 
   const refreshEnquiries = useCallback(async () => {
     const e = await fetchEnquiries();
@@ -140,6 +165,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         refreshEnquiries,
         refreshDishes,
         patchEnquiry,
+        markEnquiryViewed,
       }}
     >
       {children}

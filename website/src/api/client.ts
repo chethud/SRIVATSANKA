@@ -66,6 +66,7 @@ export async function verifySession(): Promise<AuthMe> {
 
 export interface DashboardStats {
   new_enquiries: number;
+  new_orders: number;
   total_enquiries: number;
   unread_notifications: number;
   total_dishes: number;
@@ -98,6 +99,7 @@ export interface Enquiry {
   guestCount: number;
   preferredCallbackAt: string;
   status: string;
+  ownerViewedAt?: string | null;
   notes?: string | null;
   createdAt: string;
   dishes: EnquiryDish[];
@@ -322,6 +324,10 @@ export async function updateEnquiryStatus(id: string, status: string): Promise<E
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   });
+}
+
+export async function markEnquiryViewed(id: string): Promise<Enquiry> {
+  return apiFetch<Enquiry>(`/api/enquiries/${id}/viewed`, { method: 'POST' });
 }
 
 export async function createDish(data: { name: string; category: string; price: number; description?: string }) {

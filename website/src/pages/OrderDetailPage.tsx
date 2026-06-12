@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import type { Enquiry } from '../api/client';
@@ -8,11 +8,17 @@ import { useAppData } from '../context/AppDataContext';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { enquiries, dishes, workers, patchEnquiry, refreshDishes } = useAppData();
+  const { enquiries, dishes, workers, patchEnquiry, refreshDishes, markEnquiryViewed } = useAppData();
   const onOrderUpdated = useCallback((updated: Enquiry) => {
     patchEnquiry(updated);
   }, [patchEnquiry]);
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
+
+  useEffect(() => {
+    if (order && !order.ownerViewedAt) {
+      void markEnquiryViewed(order.id);
+    }
+  }, [order, markEnquiryViewed]);
 
   if (!order) {
     return (
