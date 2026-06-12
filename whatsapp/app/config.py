@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     whatsapp_verify_token: str = "kannans-verify-token"
     meta_app_secret: str = ""  # optional – verifies webhook signatures
 
-    owner_phone_number: str = "917899102165"
+    owner_phone_number: str = "917899410254"
     cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175"
 
     # Demo dashboard data (Settings → Load demo data, or POST /dev/seed)

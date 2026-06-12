@@ -29,4 +29,4 @@ services:
       - key: WHATSAPP_VERIFY_TOKEN
         generateValue: true
       - key: OWNER_PHONE_NUMBER
-        value: "917899102165"
+        value: "917899410254"
