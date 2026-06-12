@@ -31,7 +31,7 @@ const navItems: {
   { to: '/workers', label: 'Workers', icon: HardHat, badge: (d) => d.workers.length },
   { to: '/invoices', label: 'Invoices', icon: FileText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/bot-tester', label: 'WhatsApp Chat', icon: MessageCircle },
+  { to: '/bot-tester', label: 'WhatsApp Chats', icon: MessageCircle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -48,7 +48,8 @@ function DashboardLayoutInner() {
     navigate('/login', { replace: true });
   }
 
-  const isWhatsAppChat = location.pathname === '/bot-tester';
+  const isWhatsAppChat =
+    location.pathname === '/bot-tester' || location.pathname.startsWith('/bot-tester/');
 
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
@@ -143,8 +144,8 @@ function DashboardLayoutInner() {
 
       <motion.main
         layout
-        className={`flex-1 min-h-screen flex flex-col ${
-          isWhatsAppChat ? 'px-2 py-2 md:px-3' : 'px-4 py-4 md:px-6 lg:px-8'
+        className={`flex-1 flex flex-col ${
+          isWhatsAppChat ? 'p-0 h-screen overflow-hidden' : 'min-h-screen px-4 py-4 md:px-6 lg:px-8'
         }`}
         style={{ marginLeft: sidebarWidth }}
         transition={{ type: 'spring', stiffness: 380, damping: 32 }}
@@ -161,7 +162,7 @@ function DashboardLayoutInner() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className={isWhatsAppChat ? 'flex-1 min-h-0 flex flex-col' : undefined}
+            className={isWhatsAppChat ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : undefined}
           >
             <Outlet />
           </motion.div>

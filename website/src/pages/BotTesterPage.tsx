@@ -159,19 +159,24 @@ export default function BotTesterPage() {
   const active = conversations.find((c) => c.phoneNumber === selectedPhone);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 h-[calc(100vh-1rem)]">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <header className="shrink-0 flex items-center gap-2.5 px-4 py-3 border-b border-[var(--border)] bg-[var(--card)]">
+        <MessageCircle size={22} className="text-[var(--primary)]" />
+        <h1 className="text-lg font-semibold text-[var(--foreground)]">WhatsApp Chats</h1>
+      </header>
+
       {!connected && (
-        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-2 shrink-0">
-          API offline — start the backend on Render or locally, then sign in again.
+        <p className="text-xs text-amber-800 bg-amber-50 border-b border-amber-200 px-4 py-2 shrink-0">
+          API offline — sign in again after the backend is running.
         </p>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-3 flex-1 min-h-0">
-        <aside className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden min-h-0 h-full">
-          <div className="p-4 border-b border-[var(--border)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] flex-1 min-h-0">
+        <aside className="flex flex-col overflow-hidden min-h-0 h-full border-r border-[var(--border)] bg-[var(--card)]">
+          <div className="p-3 border-b border-[var(--border)]">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)]">
-                Conversations ({conversations.length})
+              <p className="text-xs font-semibold text-[var(--muted)]">
+                {conversations.length} chat{conversations.length === 1 ? '' : 's'}
               </p>
               <button
                 type="button"
@@ -205,9 +210,7 @@ export default function BotTesterPage() {
             {loadingList && conversations.length === 0 ? (
               <p className="text-sm text-[var(--muted)] p-4">Loading conversations…</p>
             ) : conversations.length === 0 ? (
-              <p className="text-sm text-[var(--muted)] p-4">
-                No chats yet. Send <strong>Hi</strong> from a customer phone to your Meta business number — it will show up here.
-              </p>
+              <p className="text-sm text-[var(--muted)] p-4">No chats yet.</p>
             ) : (
               conversations.map((c) => {
                 const activeRow = c.phoneNumber === selectedPhone;
@@ -245,22 +248,19 @@ export default function BotTesterPage() {
           </div>
         </aside>
 
-        <section className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden min-h-0 h-full">
+        <section className="flex flex-col overflow-hidden min-h-0 h-full bg-[var(--background)]">
           {!selectedPhone ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-[var(--muted)]">
-              <MessageCircle size={40} className="mb-3 opacity-40" />
-              <p className="font-medium text-[var(--foreground)]">Select a conversation</p>
-              <p className="text-sm mt-1">Pick a phone number on the left to view history and reply.</p>
+            <div className="flex-1 flex items-center justify-center text-[var(--muted)]">
+              <MessageCircle size={48} className="opacity-25" />
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between gap-3">
+              <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between gap-3 shrink-0">
                 <div>
                   <p className="font-semibold">{formatPhoneDisplay(selectedPhone)}</p>
-                  <p className="text-xs text-[var(--muted)]">
-                    {active?.customerName ? `${active.customerName} · ` : ''}
-                    WhatsApp thread
-                  </p>
+                  {active?.customerName && (
+                    <p className="text-xs text-[var(--muted)]">{active.customerName}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {active?.botPaused && (
@@ -269,29 +269,17 @@ export default function BotTesterPage() {
                       onClick={() => void resumeBot()}
                       className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)]"
                     >
-                      Resume auto-reply
+                      Resume bot
                     </button>
                   )}
-                  <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)] font-medium">
-                    {messages.length} messages
-                  </span>
                 </div>
               </div>
 
-              {active?.botPaused && (
-                <p className="text-xs text-amber-800 bg-amber-50 border-b border-amber-200 px-4 py-2">
-                  Auto-reply is off for this customer — you are handling the chat. The bot will not reply until you click{' '}
-                  <strong>Resume auto-reply</strong>.
-                </p>
-              )}
-
-              <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
                 {loadingThread && messages.length === 0 ? (
                   <p className="text-sm text-[var(--muted)] text-center mt-10">Loading messages…</p>
                 ) : messages.length === 0 ? (
-                  <p className="text-sm text-[var(--muted)] text-center mt-10">
-                    No messages stored yet for this number. If they messaged on WhatsApp, wait a few seconds or refresh.
-                  </p>
+                  <p className="text-sm text-[var(--muted)] text-center mt-10">No messages yet.</p>
                 ) : (
                   messages.map((msg) => {
                     const isCustomer = msg.role === 'customer';
@@ -337,8 +325,8 @@ export default function BotTesterPage() {
                 )}
               </div>
 
-              <div className="border-t border-[var(--border)] p-4 space-y-3">
-                <div className="flex flex-wrap gap-2">
+              <div className="border-t border-[var(--border)] p-3 bg-[var(--card)] shrink-0">
+                <div className="flex gap-2 mb-2">
                   <button
                     type="button"
                     onClick={() => setSendMode('owner')}
@@ -348,7 +336,7 @@ export default function BotTesterPage() {
                         : 'bg-[var(--background)] border border-[var(--border)]'
                     }`}
                   >
-                    Send to customer (WhatsApp)
+                    Reply
                   </button>
                   <button
                     type="button"
@@ -359,32 +347,23 @@ export default function BotTesterPage() {
                         : 'bg-[var(--background)] border border-[var(--border)]'
                     }`}
                   >
-                    Simulate customer (bot test)
+                    Bot test
                   </button>
                 </div>
-                {sendMode === 'owner' && (
-                  <p className="text-xs text-[var(--muted)]">
-                    Your message goes to {formatPhoneDisplay(selectedPhone)} on WhatsApp. Auto-reply pauses while you handle this chat.
-                  </p>
-                )}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     void sendMessage(input);
                   }}
-                  className="flex gap-3"
+                  className="flex gap-2"
                 >
                   <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={
-                      sendMode === 'owner'
-                        ? 'Type your reply — customer receives this on WhatsApp…'
-                        : 'Type as customer (e.g. Hi)…'
-                    }
+                    placeholder={sendMode === 'owner' ? 'Type a message…' : 'Simulate customer…'}
                     disabled={sending}
-                    className="form-input flex-1 px-4 py-2 rounded-lg outline-none focus:border-[var(--primary)] disabled:opacity-50"
+                    className="form-input flex-1 px-4 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] disabled:opacity-50"
                   />
                   <button
                     type="submit"
