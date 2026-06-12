@@ -18,12 +18,12 @@ export function OrderExcelMenuGrid({
   order,
   extras,
   menuItems,
-  onRefresh,
+  onOrderUpdated,
 }: {
   order: Enquiry;
   extras: OrderExtras;
   menuItems: EnquiryDish[];
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const columns = resolveMenuColumns(extras, order, menuItems);
 
@@ -46,7 +46,7 @@ export function OrderExcelMenuGrid({
             extras={extras}
             menuItems={menuItems}
             orderId={order.id}
-            onRefresh={onRefresh}
+            onOrderUpdated={onOrderUpdated}
           />
         ))}
       </div>
@@ -63,17 +63,18 @@ function SessionBlock({
   extras,
   menuItems,
   orderId,
-  onRefresh,
+  onOrderUpdated,
 }: {
   column: MenuColumn;
   columns: MenuColumn[];
   extras: OrderExtras;
   menuItems: EnquiryDish[];
   orderId: string;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const items = dishesForColumn(column, menuItems, extras);
   const [deleting, setDeleting] = useState(false);
+  const [removed, setRemoved] = useState(false);
 
   async function removeSession() {
     const sessionLabel = `${column.sessionLabel} · ${formatDate(column.date)}`;
@@ -83,20 +84,24 @@ function SessionBlock({
         : `Remove ${sessionLabel}?`;
     if (!confirm(message)) return;
 
+    setRemoved(true);
     setDeleting(true);
     try {
-      for (const dish of items) {
-        await deleteOrderDish(orderId, dish.id);
+      if (items.length > 0) {
+        await Promise.all(items.map((dish) => deleteOrderDish(orderId, dish.id)));
       }
       const merged = removeMenuColumn(extras, columns, column.id);
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } catch {
+      setRemoved(false);
       alert('Could not remove this session. Please try again.');
     } finally {
       setDeleting(false);
     }
   }
+
+  if (removed) return null;
 
   return (
     <article className="excel-session-block">
@@ -121,14 +126,14 @@ function SessionBlock({
           columns={columns}
           extras={extras}
           orderId={orderId}
-          onRefresh={onRefresh}
+          onOrderUpdated={onOrderUpdated}
         />
         <SessionTimeField
           column={column}
           columns={columns}
           extras={extras}
           orderId={orderId}
-          onRefresh={onRefresh}
+          onOrderUpdated={onOrderUpdated}
         />
       </div>
 
@@ -138,7 +143,7 @@ function SessionBlock({
         ) : (
           <ul className="excel-dish-list">
             {items.map((d) => (
-              <OrderMenuItem key={d.id} orderId={orderId} dish={d} onUpdated={onRefresh} />
+              <OrderMenuItem key={d.id} orderId={orderId} dish={d} onUpdated={onOrderUpdated} />
             ))}
           </ul>
         )}
@@ -151,7 +156,7 @@ function SessionBlock({
             columns={columns}
             extras={extras}
             orderId={orderId}
-            onRefresh={onRefresh}
+            onOrderUpdated={onOrderUpdated}
           />
         </footer>
       )}
@@ -164,13 +169,13 @@ function SessionPaxField({
   columns,
   extras,
   orderId,
-  onRefresh,
+  onOrderUpdated,
 }: {
   column: MenuColumn;
   columns: MenuColumn[];
   extras: OrderExtras;
   orderId: string;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [value, setValue] = useState(column.pax != null ? String(column.pax) : '');
   const [saving, setSaving] = useState(false);
@@ -188,8 +193,8 @@ function SessionPaxField({
     setSaving(true);
     try {
       const merged = updateColumnPax(extras, columns, column.id, parsed);
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }
@@ -224,13 +229,13 @@ function SessionTimeField({
   columns,
   extras,
   orderId,
-  onRefresh,
+  onOrderUpdated,
 }: {
   column: MenuColumn;
   columns: MenuColumn[];
   extras: OrderExtras;
   orderId: string;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [timeFrom, setTimeFrom] = useState(column.timeFrom ?? '');
   const [timeTo, setTimeTo] = useState(column.timeTo ?? '');
@@ -250,8 +255,8 @@ function SessionTimeField({
     setSaving(true);
     try {
       const merged = updateColumnTime(extras, columns, column.id, from, to);
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }
@@ -298,13 +303,13 @@ function SessionAmountField({
   columns,
   extras,
   orderId,
-  onRefresh,
+  onOrderUpdated,
 }: {
   column: MenuColumn;
   columns: MenuColumn[];
   extras: OrderExtras;
   orderId: string;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [rawValue, setRawValue] = useState(column.amount != null ? String(column.amount) : '');
   const [focused, setFocused] = useState(false);
@@ -329,8 +334,8 @@ function SessionAmountField({
     setSaving(true);
     try {
       const merged = updateColumnAmount(extras, columns, column.id, parsed);
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }

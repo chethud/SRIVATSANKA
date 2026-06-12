@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { updateEnquiry } from '../../api/client';
+import { updateEnquiry, type Enquiry } from '../../api/client';
 import {
   activeOrderExtraItems,
   mergeOrderExtraItems,
@@ -36,11 +36,11 @@ function normalizeForSave(items: OrderExtraItem[]): OrderExtraItem[] {
 export function OrderExtrasSection({
   orderId,
   extras,
-  onRefresh,
+  onOrderUpdated,
 }: {
   orderId: string;
   extras: OrderExtras;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const enabled = extras.extrasEnabled ?? false;
   const [activeTab, setActiveTab] = useState<'extra'>('extra');
@@ -60,8 +60,8 @@ export function OrderExtrasSection({
     setSaving(true);
     try {
       const merged: OrderExtras = { ...extras, ...next };
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }

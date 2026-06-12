@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, startTransition, type ReactNode } from 'react';
 import {
   fetchStats,
   fetchEnquiries,
@@ -32,6 +32,8 @@ interface AppData {
   workers: Worker[];
   analytics: Analytics | null;
   refresh: () => Promise<void>;
+  refreshEnquiries: () => Promise<void>;
+  patchEnquiry: (updated: Enquiry) => void;
 }
 
 const AppDataContext = createContext<AppData | null>(null);
@@ -48,6 +50,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+
+  const patchEnquiry = useCallback((updated: Enquiry) => {
+    startTransition(() => {
+      setEnquiries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    });
+  }, []);
+
+  const refreshEnquiries = useCallback(async () => {
+    const e = await fetchEnquiries();
+    startTransition(() => {
+      setEnquiries(e);
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -66,15 +81,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         fetchWorkers(),
         fetchAnalytics(),
       ]);
-      setStats(s);
-      setEnquiries(e);
-      setDishes(d);
-      setNotifications(n);
-      setVendors(v);
-      setWorkers(w);
-      setAnalytics(a);
-      setError('');
-      setLastSync(new Date());
+      startTransition(() => {
+        setStats(s);
+        setEnquiries(e);
+        setDishes(d);
+        setNotifications(n);
+        setVendors(v);
+        setWorkers(w);
+        setAnalytics(a);
+        setError('');
+        setLastSync(new Date());
+      });
     } catch (err) {
       setConnected(false);
       const msg = err instanceof Error ? err.message : '';
@@ -89,8 +106,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
+    void refresh();
+    const id = setInterval(() => {
+      if (document.hidden) return;
+      void refresh();
+    }, POLL_MS);
     return () => clearInterval(id);
   }, [refresh]);
 
@@ -109,6 +129,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         workers,
         analytics,
         refresh,
+        refreshEnquiries,
+        patchEnquiry,
       }}
     >
       {children}

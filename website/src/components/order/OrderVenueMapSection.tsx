@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapPinned } from 'lucide-react';
-import { updateEnquiry } from '../../api/client';
+import { updateEnquiry, type Enquiry } from '../../api/client';
 import { normalizeMapUrl, qrCodeDataUrl } from '../../utils/qrCode';
 import { serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
 import { Button } from '../Layout';
@@ -8,11 +8,11 @@ import { Button } from '../Layout';
 export function OrderVenueMapSection({
   orderId,
   extras,
-  onRefresh,
+  onOrderUpdated,
 }: {
   orderId: string;
   extras: OrderExtras;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [value, setValue] = useState(extras.venueMapLink ?? '');
   const [saving, setSaving] = useState(false);
@@ -36,8 +36,8 @@ export function OrderVenueMapSection({
         ...extras,
         venueMapLink: trimmed || null,
       };
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }

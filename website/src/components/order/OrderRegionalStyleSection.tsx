@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapPin } from 'lucide-react';
-import { updateEnquiry } from '../../api/client';
+import { updateEnquiry, type Enquiry } from '../../api/client';
 import { serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
 import { Button } from '../Layout';
 
@@ -14,11 +14,11 @@ export const REGIONAL_STYLE_PRESETS = [
 export function OrderRegionalStyleSection({
   orderId,
   extras,
-  onRefresh,
+  onOrderUpdated,
 }: {
   orderId: string;
   extras: OrderExtras;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [value, setValue] = useState(extras.regionalStyle ?? '');
   const [saving, setSaving] = useState(false);
@@ -35,8 +35,8 @@ export function OrderRegionalStyleSection({
         ...extras,
         regionalStyle: trimmed || null,
       };
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }

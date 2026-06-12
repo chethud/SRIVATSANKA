@@ -1,12 +1,17 @@
+import { useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import type { Enquiry } from '../api/client';
 import { EmptyState } from '../components/Layout';
 import { OrderDetailView } from '../components/order/OrderDetailView';
 import { useAppData } from '../context/AppDataContext';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { enquiries, dishes, workers, refresh } = useAppData();
+  const { enquiries, dishes, workers, patchEnquiry } = useAppData();
+  const onOrderUpdated = useCallback((updated: Enquiry) => {
+    patchEnquiry(updated);
+  }, [patchEnquiry]);
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
 
   if (!order) {
@@ -20,5 +25,5 @@ export default function OrderDetailPage() {
     );
   }
 
-  return <OrderDetailView order={order} dishes={dishes} workers={workers} onRefresh={refresh} />;
+  return <OrderDetailView order={order} dishes={dishes} workers={workers} onOrderUpdated={onOrderUpdated} />;
 }

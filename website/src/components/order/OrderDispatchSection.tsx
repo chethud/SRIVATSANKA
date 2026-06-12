@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Truck, User, X } from 'lucide-react';
-import type { Worker } from '../../api/client';
+import type { Enquiry, Worker } from '../../api/client';
 import { updateEnquiry } from '../../api/client';
 import { WorkerSearchSelect } from '../WorkerSearchSelect';
 import { type OrderExtras, resolveAssignedWorkerIds, serializeOrderNotes } from '../../utils/orderNotes';
@@ -9,12 +9,12 @@ export function OrderDispatchSection({
   orderId,
   workers,
   extras,
-  onRefresh,
+  onOrderUpdated,
 }: {
   orderId: string;
   workers: Worker[];
   extras: OrderExtras;
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [saving, setSaving] = useState(false);
 
@@ -33,8 +33,8 @@ export function OrderDispatchSection({
     setSaving(true);
     try {
       const merged = { ...extras, assignedWorkerIds: ids, primaryWorkerId: ids[0] ?? null };
-      await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
-      await onRefresh();
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }

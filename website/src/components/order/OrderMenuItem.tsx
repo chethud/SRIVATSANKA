@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
-import { updateOrderDish, deleteOrderDish, type EnquiryDish } from '../../api/client';
+import { updateOrderDish, deleteOrderDish, type Enquiry, type EnquiryDish } from '../../api/client';
 import { MEAL_SESSIONS } from '../../utils/mealSessions';
 
 export function OrderMenuItem({
@@ -10,7 +10,7 @@ export function OrderMenuItem({
 }: {
   orderId: string;
   dish: EnquiryDish;
-  onUpdated: () => void;
+  onUpdated: (order: Enquiry) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [session, setSession] = useState(dish.category);
@@ -24,9 +24,9 @@ export function OrderMenuItem({
   async function save() {
     setSaving(true);
     try {
-      await updateOrderDish(orderId, dish.id, { category: session });
+      const updated = await updateOrderDish(orderId, dish.id, { category: session });
       setEditing(false);
-      onUpdated();
+      onUpdated(updated);
     } finally {
       setSaving(false);
     }
@@ -36,8 +36,8 @@ export function OrderMenuItem({
     if (!confirm(`Remove ${dish.dishName} from this order?`)) return;
     setSaving(true);
     try {
-      await deleteOrderDish(orderId, dish.id);
-      onUpdated();
+      const updated = await deleteOrderDish(orderId, dish.id);
+      onUpdated(updated);
     } catch {
       alert('Could not remove this item. Please try again.');
     } finally {

@@ -64,12 +64,12 @@ export function OrderDetailView({
   order,
   dishes,
   workers,
-  onRefresh,
+  onOrderUpdated,
 }: {
   order: Enquiry;
   dishes: Dish[];
   workers: Worker[];
-  onRefresh: () => void;
+  onOrderUpdated: (order: Enquiry) => void;
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingExtras, setEditingExtras] = useState(false);
@@ -189,7 +189,7 @@ export function OrderDetailView({
       await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
 
       const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
-      const updated = await addOrderDish(order.id, {
+      let updated = await addOrderDish(order.id, {
         dishId,
         category: mealSession,
       });
@@ -198,11 +198,11 @@ export function OrderDetailView({
       );
       if (newDish) {
         merged = assignDishColumn(merged, newDish.id, columnId);
-        await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
+        updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
       }
 
       setDishId('');
-      await onRefresh();
+      onOrderUpdated(updated);
     } catch {
       setAddError('Could not add item.');
     } finally {
@@ -213,9 +213,9 @@ export function OrderDetailView({
   async function saveExtras() {
     setSaving(true);
     try {
-      await updateEnquiry(order.id, { notes: serializeOrderNotes(draftExtras) });
+      const updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(draftExtras) });
       setEditingExtras(false);
-      await onRefresh();
+      onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }
@@ -237,9 +237,9 @@ export function OrderDetailView({
         scheduleTimeTo: null,
         mealSchedules: mealSchedulesForSave(draftSchedule.sessions),
       };
-      await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
+      const updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
       setEditingSchedule(false);
-      await onRefresh();
+      onOrderUpdated(updated);
     } finally {
       setScheduleSaving(false);
     }
@@ -429,9 +429,9 @@ export function OrderDetailView({
         </p>
       </div>
 
-      <OrderRegionalStyleSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
+      <OrderRegionalStyleSection orderId={order.id} extras={extras} onOrderUpdated={onOrderUpdated} />
 
-      <OrderVenueMapSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
+      <OrderVenueMapSection orderId={order.id} extras={extras} onOrderUpdated={onOrderUpdated} />
 
       <div className="order-section">
         <div className="order-section-head">
@@ -548,7 +548,7 @@ export function OrderDetailView({
               order={order}
               extras={extras}
               menuItems={menuItems}
-              onRefresh={onRefresh}
+              onOrderUpdated={onOrderUpdated}
             />
           </>
         ) : (
@@ -571,13 +571,13 @@ export function OrderDetailView({
         )}
       </div>
 
-      <OrderExtrasSection orderId={order.id} extras={extras} onRefresh={onRefresh} />
+      <OrderExtrasSection orderId={order.id} extras={extras} onOrderUpdated={onOrderUpdated} />
 
       <OrderDispatchSection
         orderId={order.id}
         workers={workers}
         extras={extras}
-        onRefresh={onRefresh}
+        onOrderUpdated={onOrderUpdated}
       />
 
       <div className="order-section">
