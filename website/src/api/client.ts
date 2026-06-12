@@ -315,7 +315,16 @@ export async function createDish(data: { name: string; category: string; price: 
 
 export async function addOrderDish(
   enquiryId: string,
-  data: { dishId: string; category?: string; quantity?: number; quantityUnit?: string; customizations?: string; notes?: string; unitPrice?: number },
+  data: {
+    dishId?: string;
+    dishName?: string;
+    category?: string;
+    quantity?: number;
+    quantityUnit?: string;
+    customizations?: string;
+    notes?: string;
+    unitPrice?: number;
+  },
 ) {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/dishes`, {
     method: 'POST',

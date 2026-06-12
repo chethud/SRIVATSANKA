@@ -8,7 +8,7 @@ import { useAppData } from '../context/AppDataContext';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { enquiries, dishes, workers, patchEnquiry } = useAppData();
+  const { enquiries, dishes, workers, patchEnquiry, refreshDishes } = useAppData();
   const onOrderUpdated = useCallback((updated: Enquiry) => {
     patchEnquiry(updated);
   }, [patchEnquiry]);
@@ -25,5 +25,13 @@ export default function OrderDetailPage() {
     );
   }
 
-  return <OrderDetailView order={order} dishes={dishes} workers={workers} onOrderUpdated={onOrderUpdated} />;
+  return (
+    <OrderDetailView
+      order={order}
+      dishes={dishes}
+      workers={workers}
+      onOrderUpdated={onOrderUpdated}
+      onDishesCatalogUpdated={refreshDishes}
+    />
+  );
 }

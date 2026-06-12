@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class EnquiryFields(BaseModel):
@@ -50,13 +50,22 @@ class EnquiryDishOut(BaseModel):
 
 
 class OrderDishIn(BaseModel):
-    dishId: str
+    dishId: str | None = None
+    dishName: str | None = None
     category: str | None = None
     quantity: float = 1
     quantityUnit: str = "pcs"
     customizations: str | None = None
     notes: str | None = None
     unitPrice: float | None = None
+
+    @model_validator(mode="after")
+    def require_dish_reference(self) -> "OrderDishIn":
+        has_id = bool(self.dishId and self.dishId.strip())
+        has_name = bool(self.dishName and self.dishName.strip())
+        if not has_id and not has_name:
+            raise ValueError("Provide dishId or dishName")
+        return self
 
 
 class OrderDishUpdate(BaseModel):

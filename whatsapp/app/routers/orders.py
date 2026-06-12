@@ -110,16 +110,39 @@ async def add_order_dish(
     db: AsyncSession = Depends(get_db),
 ) -> EnquiryOut:
     enquiry = await _get_converted_enquiry(enquiry_id, db)
-    menu = await db.get(Dish, payload.dishId)
-    if not menu or not menu.isActive:
-        raise HTTPException(404, "Dish not found in menu")
 
     if payload.category:
         session_label = normalize_meal_session_label(payload.category)
         if not session_label:
             raise HTTPException(400, "Invalid meal session")
     else:
-        session_label = CATEGORY_LABELS.get(menu.category, MEAL_SESSION_LABELS[DishCategory.LUNCH])
+        session_label = MEAL_SESSION_LABELS[DishCategory.LUNCH]
+
+    if payload.dishId:
+        menu = await db.get(Dish, payload.dishId)
+        if not menu or not menu.isActive:
+            raise HTTPException(404, "Dish not found in menu")
+        if not payload.category:
+            session_label = CATEGORY_LABELS.get(menu.category, MEAL_SESSION_LABELS[DishCategory.LUNCH])
+    else:
+        name = (payload.dishName or "").strip()
+        if not name:
+            raise HTTPException(400, "Dish name is required")
+        result = await db.execute(
+            select(Dish).where(Dish.isActive.is_(True)).where(Dish.name.ilike(name))
+        )
+        menu = result.scalar_one_or_none()
+        if not menu:
+            cat = LABEL_TO_CATEGORY.get(session_label, DishCategory.LUNCH)
+            menu = Dish(
+                name=name,
+                category=cat,
+                price=0.0,
+                description="Added from order menu",
+                isActive=True,
+            )
+            db.add(menu)
+            await db.flush()
 
     item = EnquiryDish(
         enquiryId=enquiry.id,

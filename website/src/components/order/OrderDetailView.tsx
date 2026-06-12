@@ -65,15 +65,18 @@ export function OrderDetailView({
   dishes,
   workers,
   onOrderUpdated,
+  onDishesCatalogUpdated,
 }: {
   order: Enquiry;
   dishes: Dish[];
   workers: Worker[];
   onOrderUpdated: (order: Enquiry) => void;
+  onDishesCatalogUpdated?: () => Promise<void>;
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingExtras, setEditingExtras] = useState(false);
   const [dishId, setDishId] = useState('');
+  const [customDishName, setCustomDishName] = useState('');
   const [mealSession, setMealSession] = useState('Breakfast');
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState('');
@@ -141,8 +144,9 @@ export function OrderDetailView({
 
   async function handleAdd() {
     setAddError('');
-    if (!dishId) {
-      setAddError('Select a menu item first.');
+    const customName = customDishName.trim();
+    if (!dishId && !customName) {
+      setAddError('Select a menu item or add a new dish name.');
       return;
     }
     if (!mealSession) {
@@ -190,18 +194,25 @@ export function OrderDetailView({
 
       const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
       let updated = await addOrderDish(order.id, {
-        dishId,
+        ...(dishId ? { dishId } : { dishName: customName }),
         category: mealSession,
       });
       const newDish = updated.dishes.find(
-        (d) => !prevIds.has(d.id) && (d.dishId === dishId || d.dishName),
+        (d) =>
+          !prevIds.has(d.id) &&
+          (dishId ? d.dishId === dishId : d.dishName.toLowerCase() === customName.toLowerCase()),
       );
       if (newDish) {
         merged = assignDishColumn(merged, newDish.id, columnId);
         updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
       }
 
+      if (customName) {
+        await onDishesCatalogUpdated?.();
+      }
+
       setDishId('');
+      setCustomDishName('');
       onOrderUpdated(updated);
     } catch {
       setAddError('Could not add item.');
@@ -528,11 +539,18 @@ export function OrderDetailView({
                 <DishSearchSelect
                   dishes={dishes}
                   value={dishId}
+                  customName={customDishName}
                   onChange={setDishId}
+                  onCustomNameChange={setCustomDishName}
                 />
               </div>
               <div className="lg:col-span-2">
-                <Button type="button" onClick={handleAdd} disabled={saving || !dishId} className="w-full !py-2">
+                <Button
+                  type="button"
+                  onClick={handleAdd}
+                  disabled={saving || (!dishId && !customDishName.trim())}
+                  className="w-full !py-2"
+                >
                   Add
                 </Button>
               </div>

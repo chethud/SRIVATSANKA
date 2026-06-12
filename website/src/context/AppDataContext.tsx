@@ -33,6 +33,7 @@ interface AppData {
   analytics: Analytics | null;
   refresh: () => Promise<void>;
   refreshEnquiries: () => Promise<void>;
+  refreshDishes: () => Promise<void>;
   patchEnquiry: (updated: Enquiry) => void;
 }
 
@@ -61,6 +62,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const e = await fetchEnquiries();
     startTransition(() => {
       setEnquiries(e);
+    });
+  }, []);
+
+  const refreshDishes = useCallback(async () => {
+    const d = await fetchDishes();
+    startTransition(() => {
+      setDishes(d);
     });
   }, []);
 
@@ -130,6 +138,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         analytics,
         refresh,
         refreshEnquiries,
+        refreshDishes,
         patchEnquiry,
       }}
     >
