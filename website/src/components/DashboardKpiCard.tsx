@@ -15,6 +15,7 @@ type DashboardKpiCardProps = {
   gradient?: 1 | 2;
   formatValue?: (n: number) => string;
   sparkId?: string;
+  onClick?: () => void;
 };
 
 export function DashboardKpiCard({
@@ -28,19 +29,36 @@ export function DashboardKpiCard({
   gradient = 1,
   formatValue,
   sparkId = 'kpi',
+  onClick,
 }: DashboardKpiCardProps) {
   const bg = gradient === 2 ? 'var(--kpi-gradient-2)' : 'var(--kpi-gradient-1)';
   const sparkData = useMemo(
     () => sparkline.map((v, i) => ({ i, v })),
     [sparkline],
   );
+  const interactive = Boolean(onClick);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3, transition: { duration: 0.18 } }}
-      className="relative overflow-hidden rounded-[var(--radius-xl)] p-5 border border-[var(--border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow"
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`relative overflow-hidden rounded-[var(--radius-xl)] p-5 border border-[var(--border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow ${
+        interactive ? 'cursor-pointer hover:border-[var(--primary)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30' : ''
+      }`}
       style={{ background: bg }}
     >
       <div className="absolute top-0 left-0 right-0 h-0.5 opacity-80" style={{ background: 'var(--kpi-accent-bar)' }} />
