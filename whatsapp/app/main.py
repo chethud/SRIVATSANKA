@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import SessionLocal, init_db
 from app.middleware.auth import AuthMiddleware
-from app.routers import api, auth, brand, chat, dev, orders, resources, webhook
+from app.routers import api, auth, chat, dev, orders, resources, webhook
 from app.services.gemini_conversation import is_gemini_configured
 from app.services.scheduler import start_scheduler
 
@@ -61,7 +61,6 @@ app.add_middleware(AuthMiddleware)
 
 app.include_router(auth.router)
 app.include_router(webhook.router)
-app.include_router(brand.router)
 app.include_router(api.router)
 app.include_router(chat.router)
 app.include_router(orders.router)

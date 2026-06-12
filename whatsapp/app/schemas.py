@@ -184,11 +184,6 @@ class DashboardStats(BaseModel):
     total_expenses: float = 0
 
 
-class BrandInfo(BaseModel):
-    customLogo: bool
-    updatedAt: datetime | None = None
-
-
 class DishOut(BaseModel):
     id: str
     name: str

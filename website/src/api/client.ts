@@ -5,10 +5,6 @@ const API_BASE =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? DEFAULT_LIVE_API : '');
 
-export function getApiBase(): string {
-  return API_BASE;
-}
-
 const AUTH_STORAGE_KEY = 'kannans_auth_token';
 
 export function getAuthToken(): string | null {
@@ -296,34 +292,6 @@ export const fetchWorkers = () => apiFetch<Worker[]>('/api/workers');
 export const fetchExpenses = () => apiFetch<Expense[]>('/api/expenses');
 export const fetchAnalytics = () => apiFetch<Analytics>('/api/analytics');
 export const fetchWhatsAppStatus = () => apiFetch<WhatsAppStatus>('/api/whatsapp/status');
-
-export interface BrandInfo {
-  customLogo: boolean;
-  updatedAt: string | null;
-}
-
-export async function fetchBrandInfo(): Promise<BrandInfo> {
-  const res = await fetch(`${API_BASE}/api/brand`, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) return { customLogo: false, updatedAt: null };
-  return res.json();
-}
-
-export function brandLogoSrc(updatedAt?: string | null): string {
-  const base = `${API_BASE}/api/brand/logo`;
-  return updatedAt ? `${base}?v=${encodeURIComponent(updatedAt)}` : base;
-}
-
-export async function uploadBrandLogo(file: File): Promise<BrandInfo> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE}/api/brand/logo`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: form,
-  });
-  if (!res.ok) throw new Error(await apiErrorMessage(res, '/api/brand/logo'));
-  return res.json();
-}
 
 export async function createEnquiry(data: {
   customerName: string;
