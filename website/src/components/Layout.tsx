@@ -31,7 +31,7 @@ const navItems: {
   { to: '/invoices', label: 'Invoices', icon: FileText },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
-  { to: '/bot-tester', label: 'Bot Tester', icon: MessageCircle },
+  { to: '/bot-tester', label: 'WhatsApp Chat', icon: MessageCircle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

@@ -323,6 +323,28 @@ class DevMessageResponse(BaseModel):
     media: list[MediaAttachment] = Field(default_factory=list)
 
 
+class ChatMessageOut(BaseModel):
+    id: str
+    phoneNumber: str
+    role: str
+    body: str
+    media: list[MediaAttachment] = Field(default_factory=list)
+    createdAt: datetime
+
+
+class ChatConversationOut(BaseModel):
+    phoneNumber: str
+    customerName: str | None = None
+    lastMessage: str
+    lastRole: str
+    lastAt: datetime
+    messageCount: int
+
+
+class OwnerChatMessageIn(BaseModel):
+    text: str
+
+
 class AIAssistantRequest(BaseModel):
     query: str
 

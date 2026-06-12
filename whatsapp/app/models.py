@@ -117,6 +117,17 @@ class Notification(Base):
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class WhatsappChatMessage(Base):
+    __tablename__ = "WhatsappChatMessage"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=cuid)
+    phoneNumber: Mapped[str] = mapped_column(String, index=True)
+    role: Mapped[str] = mapped_column(String)  # customer | bot | owner
+    body: Mapped[str] = mapped_column(Text)
+    mediaJson: Mapped[str | None] = mapped_column(Text, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+
+
 class Vendor(Base):
     __tablename__ = "Vendor"
 

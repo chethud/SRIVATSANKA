@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.services.chat_log import log_bot_message, log_customer_message
 from app.services.conversation_handler import handle_conversation
 from app.services.whatsapp_client import send_whatsapp_image, send_whatsapp_message, verify_webhook_signature
 
@@ -57,8 +58,10 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
     if not text:
         return {"status": "empty_message"}
 
+    await log_customer_message(db, from_number, text)
     result, _saved = await handle_conversation(from_number, text, db)
     for attachment in result.media:
         await send_whatsapp_image(from_number, attachment.url, caption=attachment.caption)
     await send_whatsapp_message(from_number, result.reply)
+    await log_bot_message(db, from_number, result.reply, result.media)
     return {"status": "ok"}

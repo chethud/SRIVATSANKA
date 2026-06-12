@@ -7,6 +7,7 @@ from app.config import settings
 from app.data.seed_demo_data import seed_demo_data
 from app.database import get_db
 from app.schemas import DevMessageRequest, DevMessageResponse
+from app.services.chat_log import log_bot_message, log_customer_message
 from app.services.conversation_handler import handle_conversation
 from app.services.data_reset import clear_all_dashboard_data
 
@@ -53,7 +54,9 @@ async def simulate_message(
     payload: DevMessageRequest,
     db: AsyncSession = Depends(get_db),
 ) -> DevMessageResponse:
+    await log_customer_message(db, payload.from_number, payload.text)
     result, enquiry_saved = await handle_conversation(payload.from_number, payload.text, db)
+    await log_bot_message(db, payload.from_number, result.reply, result.media)
 
     return DevMessageResponse(
         from_number=payload.from_number,

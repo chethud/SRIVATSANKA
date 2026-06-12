@@ -210,6 +210,24 @@ export interface BotTestResponse {
   media?: { url: string; caption?: string | null }[];
 }
 
+export interface ChatConversation {
+  phoneNumber: string;
+  customerName: string | null;
+  lastMessage: string;
+  lastRole: string;
+  lastAt: string;
+  messageCount: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  phoneNumber: string;
+  role: 'customer' | 'bot' | 'owner' | string;
+  body: string;
+  media?: { url: string; caption?: string | null }[];
+  createdAt: string;
+}
+
 async function apiErrorMessage(res: Response, path: string): Promise<string> {
   try {
     const body = await res.json();
@@ -512,6 +530,34 @@ export async function testBotMessage(from: string, text: string): Promise<BotTes
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ from_number: from, text }),
   });
+}
+
+export const fetchChatConversations = () => apiFetch<ChatConversation[]>('/api/chat/conversations');
+
+export const fetchChatMessages = (phone: string) =>
+  apiFetch<ChatMessage[]>(`/api/chat/conversations/${encodeURIComponent(phone)}/messages`);
+
+export async function sendOwnerChatMessage(phone: string, text: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/api/chat/conversations/${encodeURIComponent(phone)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+}
+
+export function normalizePhoneInput(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+export function formatPhoneDisplay(digits: string): string {
+  const d = normalizePhoneInput(digits);
+  if (d.startsWith('91') && d.length === 12) {
+    return `+91 ${d.slice(2, 7)} ${d.slice(7)}`;
+  }
+  if (d.length === 10) {
+    return `+91 ${d.slice(0, 5)} ${d.slice(5)}`;
+  }
+  return d ? `+${d}` : '';
 }
 
 export async function askDashboardAssistant(query: string): Promise<{ reply: string }> {
