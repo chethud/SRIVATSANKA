@@ -339,6 +339,7 @@ class ChatConversationOut(BaseModel):
     lastRole: str
     lastAt: datetime
     messageCount: int
+    botPaused: bool = False
 
 
 class OwnerChatMessageIn(BaseModel):

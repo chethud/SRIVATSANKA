@@ -217,6 +217,7 @@ export interface ChatConversation {
   lastRole: string;
   lastAt: string;
   messageCount: number;
+  botPaused?: boolean;
 }
 
 export interface ChatMessage {
@@ -537,12 +538,19 @@ export const fetchChatConversations = () => apiFetch<ChatConversation[]>('/api/c
 export const fetchChatMessages = (phone: string) =>
   apiFetch<ChatMessage[]>(`/api/chat/conversations/${encodeURIComponent(phone)}/messages`);
 
-export async function sendOwnerChatMessage(phone: string, text: string): Promise<{ ok: boolean }> {
-  return apiFetch<{ ok: boolean }>(`/api/chat/conversations/${encodeURIComponent(phone)}/messages`, {
+export async function sendOwnerChatMessage(phone: string, text: string): Promise<{ ok: boolean; botPaused?: boolean }> {
+  return apiFetch<{ ok: boolean; botPaused?: boolean }>(`/api/chat/conversations/${encodeURIComponent(phone)}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
+}
+
+export async function resumeChatBot(phone: string): Promise<{ ok: boolean; botPaused: boolean }> {
+  return apiFetch<{ ok: boolean; botPaused: boolean }>(
+    `/api/chat/conversations/${encodeURIComponent(phone)}/resume`,
+    { method: 'POST' },
+  );
 }
 
 export function normalizePhoneInput(value: string): string {

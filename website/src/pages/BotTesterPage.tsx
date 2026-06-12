@@ -11,6 +11,7 @@ import {
   normalizePhoneInput,
   sendOwnerChatMessage,
   testBotMessage,
+  resumeChatBot,
   type ChatConversation,
   type ChatMessage,
 } from '../api/client';
@@ -123,6 +124,17 @@ export default function BotTesterPage() {
     setNewPhone('');
   }
 
+  async function resumeBot() {
+    if (!selectedPhone) return;
+    setError('');
+    try {
+      await resumeChatBot(selectedPhone);
+      await loadConversations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not resume bot.');
+    }
+  }
+
   async function sendMessage(text: string) {
     if (!text.trim() || !selectedPhone || sending) return;
     setSending(true);
@@ -130,6 +142,7 @@ export default function BotTesterPage() {
     try {
       if (sendMode === 'owner') {
         await sendOwnerChatMessage(selectedPhone, text.trim());
+        setSendMode('owner');
       } else {
         const res = await testBotMessage(selectedPhone, text.trim());
         if (res.enquiry_saved) refresh();
@@ -234,6 +247,7 @@ export default function BotTesterPage() {
                         </p>
                         <p className="text-[10px] text-[var(--muted)] mt-0.5">
                           {formatDateTime(c.lastAt)} · {c.messageCount} msgs
+                          {c.botPaused ? ' · You are replying' : ''}
                         </p>
                       </div>
                     </div>
@@ -261,10 +275,28 @@ export default function BotTesterPage() {
                     WhatsApp thread
                   </p>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)] font-medium shrink-0">
-                  {messages.length} messages
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {active?.botPaused && (
+                    <button
+                      type="button"
+                      onClick={() => void resumeBot()}
+                      className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)]"
+                    >
+                      Resume auto-reply
+                    </button>
+                  )}
+                  <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)] font-medium">
+                    {messages.length} messages
+                  </span>
+                </div>
               </div>
+
+              {active?.botPaused && (
+                <p className="text-xs text-amber-800 bg-amber-50 border-b border-amber-200 px-4 py-2">
+                  Auto-reply is off for this customer — you are handling the chat. The bot will not reply until you click{' '}
+                  <strong>Resume auto-reply</strong>.
+                </p>
+              )}
 
               <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                 {loadingThread && messages.length === 0 ? (
@@ -345,7 +377,7 @@ export default function BotTesterPage() {
                 </div>
                 {sendMode === 'owner' && (
                   <p className="text-xs text-[var(--muted)]">
-                    Your message goes to {formatPhoneDisplay(selectedPhone)} on WhatsApp instantly.
+                    Your message goes to {formatPhoneDisplay(selectedPhone)} on WhatsApp. Auto-reply pauses while you handle this chat.
                   </p>
                 )}
                 <form

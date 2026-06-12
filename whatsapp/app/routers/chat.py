@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas import ChatConversationOut, ChatMessageOut, OwnerChatMessageIn
+from app.services.chat_handoff import pause_bot_for_phone, resume_bot_for_phone
 from app.services.chat_log import get_messages, list_conversations, log_owner_message
 from app.services.whatsapp_client import normalize_phone, send_whatsapp_message
 
@@ -47,5 +48,19 @@ async def send_owner_message(
     if not sent:
         raise HTTPException(status_code=502, detail=err or "Could not send WhatsApp message")
     await log_owner_message(db, normalized, text)
-    logger.info("Owner replied to %s via dashboard chat", normalized)
-    return {"ok": True, "phoneNumber": normalized}
+    await pause_bot_for_phone(db, normalized)
+    logger.info("Owner replied to %s via dashboard chat — bot auto-reply paused", normalized)
+    return {"ok": True, "phoneNumber": normalized, "botPaused": True}
+
+
+@router.post("/conversations/{phone}/resume")
+async def resume_bot_for_conversation(
+    phone: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    normalized = normalize_phone(phone)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    await resume_bot_for_phone(db, normalized)
+    logger.info("Bot auto-reply resumed for %s", normalized)
+    return {"ok": True, "phoneNumber": normalized, "botPaused": False}

@@ -6,8 +6,6 @@ from app.data.company_knowledge import (
     COMPANY,
     EVENT_TYPE_DETAILS,
     POPULAR_DISHES,
-    SOCIAL_PROOF,
-    WEBSITE_ABOUT,
     WEBSITE_URL,
 )
 from app.services.gemini_conversation import (
@@ -82,50 +80,43 @@ def _fallback_answer(
     t = user_text.lower()
 
     if sharing_photos or customer_wants_photos(user_text):
-        dishes = ", ".join(POPULAR_DISHES[:4])
         return (
-            f"Of course, *{name}*! 🌿\n\n"
-            "Sharing photos from past events we have catered — wedding spreads, live counters, "
-            "and elegant pure-veg presentation.\n\n"
-            f"For your *{event}*, we specialise in {dishes}, and more — all with Mr. Kannan's personal oversight.\n\n"
-            f"Browse our full gallery anytime: {WEBSITE_URL}\n\n"
-            "Ask anything else, or reply *ok* when you would like us to note your event date and callback time."
+            f"Sure, *{name}*! Sharing a few photos from past events now 👇\n\n"
+            f"Ask anything else, or reply *ok* when you'd like us to note your date and call time."
+        )
+
+    if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
+        return (
+            f"We're *{COMPANY['brand_name']}* — pure veg catering in Bengaluru since {COMPANY['established']}, "
+            f"led by {COMPANY['managing_director']}. Weddings, corporate & family events. "
+            f"More at {WEBSITE_URL}\n\n"
+            f"Anything else, or reply *ok* to continue?"
         )
 
     if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio", "wedding")):
-        proof = "\n".join(f"• {p}" for p in SOCIAL_PROOF[:4])
         return (
-            f"Great question, *{name}*! 🌿\n\n"
-            f"Since {COMPANY['established']}, our team has catered *hundreds of events* across Bengaluru — "
-            f"weddings, receptions, house warmings, baby showers, and corporate functions.\n\n"
-            f"{proof}\n\n"
-            f"For *{details['title']}*, {details['description']}\n\n"
-            f"More photos & reviews: {WEBSITE_URL}\n\n"
-            "Ask anything else, or reply *ok* when you would like us to note your event date and callback time."
+            f"We've catered hundreds of events across Bengaluru — weddings, receptions, house warmings & more. "
+            f"For *{details['title']}*, {details['description'][:120]}…\n\n"
+            f"Reply *ok* when ready, or ask another question."
         )
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
         return (
-            f"*{name}*, every {event} menu is customised for guest count, venue, and dishes — "
-            "so pricing is shared on a call with our team, not as a fixed list here.\n\n"
-            "We will discuss packages when we call you. Any other questions? "
-            "Or reply *ok* to continue with your event details."
+            f"Every menu is customised for your guest count and dishes — our team shares pricing on a call, "
+            f"not as a fixed list here.\n\n"
+            f"Reply *ok* to continue, or ask anything else."
         )
 
     if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "service")):
-        dishes = ", ".join(POPULAR_DISHES[:5])
+        dishes = ", ".join(POPULAR_DISHES[:4])
         return (
-            f"We serve *100% pure vegetarian* food — {dishes}, snacks, desserts, and live counters.\n\n"
-            f"{WEBSITE_ABOUT[:200]}…\n\n"
-            "Reply *ok* when ready, or ask another question."
+            f"100% pure vegetarian — {dishes}, live counters & more.\n\n"
+            f"Reply *ok* when ready, or ask another question."
         )
 
     return (
-        f"Happy to help, *{name}*! Our team at *{COMPANY['brand_name']}* focuses on hygienic pure-veg catering "
-        f"with a personal touch from {COMPANY['managing_director']}.\n\n"
-        f"You are planning *{event}* — {details['description']}\n\n"
-        f"See more on our website: {WEBSITE_URL}\n\n"
-        "What would you like to know? Or reply *ok* when you are ready for us to collect event date & call time."
+        f"Happy to help, *{name}*! We're {COMPANY['brand_name']} — hygienic pure-veg catering with a personal touch.\n\n"
+        f"You're planning *{event}*. What would you like to know? Or reply *ok* when ready for date & call time."
     )
 
 

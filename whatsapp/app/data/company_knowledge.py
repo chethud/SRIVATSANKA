@@ -217,6 +217,16 @@ def match_event_type(text: str) -> str:
     return "General"
 
 
+def build_short_company_context() -> str:
+    """Brief company facts for natural Q&A replies."""
+    return (
+        f"{COMPANY['brand_name']} ({COMPANY['legal_name']}) — pure vegetarian catering in Bengaluru "
+        f"since {COMPANY['established']}, led by {COMPANY['managing_director']}. "
+        f"Phone {COMPANY['phone']}. Website {WEBSITE_URL}. "
+        f"We handle weddings, house warmings, corporate events, and multi-cuisine veg menus with live counters."
+    )
+
+
 def build_agent_context() -> str:
     """Compact knowledge block injected into the Gemini system prompt."""
     services = "\n".join(f"- {s}" for s in SERVICES)

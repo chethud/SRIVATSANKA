@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.services.chat_handoff import is_bot_paused_for_phone
 from app.services.chat_log import log_bot_message, log_customer_message
 from app.services.conversation_handler import handle_conversation
 from app.services.whatsapp_client import send_whatsapp_image, send_whatsapp_message, verify_webhook_signature
@@ -62,6 +63,10 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
         await log_customer_message(db, from_number, text)
     except Exception:
         logger.exception("Failed to log customer WhatsApp message for %s", from_number)
+
+    if await is_bot_paused_for_phone(db, from_number):
+        logger.info("Bot paused for %s — owner is handling this chat", from_number)
+        return {"status": "bot_paused"}
 
     result, _saved = await handle_conversation(from_number, text, db)
     for attachment in result.media:

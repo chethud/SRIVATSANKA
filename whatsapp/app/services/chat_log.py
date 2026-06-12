@@ -8,7 +8,7 @@ import logging
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Enquiry, WhatsappChatMessage
+from app.models import Enquiry, WhatsappChatMessage, WhatsappChatState
 from app.schemas import MediaAttachment
 from app.services.whatsapp_client import normalize_phone
 
@@ -100,6 +100,7 @@ async def list_conversations(db: AsyncSession) -> list[dict]:
         )
         msg = latest.scalar_one()
         name = await _customer_name_for_phone(db, phone)
+        state = await db.get(WhatsappChatState, phone)
         conversations.append(
             {
                 "phoneNumber": phone,
@@ -108,6 +109,7 @@ async def list_conversations(db: AsyncSession) -> list[dict]:
                 "lastRole": msg.role,
                 "lastAt": last_at,
                 "messageCount": int(message_count),
+                "botPaused": bool(state and state.botPaused),
             }
         )
     return conversations

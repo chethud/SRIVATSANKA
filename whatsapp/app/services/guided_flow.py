@@ -5,8 +5,6 @@ import logging
 from app.data.company_knowledge import (
     COMPANY,
     EVENT_TYPE_DETAILS,
-    GALLERY_ITEMS,
-    SERVICES,
     WEBSITE_URL,
     match_event_type,
 )
@@ -18,72 +16,50 @@ from app.services.guided_conversation import (
 )
 from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.session_store import ConversationSession, GuidedStep
-from app.services.website_gallery import customer_wants_photos, mark_gallery_sent, prepare_gallery_photos
+from app.services.website_gallery import customer_wants_photos, prepare_gallery_photos
 from app.services.whatsapp_client import normalize_phone
 
 logger = logging.getLogger(__name__)
 
 DETAIL_STEPS: list[tuple[str, str]] = [
-    ("event_date", "When is your event? (e.g. 15 June 2026)"),
-    ("event_location", "Which area or venue in Bengaluru will the event be held?"),
+    ("event_date", "When is the event? (e.g. 15 June 2026)"),
+    ("event_location", "Which area or venue in Bengaluru?"),
     (
         "preferred_callback",
-        "When should Mr. Kannan's team call you with menu ideas and pricing? (e.g. today 4 PM, tomorrow morning)",
+        "When should our team call you with menu ideas? (e.g. today 4 PM, tomorrow morning)",
     ),
 ]
 
 
 def _welcome_message() -> str:
-    services = ", ".join(SERVICES[:3])
     return (
-        f"Vanakkam! Welcome to *{COMPANY['brand_name']}* 🌿\n\n"
-        f"We are *{COMPANY['legal_name']}* — pure vegetarian catering in Bengaluru "
-        f"since {COMPANY['established']}. {COMPANY['tagline']}.\n\n"
-        f"Our team handles {services}, and more — with hygiene, transparency, and a personal "
-        f"touch from {COMPANY['managing_director']}.\n\n"
-        f"May I know your *name*, please?"
+        f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿\n\n"
+        f"We're a pure veg catering team in Bengaluru — happy to help you plan your event.\n\n"
+        f"May I know your name?"
     )
 
 
 def _company_intro_message(name: str) -> str:
     return (
-        f"Thank you, *{name}*! 🙏\n\n"
-        f"We at *{COMPANY['brand_name']}* are glad you reached out. We specialise in memorable "
-        f"pure-veg celebrations — weddings, house warmings, naming ceremonies, receptions, and corporate events.\n\n"
-        f"📍 {COMPANY['address']}\n"
-        f"📞 {COMPANY['phone']}\n"
-        f"🌐 {WEBSITE_URL}\n\n"
-        f"What type of celebration are you looking for?"
+        f"Nice to meet you, *{name}*! 😊\n\n"
+        f"What kind of celebration are you planning — wedding, house warming, corporate, or something else?"
     )
 
 
 def _event_showcase_message(event_type: str, *, with_images: bool) -> str:
     details = EVENT_TYPE_DETAILS.get(event_type, EVENT_TYPE_DETAILS["General"])
-    image_note = (
-        "Sharing a few photos from events we have catered 👇\n\n"
+    photo_note = (
+        "Sharing a few photos from past events 👇\n\n"
         if with_images
-        else f"View event photos on our website: {WEBSITE_URL}\n\n"
+        else f"If you'd like to see photos, just ask — or visit {WEBSITE_URL}\n\n"
     )
     return (
-        f"Wonderful — *{details['title']}* is close to our heart! 💚\n\n"
+        f"Lovely — we do a lot of *{details['title']}* events! 💚\n\n"
         f"{details['description']}\n\n"
-        f"{image_note}"
-        "Ask us anything about our experience, menus, or service — we are happy to chat.\n\n"
-        "When you are ready, reply *ok* and we will note your event date, venue, "
-        "and the best time for our team to call you."
+        f"{photo_note}"
+        f"Feel free to ask anything about menu, service, or pricing.\n\n"
+        f"When you're ready, reply *ok* and we'll note your date and call time."
     )
-
-
-def _prepare_event_images(event_type: str, session: ConversationSession) -> list[MediaAttachment]:
-    details = EVENT_TYPE_DETAILS.get(event_type, EVENT_TYPE_DETAILS["General"])
-    captions = details.get("image_captions") or [item["caption"] for item in GALLERY_ITEMS[:3]]
-    attachments: list[MediaAttachment] = []
-    for i, item in enumerate(GALLERY_ITEMS[:3]):
-        url = item["url"]
-        cap = captions[i] if i < len(captions) else item.get("caption") or details["title"]
-        attachments.append(MediaAttachment(url=url, caption=cap))
-        mark_gallery_sent(session, [url])
-    return attachments
 
 
 def _store_detail_field(session: ConversationSession, key: str, user_text: str) -> bool:
@@ -110,10 +86,7 @@ def _start_detail_collection(session: ConversationSession) -> AgentTurnResult:
     first_prompt = _next_detail_prompt(session)
     name = session.fields.customer_name or "there"
     return AgentTurnResult(
-        reply=(
-            f"Thank you, *{name}*! Let us note your event details. 🌿\n\n"
-            f"{first_prompt}"
-        ),
+        reply=f"Great, *{name}*! {first_prompt}",
         fields=session.fields,
     )
 
@@ -138,7 +111,7 @@ async def process_guided_flow(
         skip_names = {"hi", "hello", "hey", "hii", "namaste", "vanakkam", "start", "help"}
         if not name or name.lower() in skip_names:
             return AgentTurnResult(
-                reply="Please share your name so we can assist you better 😊",
+                reply="Could you share your name? That helps us assist you better 😊",
                 fields=session.fields,
             )
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": name})
@@ -148,12 +121,11 @@ async def process_guided_flow(
     if step == GuidedStep.AWAIT_EVENT_TYPE:
         event_type = match_event_type(text)
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
-        media = _prepare_event_images(event_type, session)
         session.guided_step = GuidedStep.AWAIT_POST_SHOWCASE
         return AgentTurnResult(
-            reply=_event_showcase_message(event_type, with_images=bool(media)),
+            reply=_event_showcase_message(event_type, with_images=False),
             fields=session.fields,
-            media=media,
+            media=[],
         )
 
     if step == GuidedStep.AWAIT_POST_SHOWCASE:
@@ -161,8 +133,8 @@ async def process_guided_flow(
             return _start_detail_collection(session)
 
         wants_photos = customer_wants_photos(text)
-        media = prepare_gallery_photos(session, limit=4) if wants_photos else []
-        reply = await answer_showcase_question(session, text, sharing_photos=wants_photos)
+        media: list[MediaAttachment] = prepare_gallery_photos(session, limit=4) if wants_photos else []
+        reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
         return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
     if step == GuidedStep.COLLECT_DETAILS:
@@ -172,7 +144,7 @@ async def process_guided_flow(
 
             if customer_wants_photos(text):
                 media = prepare_gallery_photos(session, limit=4)
-                reply = await answer_showcase_question(session, text, sharing_photos=True)
+                reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
                 return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
             if looks_like_question(text) and not is_likely_field_answer(text, key):
@@ -182,12 +154,12 @@ async def process_guided_flow(
             if not _store_detail_field(session, key, text):
                 retry = dict(DETAIL_STEPS)[key]
                 return AgentTurnResult(
-                    reply=f"I didn't catch that — {retry}",
+                    reply=f"Sorry, I didn't catch that — {retry}",
                     fields=session.fields,
                 )
             next_prompt = _next_detail_prompt(session)
             if next_prompt:
-                return AgentTurnResult(reply=f"Noted, thank you! ✅\n\n{next_prompt}", fields=session.fields)
+                return AgentTurnResult(reply=f"Got it, thanks! 👍\n\n{next_prompt}", fields=session.fields)
             break
 
         if not _details_complete(session):
@@ -202,13 +174,13 @@ async def process_guided_flow(
         name = session.fields.customer_name or "there"
         return AgentTurnResult(
             reply=(
-                f"Perfect, *{name}*! We have your enquiry details ✅\n\n"
+                f"Perfect, *{name}* — we've noted everything ✅\n\n"
                 f"• Event: {session.fields.event_type}\n"
                 f"• Date: {session.fields.event_date}\n"
                 f"• Venue: {session.fields.event_location}\n"
                 f"• Call back: {session.fields.preferred_callback}\n\n"
-                "Pax per meal (breakfast, lunch, etc.) is confirmed when we plan your menu.\n\n"
-                "Next, tell us which *cuisine styles* you prefer (e.g. Multi Cuisine, South Indian)."
+                f"Our team will reach out at the time you mentioned.\n\n"
+                f"Next — which cuisine styles do you prefer? (e.g. South Indian, Multi Cuisine)"
             ),
             fields=session.fields,
             enquiry_fields_complete=True,

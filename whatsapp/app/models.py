@@ -128,6 +128,14 @@ class WhatsappChatMessage(Base):
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
 
 
+class WhatsappChatState(Base):
+    __tablename__ = "WhatsappChatState"
+
+    phoneNumber: Mapped[str] = mapped_column(String, primary_key=True)
+    botPaused: Mapped[bool] = mapped_column(Boolean, default=False)
+    pausedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class Vendor(Base):
     __tablename__ = "Vendor"
 

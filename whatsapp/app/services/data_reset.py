@@ -16,6 +16,7 @@ from app.models import (
     Notification,
     Vendor,
     WhatsappChatMessage,
+    WhatsappChatState,
     Worker,
     WorkerAssignment,
 )
@@ -34,6 +35,7 @@ async def clear_all_dashboard_data(session: AsyncSession) -> dict:
         (InvoiceUpload, "invoice_uploads"),
         (WorkerAssignment, "worker_assignments"),
         (WhatsappChatMessage, "chat_messages"),
+        (WhatsappChatState, "chat_states"),
         (Enquiry, "enquiries"),
         (Notification, "notifications"),
         (Expense, "expenses"),

@@ -7,7 +7,7 @@ import re
 import google.generativeai as genai
 
 from app.config import settings
-from app.data.company_knowledge import COMPANY, build_agent_context
+from app.data.company_knowledge import COMPANY, build_short_company_context
 from app.services.session_store import ConversationSession
 
 logger = logging.getLogger(__name__)
@@ -66,48 +66,47 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
 def _showcase_system(session: ConversationSession, *, sharing_photos: bool = False) -> str:
     name = session.fields.customer_name or "the customer"
     event = session.fields.event_type or "their celebration"
-    context = build_agent_context()
+    context = build_short_company_context()
     photo_note = (
-        "\nIMPORTANT: The customer asked for photos. Our system is sending WhatsApp gallery images from "
-        "past events right now. Acknowledge that you are sharing them — do not redirect only to the website."
+        "\nThe customer asked for photos — our system is sending gallery images now. "
+        "Briefly acknowledge that you're sharing them."
         if sharing_photos
-        else ""
+        else "\nDo NOT send or mention sharing photos unless the customer explicitly asked."
     )
-    return f"""You are a warm, experienced catering consultant for {COMPANY['brand_name']} on WhatsApp.
-You represent {COMPANY['legal_name']} — pure vegetarian catering in Bengaluru since {COMPANY['established']}.
-Speak as part of {COMPANY['managing_director']}'s team. Never say you are a bot or AI.
+    return f"""You are a friendly human catering consultant for {COMPANY['brand_name']} on WhatsApp.
+You work with {COMPANY['managing_director']}'s team in Bengaluru. Never say you are a bot or AI.
 
-You are chatting with *{name}* who is planning *{event}*.
+Chatting with *{name}* about *{event}*.
 
 {context}
 
 HOW TO REPLY
-- Read the customer's message carefully and answer their specific question first.
-- Use company knowledge above — be concrete (menus, hygiene, experience, wedding spreads, live counters, popular dishes, etc.).
-- When they ask for photos, pictures, or past events: confirm you are sharing real photos from our gallery on WhatsApp right now (images arrive separately). Do NOT say you cannot share photos here.
-- Sound natural and human: 2–4 short WhatsApp paragraphs, light emoji only if natural.
-- Use *bold* sparingly for key phrases.
-- Do NOT ask for event date, venue, or callback time yet unless they ask what information you need next.
-- End by inviting another question OR reply *ok* when they are ready to share event date and callback time.
-- Plain text only — no JSON, no bullet lists longer than 4 items.{photo_note}"""
+- Sound like a real person texting — warm, natural, concise.
+- Answer their specific question first in 1–3 short sentences.
+- For company/about questions: keep it short and sweet — one or two lines, not a brochure.
+- No long bullet lists unless they ask for details.
+- Do NOT ask for event date, venue, or callback time yet unless they ask what's next.
+- Invite another question OR reply *ok* when ready to share event date and call time.
+- Plain text only.{photo_note}"""
 
 
 def _collect_details_system(session: ConversationSession, next_prompt: str | None) -> str:
     name = session.fields.customer_name or "the customer"
     event = session.fields.event_type or "their celebration"
-    context = build_agent_context()
+    context = build_short_company_context()
     pending = next_prompt or "remaining event details"
     collected = session.fields.model_dump()
-    return f"""You are a warm catering consultant for {COMPANY['brand_name']} on WhatsApp, helping *{name}* with *{event}*.
+    return f"""You are a friendly human catering consultant for {COMPANY['brand_name']} on WhatsApp.
 
 {context}
 
-We are collecting enquiry details. Already noted: {collected}
-Still need from the customer: {pending}
+Helping *{name}* with *{event}*. Already noted: {collected}
+Still need: {pending}
 
-If they ask a question, answer it clearly using company knowledge, then gently remind them what detail we still need.
-Do NOT invent or assume dates, venues, or callback times they have not given.
-Keep replies short and friendly. Plain text only."""
+If they ask about the company or services, answer in 1–3 short sentences — warm and natural, not a long pitch.
+Then gently remind them what detail we still need.
+Do NOT invent dates, venues, or callback times they have not given.
+Plain text only."""
 
 
 async def generate_showcase_reply(

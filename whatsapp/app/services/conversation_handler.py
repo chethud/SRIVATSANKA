@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import AgentTurnResult
 from app.services.ai_agent import AIAgent, _all_fields_filled
+from app.services.chat_handoff import resume_bot_for_phone
 from app.services.guided_flow import process_guided_flow
 from app.services.dish_flow import handle_dish_flow, start_dish_flow
 from app.services.enquiry_service import save_enquiry
@@ -18,6 +19,7 @@ async def handle_conversation(
 
     if user_text.strip().lower() in {"new", "start over", "restart"}:
         session_store.reset(whatsapp_id)
+        await resume_bot_for_phone(db, whatsapp_id)
         session = session_store.get(whatsapp_id)
         user_text = "Hi"
 
