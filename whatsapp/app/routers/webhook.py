@@ -58,10 +58,20 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
     if not text:
         return {"status": "empty_message"}
 
-    await log_customer_message(db, from_number, text)
+    try:
+        await log_customer_message(db, from_number, text)
+    except Exception:
+        logger.exception("Failed to log customer WhatsApp message for %s", from_number)
+
     result, _saved = await handle_conversation(from_number, text, db)
     for attachment in result.media:
         await send_whatsapp_image(from_number, attachment.url, caption=attachment.caption)
-    await send_whatsapp_message(from_number, result.reply)
-    await log_bot_message(db, from_number, result.reply, result.media)
+    sent, send_err = await send_whatsapp_message(from_number, result.reply)
+    if not sent:
+        logger.error("Bot reply not delivered to %s: %s", from_number, send_err)
+
+    try:
+        await log_bot_message(db, from_number, result.reply, result.media)
+    except Exception:
+        logger.exception("Failed to log bot WhatsApp message for %s", from_number)
     return {"status": "ok"}

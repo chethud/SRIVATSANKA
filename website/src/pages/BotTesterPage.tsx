@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MessageCircle, Plus, Send, User } from 'lucide-react';
+import { MessageCircle, Plus, RefreshCw, Send, User } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import {
@@ -19,7 +19,7 @@ type SendMode = 'customer' | 'owner';
 
 function roleLabel(role: string) {
   if (role === 'customer') return 'Customer';
-  if (role === 'owner') return 'You';
+  if (role === 'owner') return 'You (team)';
   return 'Bot';
 }
 
@@ -31,12 +31,13 @@ export default function BotTesterPage() {
   const [selectedPhone, setSelectedPhone] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [input, setInput] = useState('');
-  const [sendMode, setSendMode] = useState<SendMode>('customer');
+  const [sendMode, setSendMode] = useState<SendMode>('owner');
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const threadRef = useRef<HTMLDivElement>(null);
+  const autoSelectedRef = useRef(false);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -69,21 +70,34 @@ export default function BotTesterPage() {
 
   useEffect(() => {
     void loadConversations();
-    const id = setInterval(() => void loadConversations(), 8000);
+    const id = setInterval(() => void loadConversations(), 5000);
     return () => clearInterval(id);
   }, [loadConversations]);
 
   useEffect(() => {
-    const fromUrl = searchParams.get('phone') || '';
-    if (fromUrl && fromUrl !== selectedPhone) {
+    if (loadingList || autoSelectedRef.current) return;
+
+    const fromUrl = normalizePhoneInput(searchParams.get('phone') || '');
+    if (fromUrl) {
       setSelectedPhone(fromUrl);
+      setSendMode('owner');
+      autoSelectedRef.current = true;
+      return;
     }
-  }, [searchParams, selectedPhone]);
+
+    if (conversations.length > 0) {
+      const first = conversations[0].phoneNumber;
+      setSelectedPhone(first);
+      setSearchParams({ phone: first }, { replace: true });
+      setSendMode('owner');
+      autoSelectedRef.current = true;
+    }
+  }, [loadingList, conversations, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!selectedPhone) return;
     void loadMessages(selectedPhone);
-    const id = setInterval(() => void loadMessages(selectedPhone), 4000);
+    const id = setInterval(() => void loadMessages(selectedPhone), 3000);
     return () => clearInterval(id);
   }, [selectedPhone, loadMessages]);
 
@@ -91,10 +105,11 @@ export default function BotTesterPage() {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loadingThread]);
 
-  function selectConversation(phone: string) {
+  function selectConversation(phone: string, mode: SendMode = 'owner') {
     setSelectedPhone(phone);
-    setSearchParams(phone ? { phone } : {});
-    setSendMode('customer');
+    setSearchParams({ phone });
+    setSendMode(mode);
+    setError('');
   }
 
   function startNewChat() {
@@ -104,7 +119,7 @@ export default function BotTesterPage() {
       return;
     }
     setError('');
-    selectConversation(phone);
+    selectConversation(phone, 'customer');
     setNewPhone('');
   }
 
@@ -134,35 +149,39 @@ export default function BotTesterPage() {
   return (
     <>
       <PageHeader
-        title="WhatsApp Chat & Bot Tester"
-        description="View every customer conversation by phone, simulate the bot, or reply directly from the dashboard"
+        title="WhatsApp Chat"
+        description="Live customer conversations by phone — open a thread and reply directly to their WhatsApp"
       />
 
       {!connected && (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
-          API offline — start the backend locally or check Render, then sign in again.
+          API offline — start the backend on Render or locally, then sign in again.
         </p>
       )}
 
       <div className="text-sm text-[var(--muted)] mb-4 space-y-1">
         <p>
-          <strong>Test here:</strong> Sidebar → <strong>WhatsApp Chat</strong> (this page) at{' '}
-          <code className="text-xs bg-[var(--background)] px-1.5 py-0.5 rounded">/bot-tester</code>
-        </p>
-        <p>
-          <strong>Live WhatsApp:</strong> Message your Meta business/test number from a real phone — chats appear here automatically.
-        </p>
-        <p>
-          Bot flow: Hi → name → event type → <strong>ok</strong> → details → meals. Customer mode simulates the bot; Team reply sends a real WhatsApp message.
+          When a customer messages your Meta business number, their chat appears here with their phone number.
+          Click the conversation, type a message, and choose <strong>Send to customer</strong> — they receive it on WhatsApp.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 h-[min(720px,calc(100vh-280px))]">
         <aside className="bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden">
           <div className="p-4 border-b border-[var(--border)]">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-2">
-              Conversations
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)]">
+                Conversations ({conversations.length})
+              </p>
+              <button
+                type="button"
+                onClick={() => void loadConversations()}
+                className="p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)]"
+                title="Refresh list"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
             <div className="flex gap-2">
               <input
                 type="tel"
@@ -175,7 +194,7 @@ export default function BotTesterPage() {
                 type="button"
                 onClick={startNewChat}
                 className="px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]"
-                title="Open chat"
+                title="Open chat by phone"
               >
                 <Plus size={18} />
               </button>
@@ -184,10 +203,10 @@ export default function BotTesterPage() {
 
           <div className="flex-1 overflow-y-auto">
             {loadingList && conversations.length === 0 ? (
-              <p className="text-sm text-[var(--muted)] p-4">Loading…</p>
+              <p className="text-sm text-[var(--muted)] p-4">Loading conversations…</p>
             ) : conversations.length === 0 ? (
               <p className="text-sm text-[var(--muted)] p-4">
-                No chats yet. Start a new number above or send Hi from Bot Tester / WhatsApp.
+                No chats yet. Send <strong>Hi</strong> from a customer phone to your Meta business number — it will show up here.
               </p>
             ) : (
               conversations.map((c) => {
@@ -196,7 +215,7 @@ export default function BotTesterPage() {
                   <button
                     key={c.phoneNumber}
                     type="button"
-                    onClick={() => selectConversation(c.phoneNumber)}
+                    onClick={() => selectConversation(c.phoneNumber, 'owner')}
                     className={`w-full text-left px-4 py-3 border-b border-[var(--border)] transition-colors ${
                       activeRow ? 'bg-[var(--primary-light)]' : 'hover:bg-[var(--sidebar-hover)]'
                     }`}
@@ -206,12 +225,15 @@ export default function BotTesterPage() {
                         <User size={16} className="text-[var(--muted)]" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm truncate">
-                          {c.customerName || formatPhoneDisplay(c.phoneNumber)}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">{formatPhoneDisplay(c.phoneNumber)}</p>
+                        <p className="font-semibold text-sm truncate">{formatPhoneDisplay(c.phoneNumber)}</p>
+                        {c.customerName && (
+                          <p className="text-xs text-[var(--foreground)] truncate">{c.customerName}</p>
+                        )}
                         <p className="text-xs text-[var(--muted)] mt-1 truncate">
                           {roleLabel(c.lastRole)}: {c.lastMessage}
+                        </p>
+                        <p className="text-[10px] text-[var(--muted)] mt-0.5">
+                          {formatDateTime(c.lastAt)} · {c.messageCount} msgs
                         </p>
                       </div>
                     </div>
@@ -231,9 +253,17 @@ export default function BotTesterPage() {
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background)]">
-                <p className="font-semibold">{active?.customerName || 'Customer'}</p>
-                <p className="text-xs text-[var(--muted)]">{formatPhoneDisplay(selectedPhone)}</p>
+              <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{formatPhoneDisplay(selectedPhone)}</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {active?.customerName ? `${active.customerName} · ` : ''}
+                    WhatsApp thread
+                  </p>
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)] font-medium shrink-0">
+                  {messages.length} messages
+                </span>
               </div>
 
               <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -241,7 +271,7 @@ export default function BotTesterPage() {
                   <p className="text-sm text-[var(--muted)] text-center mt-10">Loading messages…</p>
                 ) : messages.length === 0 ? (
                   <p className="text-sm text-[var(--muted)] text-center mt-10">
-                    No messages yet. Send Hi as the customer to start the bot flow.
+                    No messages stored yet for this number. If they messaged on WhatsApp, wait a few seconds or refresh.
                   </p>
                 ) : (
                   messages.map((msg) => {
@@ -289,18 +319,7 @@ export default function BotTesterPage() {
               </div>
 
               <div className="border-t border-[var(--border)] p-4 space-y-3">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSendMode('customer')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                      sendMode === 'customer'
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'bg-[var(--background)] border border-[var(--border)]'
-                    }`}
-                  >
-                    As customer (bot test)
-                  </button>
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => setSendMode('owner')}
@@ -310,9 +329,25 @@ export default function BotTesterPage() {
                         : 'bg-[var(--background)] border border-[var(--border)]'
                     }`}
                   >
-                    Team reply (WhatsApp)
+                    Send to customer (WhatsApp)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSendMode('customer')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                      sendMode === 'customer'
+                        ? 'bg-[var(--primary)] text-white'
+                        : 'bg-[var(--background)] border border-[var(--border)]'
+                    }`}
+                  >
+                    Simulate customer (bot test)
                   </button>
                 </div>
+                {sendMode === 'owner' && (
+                  <p className="text-xs text-[var(--muted)]">
+                    Your message goes to {formatPhoneDisplay(selectedPhone)} on WhatsApp instantly.
+                  </p>
+                )}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -326,7 +361,7 @@ export default function BotTesterPage() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={
                       sendMode === 'owner'
-                        ? 'Type your reply to the customer…'
+                        ? 'Type your reply — customer receives this on WhatsApp…'
                         : 'Type as customer (e.g. Hi)…'
                     }
                     disabled={sending}

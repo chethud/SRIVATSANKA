@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, SearchInput, FilterChips, LoadingScreen } from '../components/ui';
@@ -235,6 +237,13 @@ export default function EnquiriesPage() {
                 <h3 className="font-semibold text-lg mb-4">{detail.customerName}</h3>
                 <dl className="space-y-2 text-sm">
                   <div><dt className="text-[var(--muted)]">Phone</dt><dd>{detail.phoneNumber}</dd></div>
+                  <Link
+                    to={`/bot-tester?phone=${encodeURIComponent(detail.phoneNumber)}`}
+                    className="inline-flex items-center gap-1.5 text-sm text-[var(--primary)] hover:underline mt-2"
+                  >
+                    <MessageCircle size={14} />
+                    Open WhatsApp chat
+                  </Link>
                   <div><dt className="text-[var(--muted)]">Event</dt><dd>{detail.eventType}</dd></div>
                   <div><dt className="text-[var(--muted)]">Date</dt><dd>{formatDate(detail.eventDate)}</dd></div>
                   <div><dt className="text-[var(--muted)]">Location</dt><dd>{detail.eventLocation}</dd></div>

@@ -43,9 +43,9 @@ async def send_owner_message(
     if not text:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    await log_owner_message(db, normalized, text)
-    sent = await send_whatsapp_message(normalized, text)
+    sent, err = await send_whatsapp_message(normalized, text)
     if not sent:
-        raise HTTPException(status_code=502, detail="Could not send WhatsApp message")
+        raise HTTPException(status_code=502, detail=err or "Could not send WhatsApp message")
+    await log_owner_message(db, normalized, text)
     logger.info("Owner replied to %s via dashboard chat", normalized)
     return {"ok": True, "phoneNumber": normalized}

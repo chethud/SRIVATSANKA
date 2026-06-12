@@ -35,15 +35,16 @@ def verify_webhook_signature(payload: bytes, signature_header: str | None) -> bo
     return hmac.compare_digest(signature_header.removeprefix("sha256="), expected)
 
 
-async def send_whatsapp_message(to: str, text: str) -> bool:
+async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
+    """Send text. Returns (success, error_message)."""
     to = normalize_phone(to)
     if not to:
         logger.error("Invalid recipient phone number")
-        return False
+        return False, "Invalid phone number"
 
     if not is_whatsapp_configured():
         logger.info("[WhatsApp Mock] To: %s | %s", to, text[:120])
-        return True
+        return True, None
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -63,9 +64,10 @@ async def send_whatsapp_message(to: str, text: str) -> bool:
         )
         if response.status_code >= 400:
             logger.error("WhatsApp send failed (%s): %s", response.status_code, response.text)
-            return False
+            detail = response.text[:240] if response.text else f"HTTP {response.status_code}"
+            return False, f"WhatsApp API error: {detail}"
         logger.info("WhatsApp message sent to %s", to)
-        return True
+        return True, None
 
 
 async def send_whatsapp_image(to: str, image_url: str, caption: str | None = None) -> bool:

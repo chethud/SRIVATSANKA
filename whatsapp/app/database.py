@@ -143,6 +143,8 @@ async def _migrate_sqlite_columns() -> None:
 
 
 async def init_db() -> None:
+    import app.models  # noqa: F401 — register every table before create_all
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

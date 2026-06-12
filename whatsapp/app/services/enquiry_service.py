@@ -114,7 +114,7 @@ async def notify_owner_new_enquiry(
         f"{menu_section}\n\n"
         "Please contact the customer at the preferred callback time."
     )
-    sent = await send_whatsapp_message(owner, message)
+    sent, _err = await send_whatsapp_message(owner, message)
     if sent:
         logger.info("Owner notified via WhatsApp: %s", owner)
     else:
@@ -135,6 +135,6 @@ async def notify_owner_callback_reminder(enquiry: Enquiry) -> None:
         f"Location: {enquiry.eventLocation}\n"
         f"Guests: {enquiry.guestCount}"
     )
-    sent = await send_whatsapp_message(owner, message)
+    sent, _err = await send_whatsapp_message(owner, message)
     if sent:
         logger.info("Callback reminder sent to owner for enquiry %s", enquiry.id)

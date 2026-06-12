@@ -92,7 +92,7 @@ export default function SettingsPage() {
           <p className="text-sm text-[var(--muted)] mb-3">Webhook: <code>https://YOUR-DOMAIN/webhook</code></p>
           <p className="text-sm text-[var(--muted)] mb-4">Guide: <code>docs/META_WHATSAPP_SETUP.md</code></p>
           <Link to="/bot-tester" className="inline-block px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm hover:bg-[var(--primary-hover)] mr-3">
-            Open Bot Tester
+            Open WhatsApp Chat
           </Link>
         </Card>
 
