@@ -10,7 +10,6 @@ import {
   DashboardTabBar,
   GlassCard,
   NotificationsWidget,
-  QuickActionsPanel,
   RecentOrdersTable,
   TodaysEventsWidget,
   TopDishesList,
@@ -188,10 +187,6 @@ export default function DashboardPage() {
           <NotificationsWidget items={getUnreadNotifications(notifications)} />
         </GlassCard>
       </div>
-
-      <GlassCard title="Quick actions">
-        <QuickActionsPanel />
-      </GlassCard>
 
       <p className="text-center text-xs text-[var(--muted)] pb-4">
         {dishes.length} menu items · {vendors.length} vendors tracked

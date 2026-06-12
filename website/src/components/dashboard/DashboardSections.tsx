@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Bell, Calendar, HardHat, Sparkles, Truck, UtensilsCrossed,
-  FileText, Users, BarChart3, ShoppingBag,
+  Bell, Calendar, HardHat, Sparkles, Truck,
 } from 'lucide-react';
 import { formatDate, updateEnquiryStatus } from '../../api/client';
 import type { Enquiry, Notification, Vendor, Worker } from '../../api/client';
@@ -321,30 +320,6 @@ export function WorkerAttendanceOverview({ workers, byRole }: { workers: Worker[
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-export function QuickActionsPanel() {
-  const actions = [
-    { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { to: '/enquiries', label: 'Enquiries', icon: Users },
-    { to: '/orders', label: 'Orders', icon: ShoppingBag },
-    { to: '/dishes', label: 'Menu', icon: UtensilsCrossed },
-    { to: '/invoices', label: 'Upload bill', icon: FileText },
-  ];
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      {actions.map(({ to, label, icon: Icon }) => (
-        <Link
-          key={to}
-          to={to}
-          className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-[var(--border)] bg-[var(--background-alt)]/50 hover:bg-[var(--primary-light)] hover:border-[var(--primary)] transition-all text-center"
-        >
-          <Icon size={20} className="text-[var(--primary)]" />
-          <span className="text-xs font-semibold">{label}</span>
-        </Link>
-      ))}
     </div>
   );
 }
