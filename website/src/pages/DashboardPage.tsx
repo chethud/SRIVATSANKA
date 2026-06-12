@@ -6,6 +6,8 @@ import { DashboardKpiCard } from '../components/DashboardKpiCard';
 import {
   AiInsightsPanel,
   ChartFilter,
+  DashboardEnquiriesPanel,
+  DashboardTabBar,
   GlassCard,
   NotificationsWidget,
   QuickActionsPanel,
@@ -15,6 +17,7 @@ import {
   UpcomingEventsList,
   VendorPaymentsSummary,
   WorkerAttendanceOverview,
+  type DashboardTab,
 } from '../components/dashboard/DashboardSections';
 import {
   ProfitRadialSnapshot,
@@ -41,8 +44,9 @@ import {
 } from '../utils/dashboardData';
 
 export default function DashboardPage() {
-  const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics } = useAppData();
+  const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics, refresh } = useAppData();
   const [chartMode, setChartMode] = useState<ChartPeriod>('monthly');
+  const [tab, setTab] = useState<DashboardTab>('overview');
 
   const converted = useMemo(() => getConvertedOrders(enquiries), [enquiries]);
   const monthly = analytics?.monthly ?? [];
@@ -62,12 +66,24 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-6">
-      <motion.header initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-1">
-        <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
-        <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA catering — live metrics and pipeline</p>
+      <motion.header initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
+          <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA catering — live metrics and pipeline</p>
+        </div>
+        <DashboardTabBar
+          tab={tab}
+          onChange={setTab}
+          newEnquiries={stats?.new_enquiries ?? 0}
+        />
       </motion.header>
 
       <ErrorBanner message={error} />
+
+      {tab === 'enquiries' ? (
+        <DashboardEnquiriesPanel enquiries={enquiries} onRefresh={refresh} />
+      ) : (
+        <>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <DashboardKpiCard
@@ -80,6 +96,7 @@ export default function DashboardPage() {
           sparkline={sparklineFromMonthly(analytics, 'revenue')}
           sparkId="enq"
           gradient={1}
+          onClick={() => setTab('enquiries')}
         />
         <DashboardKpiCard
           label="Converted orders"
@@ -179,6 +196,8 @@ export default function DashboardPage() {
       <p className="text-center text-xs text-[var(--muted)] pb-4">
         {dishes.length} menu items · {vendors.length} vendors tracked
       </p>
+        </>
+      )}
     </div>
   );
 }

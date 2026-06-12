@@ -24,13 +24,13 @@ const navItems: {
   badge?: (d: AppDataSlice) => number | null | undefined;
 }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/enquiries', label: 'Enquiries', icon: MessageSquare, badge: (d) => d.stats?.new_enquiries },
   { to: '/orders', label: 'Orders', icon: ShoppingBag, badge: (d) => d.enquiries.filter((e) => e.status === 'CONVERTED').length },
   { to: '/dishes', label: 'Menu', icon: UtensilsCrossed, badge: (d) => d.stats?.total_dishes },
   { to: '/vendors', label: 'Vendors', icon: Users, badge: (d) => d.vendors.length },
   { to: '/workers', label: 'Workers', icon: HardHat, badge: (d) => d.workers.length },
   { to: '/invoices', label: 'Invoices', icon: FileText },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/bot-tester', label: 'WhatsApp Chats', icon: MessageCircle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

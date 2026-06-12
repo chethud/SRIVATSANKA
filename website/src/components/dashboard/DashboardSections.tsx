@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Bell, Calendar, HardHat, Sparkles, Truck, UtensilsCrossed,
-  FileText, Plus, Users,
+  FileText, Users, BarChart3, ShoppingBag,
 } from 'lucide-react';
-import { formatDate } from '../../api/client';
+import { formatDate, updateEnquiryStatus } from '../../api/client';
 import type { Enquiry, Notification, Vendor, Worker } from '../../api/client';
 import type { ChartPeriod } from '../../utils/dashboardData';
 
@@ -68,6 +69,138 @@ export function ChartFilter({
         </button>
       ))}
     </div>
+  );
+}
+
+export type DashboardTab = 'overview' | 'enquiries';
+
+export function DashboardTabBar({
+  tab,
+  onChange,
+  newEnquiries,
+}: {
+  tab: DashboardTab;
+  onChange: (tab: DashboardTab) => void;
+  newEnquiries: number;
+}) {
+  return (
+    <div className="inline-flex p-1 rounded-xl bg-[var(--background-alt)] border border-[var(--border)]">
+      <button
+        type="button"
+        onClick={() => onChange('overview')}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          tab === 'overview' ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+        }`}
+      >
+        Overview
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('enquiries')}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all inline-flex items-center gap-2 ${
+          tab === 'enquiries' ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+        }`}
+      >
+        Enquiries
+        {newEnquiries > 0 && (
+          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-white/20 tabular-nums">
+            {newEnquiries > 99 ? '99+' : newEnquiries}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+const ENQUIRY_STATUS_FILTERS = [
+  { id: 'ALL', label: 'All' },
+  { id: 'NEW', label: 'New' },
+  { id: 'CONTACTED', label: 'Contacted' },
+  { id: 'CONVERTED', label: 'Converted' },
+  { id: 'CLOSED', label: 'Closed' },
+];
+
+export function DashboardEnquiriesPanel({
+  enquiries,
+  onRefresh,
+}: {
+  enquiries: Enquiry[];
+  onRefresh: () => void;
+}) {
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  const filtered = enquiries.filter((e) => statusFilter === 'ALL' || e.status === statusFilter);
+
+  async function changeStatus(id: string, status: string) {
+    await updateEnquiryStatus(id, status);
+    onRefresh();
+  }
+
+  return (
+    <GlassCard
+      title="Enquiries"
+      action={
+        <Link to="/enquiries" className="text-xs font-semibold text-[var(--primary)] hover:underline">
+          Full page →
+        </Link>
+      }
+    >
+      <div className="flex flex-wrap gap-2 mb-4">
+        {ENQUIRY_STATUS_FILTERS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setStatusFilter(s.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              statusFilter === s.id
+                ? 'bg-[var(--primary)] text-white'
+                : 'bg-[var(--background-alt)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-[var(--muted)] py-8 text-center">No enquiries in this filter.</p>
+      ) : (
+        <div className="overflow-auto max-h-[min(70vh,640px)] -mx-1 rounded-xl border border-[var(--border)]">
+          <table className="data-table w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--background)]">
+                <th className="px-4 py-3 text-left">Customer</th>
+                <th className="px-4 py-3 text-left">Event</th>
+                <th className="px-4 py-3 text-left">Date</th>
+                <th className="px-4 py-3 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((e) => (
+                <tr key={e.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]">
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{e.customerName}</div>
+                    <div className="text-xs text-[var(--muted)]">{e.phoneNumber}</div>
+                  </td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{e.eventType}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{formatDate(e.eventDate)}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={e.status}
+                      onChange={(ev) => void changeStatus(e.id, ev.target.value)}
+                      className="form-select text-xs px-2 py-1 rounded-lg"
+                    >
+                      {ENQUIRY_STATUS_FILTERS.filter((s) => s.id !== 'ALL').map((s) => (
+                        <option key={s.id} value={s.id}>{s.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </GlassCard>
   );
 }
 
@@ -194,10 +327,11 @@ export function WorkerAttendanceOverview({ workers, byRole }: { workers: Worker[
 
 export function QuickActionsPanel() {
   const actions = [
+    { to: '/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/enquiries', label: 'Enquiries', icon: Users },
-    { to: '/orders', label: 'New order', icon: Plus },
-    { to: '/invoices', label: 'Upload bill', icon: FileText },
+    { to: '/orders', label: 'Orders', icon: ShoppingBag },
     { to: '/dishes', label: 'Menu', icon: UtensilsCrossed },
+    { to: '/invoices', label: 'Upload bill', icon: FileText },
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
