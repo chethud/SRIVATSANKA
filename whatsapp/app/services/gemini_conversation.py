@@ -184,7 +184,7 @@ def _is_probable_date(text: str) -> bool:
         "nov",
         "dec",
     )
-    return any(m in t for m in months) or "tomorrow" in t or "next week" in t or "this weekend" in t or "this month" in t
+    return any(m in t for m in months) or "tomorrow" in t or "next week" in t or "this weekend" in t or "this month" in t or "next month" in t
 
 
 def _is_probable_callback(text: str) -> bool:

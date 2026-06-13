@@ -63,8 +63,28 @@ def _strip_ordinals(text: str) -> str:
     return re.sub(r"\b(\d{1,2})(?:st|nd|rd|th)\b", r"\1", text.lower())
 
 
-def _start_of_day(when: datetime) -> datetime:
-    return when.replace(hour=12, minute=0, second=0, microsecond=0)
+def _next_calendar_month(reference: datetime) -> tuple[int, int]:
+    month = reference.month + 1
+    year = reference.year
+    if month > 12:
+        month = 1
+        year += 1
+    return year, month
+
+
+def _parse_next_month_day(lower: str, reference: datetime) -> datetime | None:
+    """Handle '15 next month', 'next month 15', 'next month on 15th'."""
+    match = re.search(r"\b(\d{1,2})\s*(?:of\s+)?next\s+month\b", lower)
+    if match:
+        year, month = _next_calendar_month(reference)
+        return _safe_date(year, month, int(match.group(1)))
+
+    match = re.search(r"\bnext\s+month(?:\s+on)?\s+(\d{1,2})\b", lower)
+    if match:
+        year, month = _next_calendar_month(reference)
+        return _safe_date(year, month, int(match.group(1)))
+
+    return None
 
 
 def parse_event_date(text: str, now: datetime | None = None) -> datetime:
@@ -93,14 +113,9 @@ def parse_event_date(text: str, now: datetime | None = None) -> datetime:
     if match:
         return _safe_date(reference.year, reference.month, int(match.group(1)))
 
-    match = re.search(r"\b(\d{1,2})\s*(?:of\s+)?next\s+month\b", lower)
-    if match:
-        month = reference.month + 1
-        year = reference.year
-        if month > 12:
-            month = 1
-            year += 1
-        return _safe_date(year, month, int(match.group(1)))
+    next_month = _parse_next_month_day(lower, reference)
+    if next_month is not None:
+        return next_month
 
     for name, weekday in WEEKDAYS.items():
         if re.search(rf"\b{re.escape(name)}\b", lower):
