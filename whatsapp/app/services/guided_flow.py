@@ -15,6 +15,7 @@ from app.services.guided_conversation import (
 )
 from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.session_store import ConversationSession, GuidedStep
+from app.services.callback_time import format_callback_display, parse_callback_time
 from app.services.location_normalize import normalize_location
 from app.services.website_gallery import customer_wants_photos, prepare_gallery_photos
 from app.services.whatsapp_client import normalize_phone
@@ -162,10 +163,14 @@ async def process_guided_flow(
         )
         session.guided_step = GuidedStep.DONE
         name = session.fields.customer_name or "there"
+        callback_when = format_callback_display(
+            parse_callback_time(session.fields.preferred_callback or "in 2 hours"),
+            session.fields.preferred_callback,
+        )
         return AgentTurnResult(
             reply=(
-                f"All set, *{name}* ✅ Our team will call you then.\n"
-                f"Which meal services do you need? (e.g. breakfast, lunch, dinner)"
+                f"Noted 👍 We'll call you on *{callback_when.split(' (')[0]}*.\n"
+                f"Which meal services do you need? (e.g. *1,3* or *breakfast, dinner*)"
             ),
             fields=session.fields,
             enquiry_fields_complete=True,

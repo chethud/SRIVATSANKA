@@ -86,12 +86,32 @@ def _extract_time_of_day(lower: str) -> tuple[int, int] | None:
     return None
 
 
+def _mentions_day_after_tomorrow(lower: str) -> bool:
+    return "day after tomorrow" in lower or "overmorrow" in lower
+
+
+def _mentions_tomorrow(lower: str) -> bool:
+    if re.search(
+        r"\b(?:tomorrow|tommorow|tommarow|tomorow|tommorrow|tomorrw|tmrw|tmr|2morrow|2mrw|kal)\b",
+        lower,
+    ):
+        return True
+    # Common WhatsApp typos: "tommarow", "tomorow"
+    return bool(re.search(r"\btom\w*row\b", lower))
+
+
+def _mentions_today(lower: str) -> bool:
+    if re.search(r"\b(?:today|todat|2day|tonight|this evening|this afternoon)\b", lower):
+        return True
+    return "this morning" in lower
+
+
 def _resolve_base_day(lower: str, now: datetime) -> datetime | None:
-    if "day after tomorrow" in lower:
+    if _mentions_day_after_tomorrow(lower):
         return _start_of_day(now + timedelta(days=2))
-    if any(w in lower for w in ("tomorrow", "tmrw", "tmr", "kal")):
+    if _mentions_tomorrow(lower):
         return _start_of_day(now + timedelta(days=1))
-    if any(w in lower for w in ("today", "tonight", "this evening", "this afternoon")):
+    if _mentions_today(lower):
         return _start_of_day(now)
 
     for name, weekday in WEEKDAYS.items():

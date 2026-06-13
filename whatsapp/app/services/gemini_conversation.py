@@ -198,6 +198,8 @@ def _is_probable_callback(text: str) -> bool:
         for w in (
             "today",
             "tomorrow",
+            "tommarow",
+            "tomorow",
             "morning",
             "evening",
             "afternoon",
@@ -205,7 +207,7 @@ def _is_probable_callback(text: str) -> bool:
             "call me",
             "tonight",
         )
-    )
+    ) or bool(re.search(r"\btom\w*row\b", t))
 
 
 def is_likely_field_answer(text: str, field_key: str) -> bool:

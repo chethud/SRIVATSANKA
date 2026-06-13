@@ -48,6 +48,9 @@ def test_parser_cases() -> None:
         ("in 30 min", datetime(2026, 6, 3, 10, 30)),
         ("today evening", datetime(2026, 6, 3, 18, 0)),
         ("call me tomorrow morning", datetime(2026, 6, 4, 10, 0)),
+        ("tommarow @6pm", datetime(2026, 6, 4, 18, 0)),
+        ("tomorow 6pm", datetime(2026, 6, 4, 18, 0)),
+        ("today @6pm", datetime(2026, 6, 3, 18, 0)),
     ]
 
     for text, expected in cases:
