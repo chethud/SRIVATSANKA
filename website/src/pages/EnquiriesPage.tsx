@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
+import { AttentionBadge } from '../components/AttentionBadge';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, SearchInput, FilterChips, LoadingScreen } from '../components/ui';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { createEnquiry, updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
+import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention';
 
 const STATUS_FILTERS = [
   { id: 'ALL', label: 'All' },
@@ -52,6 +54,8 @@ const emptyForm = () => ({
 
 export default function EnquiriesPage() {
   const { loading, error, enquiries, refresh, markEnquiryViewed } = useAppData();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const attentionOnly = searchParams.get('attention') === '1';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selected, setSelected] = useState<string | null>(null);
@@ -62,8 +66,13 @@ export default function EnquiriesPage() {
 
   useCreateActionListener('enquiry', () => setShowForm(true));
 
+  const unviewedEnquiries = useMemo(
+    () => sortEnquiriesForAttention(enquiries.filter(isUnviewedEnquiry)),
+    [enquiries],
+  );
+
   const filtered = useMemo(() => {
-    return enquiries.filter((e) => {
+    let list = enquiries.filter((e) => {
       const matchStatus = statusFilter === 'ALL' || e.status === statusFilter;
       const q = search.toLowerCase();
       const matchSearch =
@@ -74,9 +83,18 @@ export default function EnquiriesPage() {
         e.eventLocation.toLowerCase().includes(q);
       return matchStatus && matchSearch;
     });
-  }, [enquiries, search, statusFilter]);
+    if (attentionOnly) {
+      list = list.filter(isUnviewedEnquiry);
+    }
+    return sortEnquiriesForAttention(list);
+  }, [enquiries, search, statusFilter, attentionOnly]);
 
   const detail = enquiries.find((e) => e.id === selected);
+
+  useEffect(() => {
+    if (selected || unviewedEnquiries.length === 0) return;
+    setSelected(unviewedEnquiries[0].id);
+  }, [unviewedEnquiries, selected]);
 
   useEffect(() => {
     if (!selected) return;
@@ -123,9 +141,39 @@ export default function EnquiriesPage() {
     <>
       <PageHeader
         title="Enquiries"
-        description={`${filtered.length} enquiries — add manually or from WhatsApp; mark CONVERTED when confirmed`}
+        description={
+          attentionOnly
+            ? `${filtered.length} new ${filtered.length === 1 ? 'enquiry needs' : 'enquiries need'} your attention`
+            : `${filtered.length} enquiries — add manually or from WhatsApp; mark CONVERTED when confirmed`
+        }
       />
       <ErrorBanner message={error || formError} />
+      {unviewedEnquiries.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary-light)]">
+          <p className="text-sm text-[var(--foreground)]">
+            <span className="font-semibold">{unviewedEnquiries.length} not opened yet</span>
+            {' — '}
+            highlighted in the list with a green badge.
+          </p>
+          {attentionOnly ? (
+            <button
+              type="button"
+              onClick={() => setSearchParams({})}
+              className="text-sm font-semibold text-[var(--primary)] hover:underline"
+            >
+              Show all enquiries
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSearchParams({ attention: '1' })}
+              className="text-sm font-semibold text-[var(--primary)] hover:underline"
+            >
+              Show only new ({unviewedEnquiries.length})
+            </button>
+          )}
+        </div>
+      )}
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6">
           <h3 className="font-semibold mb-4 text-[var(--foreground)]">New enquiry (owner)</h3>
@@ -196,7 +244,7 @@ export default function EnquiriesPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState message="No enquiries match your filters." />
+        <EmptyState message={attentionOnly ? 'No new enquiries waiting — all caught up.' : 'No enquiries match your filters.'} />
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
@@ -209,17 +257,27 @@ export default function EnquiriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((e) => (
+                {filtered.map((e) => {
+                  const unread = isUnviewedEnquiry(e);
+                  return (
                   <tr
                     key={e.id}
                     onClick={() => setSelected(e.id)}
                     className={`border-t border-[var(--border)] cursor-pointer hover:bg-[var(--background)] ${
                       selected === e.id ? 'bg-[var(--primary-light)]' : ''
-                    }`}
+                    } ${unread ? 'border-l-4 border-l-[var(--primary)]' : ''}`}
                   >
                     <td className="p-4">
-                      <div className="font-medium">{e.customerName}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{e.customerName}</span>
+                        {unread && <AttentionBadge />}
+                      </div>
                       <div className="text-[var(--muted)] text-xs">{e.phoneNumber}</div>
+                      {unread && (
+                        <div className="text-xs text-[var(--primary)] mt-1">
+                          Callback: {formatDateTime(e.preferredCallbackAt)}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">{e.eventType}</td>
                     <td className="p-4" onClick={(ev) => ev.stopPropagation()}>
@@ -234,7 +292,8 @@ export default function EnquiriesPage() {
                       </select>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -242,7 +301,10 @@ export default function EnquiriesPage() {
           <Card className="p-6 h-fit sticky top-4">
             {detail ? (
               <>
-                <h3 className="font-semibold text-lg mb-4">{detail.customerName}</h3>
+                <div className="flex items-center gap-2 flex-wrap mb-4">
+                  <h3 className="font-semibold text-lg">{detail.customerName}</h3>
+                  {isUnviewedEnquiry(detail) && <AttentionBadge />}
+                </div>
                 <dl className="space-y-2 text-sm">
                   <div><dt className="text-[var(--muted)]">Phone</dt><dd>{detail.phoneNumber}</dd></div>
                   <Link

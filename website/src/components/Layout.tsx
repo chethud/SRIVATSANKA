@@ -66,10 +66,11 @@ function DashboardLayoutInner() {
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
           {navItems.map(({ to, label, icon: Icon, badge }) => {
             const count = badge?.(data);
+            const linkTo = count != null && count > 0 ? `${to}?attention=1` : to;
             return (
               <NavLink
                 key={to}
-                to={to}
+                to={linkTo}
                 end={to === '/'}
                 title={sidebarCollapsed ? label : undefined}
                 className={({ isActive }) =>
