@@ -1,6 +1,5 @@
 import asyncio
 import json
-from datetime import datetime, timedelta
 
 import google.generativeai as genai
 
@@ -25,8 +24,8 @@ YOUR PERSONALITY
 INFORMATION TO COLLECT (all required before is_complete=true)
 1. customer_name
 2. phone_number (use WhatsApp number if customer confirms)
-3. event_type
-4. event_date
+3. event_type (occasion)
+4. event_date (occasion date)
 5. event_location
 6. preferred_callback — when our team should call
 
@@ -34,6 +33,8 @@ Do NOT ask for guest count — pax is set when planning the menu.
 
 CONVERSATION RULES
 - Chat naturally; don't rush all fields at once.
+- Say "occasion" not "event" when asking customers.
+- Accept casual spelling (e.g. weding, hsr laytout, 24th of this month).
 - If they ask price/menu: customised per event — discuss on callback.
 - When all 6 fields are clear, warm summary and is_complete=true.
 - If they say "new" / start over, greet fresh.
@@ -75,15 +76,6 @@ def _all_fields_filled(fields: EnquiryFields) -> bool:
             fields.preferred_callback,
         ]
     )
-
-
-def parse_event_date(text: str) -> datetime:
-    for fmt in ("%d %B %Y", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%B %d, %Y", "%d %b %Y"):
-        try:
-            return datetime.strptime(text.strip(), fmt)
-        except ValueError:
-            continue
-    return datetime.now() + timedelta(days=7)
 
 
 def _build_gemini_history(session: ConversationSession) -> list[dict]:
@@ -159,7 +151,7 @@ class AIAgent:
             raw = await asyncio.to_thread(_call_gemini, session, agent_input)
             payload = json.loads(raw)
             result = AgentTurnResult(
-                reply=trim_whatsapp_reply(payload.get("reply", "Hi! What event are you planning?")),
+                reply=trim_whatsapp_reply(payload.get("reply", "Hi! What occasion are you looking for?")),
                 fields=EnquiryFields(**payload.get("fields", {})),
                 is_complete=bool(payload.get("is_complete", False)),
             )
@@ -180,7 +172,7 @@ class AIAgent:
         """Conversational fallback when Gemini is unavailable."""
         if not session.history or len(session.history) <= 1:
             reply = (
-                f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 What event are you planning?"
+                f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 What occasion are you looking for?"
             )
             session.history.append({"role": "assistant", "content": reply})
             return AgentTurnResult(reply=reply, fields=session.fields)
@@ -188,8 +180,8 @@ class AIAgent:
         steps = [
             ("customer_name", "Lovely! Your name?"),
             ("phone_number", "Best number to reach you?"),
-            ("event_type", "What event is it?"),
-            ("event_date", "When is the event?"),
+            ("event_type", "What occasion are you looking for?"),
+            ("event_date", "What date is your occasion?"),
             ("event_location", "Which area in Bengaluru?"),
             ("preferred_callback", "When should we call you?"),
         ]

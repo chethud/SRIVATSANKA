@@ -1,5 +1,7 @@
 """Brand knowledge from https://kannansharangapani.com/ for the WhatsApp agent."""
 
+import re
+
 WEBSITE_URL = "https://kannansharangapani.com/"
 
 COMPANY = {
@@ -195,33 +197,74 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
 
 
 def match_event_type(text: str) -> str:
-    """Map customer text to a known event type."""
-    lower = text.lower().strip()
-    aliases = {
+    """Map customer text to a known occasion type (tolerates common spelling mistakes)."""
+    import difflib
+
+    lower = re.sub(r"\s+", " ", (text or "").lower().strip())
+    if len(lower) < 2:
+        return "General"
+
+    skip = {"ok", "okay", "yes", "yeah", "sure", "fine", "continue", "proceed", "go ahead", "hi", "hello"}
+    if lower in skip:
+        return "General"
+
+    aliases: dict[str, str] = {
         "wedding": "Wedding",
+        "weddign": "Wedding",
+        "weding": "Wedding",
         "marriage": "Wedding",
+        "marraige": "Wedding",
         "reception": "Reception",
+        "receiption": "Reception",
         "house warming": "House Warming",
         "housewarming": "House Warming",
+        "house worming": "House Warming",
         "griha": "House Warming",
+        "griha pravesham": "House Warming",
         "baby shower": "Baby Shower",
+        "babyshower": "Baby Shower",
         "seemantham": "Baby Shower",
+        "seemanth": "Baby Shower",
         "naming": "Naming Ceremony",
         "naming ceremony": "Naming Ceremony",
+        "namimg": "Naming Ceremony",
         "upanayanam": "Upanayanam",
+        "upanayan": "Upanayanam",
         "corporate": "Corporate events",
         "office": "Corporate events",
-        "lunch": "Corporate events",
+        "office lunch": "Corporate events",
+        "corporate lunch": "Corporate events",
         "birthday": "General",
+        "engagement": "General",
+        "anniversary": "General",
+        "occasion": "General",
+        "function": "General",
+        "celebration": "General",
     }
     for key, canonical in aliases.items():
         if key in lower:
-            if canonical == "Naming Ceremony" or canonical == "Upanayanam":
-                return canonical
             return canonical
+
     for event in EVENT_TYPES:
         if event.lower() in lower:
             return event
+
+    words = re.findall(r"[a-z]+", lower)
+    alias_keys = list(aliases.keys()) + [e.lower() for e in EVENT_TYPES]
+    for word in words:
+        if len(word) < 4:
+            continue
+        matches = difflib.get_close_matches(word, alias_keys, n=1, cutoff=0.78)
+        if matches:
+            matched = matches[0]
+            if matched in aliases:
+                return aliases[matched]
+            for event in EVENT_TYPES:
+                if event.lower() == matched:
+                    return event
+
+    if len(lower) >= 4 and lower not in {"general", "other", "others"}:
+        return text.strip().title()
     return "General"
 
 

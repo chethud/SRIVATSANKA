@@ -15,13 +15,14 @@ from app.services.guided_conversation import (
 )
 from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.session_store import ConversationSession, GuidedStep
+from app.services.location_normalize import normalize_location
 from app.services.website_gallery import customer_wants_photos, prepare_gallery_photos
 from app.services.whatsapp_client import normalize_phone
 
 logger = logging.getLogger(__name__)
 
 DETAIL_STEPS: list[tuple[str, str]] = [
-    ("event_date", "When is the event?"),
+    ("event_date", "What date is your occasion?"),
     ("event_location", "Which area in Bengaluru?"),
     ("preferred_callback", "When should we call you?"),
 ]
@@ -32,7 +33,7 @@ def _welcome_message() -> str:
 
 
 def _company_intro_message(name: str) -> str:
-    return f"Nice to meet you, *{name}*! What event are you planning?"
+    return f"Nice to meet you, *{name}*! What occasion are you looking for?"
 
 
 def _event_showcase_message(event_type: str, *, with_images: bool) -> str:
@@ -47,6 +48,8 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
     value: str | int | None = user_text.strip()
     if not value:
         return False
+    if key == "event_location":
+        value = normalize_location(str(value))
     session.fields = EnquiryFields(**{**session.fields.model_dump(), key: value})
     return True
 
@@ -100,6 +103,12 @@ async def process_guided_flow(
         return AgentTurnResult(reply=_company_intro_message(name), fields=session.fields)
 
     if step == GuidedStep.AWAIT_EVENT_TYPE:
+        proceed_words = {"ok", "okay", "yes", "yeah", "sure", "continue", "proceed", "go ahead", "fine"}
+        if text.lower() in proceed_words or len(text.strip()) < 3:
+            return AgentTurnResult(
+                reply="Which occasion are you looking for? (e.g. wedding, house warming, reception)",
+                fields=session.fields,
+            )
         event_type = match_event_type(text)
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
         session.guided_step = GuidedStep.AWAIT_POST_SHOWCASE

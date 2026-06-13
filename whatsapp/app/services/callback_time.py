@@ -48,7 +48,7 @@ def _apply_time(base: datetime, hour: int, minute: int = 0, *, reference: dateti
 
 
 def _extract_clock_time(lower: str) -> tuple[int, int] | None:
-    match = re.search(r"\b(\d{1,2})\s*[:.]\s*(\d{2})\s*(am|pm|a\.m|p\.m)?\b", lower)
+    match = re.search(r"@?\s*(\d{1,2})\s*[:.]\s*(\d{2})\s*(am|pm|a\.m|p\.m)?\b", lower)
     if match:
         hour = int(match.group(1))
         minute = int(match.group(2))
@@ -62,7 +62,7 @@ def _extract_clock_time(lower: str) -> tuple[int, int] | None:
         if 0 <= hour <= 23 and 0 <= minute <= 59:
             return hour, minute
 
-    match = re.search(r"\b(\d{1,2})\s*(am|pm|a\.m|p\.m)\b", lower)
+    match = re.search(r"@?\s*(\d{1,2})\s*(am|pm|a\.m|p\.m)\b", lower)
     if match:
         hour = int(match.group(1))
         meridiem = match.group(2).replace(".", "")

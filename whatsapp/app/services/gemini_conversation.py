@@ -184,12 +184,12 @@ def _is_probable_date(text: str) -> bool:
         "nov",
         "dec",
     )
-    return any(m in t for m in months) or "tomorrow" in t or "next week" in t or "this weekend" in t
+    return any(m in t for m in months) or "tomorrow" in t or "next week" in t or "this weekend" in t or "this month" in t
 
 
 def _is_probable_callback(text: str) -> bool:
     t = text.lower()
-    if re.search(r"\d{1,2}\s*(am|pm|:\d{2})", t):
+    if re.search(r"@?\s*\d{1,2}\s*(am|pm|:\d{2})", t):
         return True
     if re.search(r"\bin\s+\d+\s*(min|hour)", t):
         return True

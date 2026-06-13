@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import Enquiry, EnquiryDish, EnquiryStatus, Notification, NotificationType
 from app.schemas import EnquiryFields, SelectedDishItem
-from app.services.ai_agent import parse_event_date
+from app.services.event_date import parse_event_date
+from app.services.location_normalize import normalize_location
 from app.services.callback_time import format_callback_display, parse_callback_time
 from app.services.whatsapp_client import normalize_phone, send_whatsapp_message
 
@@ -36,7 +37,11 @@ async def save_enquiry(
             dish_lines.append(f"{d.dish_name} ({d.category}) – {custom}")
 
     callback_at = parse_callback_time(fields.preferred_callback or "in 2 hours")
+    event_date_raw = (fields.event_date or "").strip()
+    event_date_parsed = parse_event_date(event_date_raw)
     note_lines: list[str] = []
+    if event_date_raw:
+        note_lines.append(f"Occasion date requested: {event_date_raw}")
     if fields.preferred_callback:
         note_lines.append(f"Callback requested: {fields.preferred_callback}")
         note_lines.append(f"Callback scheduled: {format_callback_display(callback_at, fields.preferred_callback)}")
@@ -47,8 +52,8 @@ async def save_enquiry(
         customerName=fields.customer_name or "Unknown",
         phoneNumber=phone,
         eventType=fields.event_type or "General",
-        eventDate=parse_event_date(fields.event_date or ""),
-        eventLocation=fields.event_location or "TBD",
+        eventDate=event_date_parsed,
+        eventLocation=normalize_location(fields.event_location or "TBD"),
         guestCount=fields.guest_count or 0,
         preferredCallbackAt=callback_at,
         status=EnquiryStatus.NEW,
