@@ -54,7 +54,7 @@ const emptyForm = () => ({
 
 export default function EnquiriesPage() {
   const { loading, error, enquiries, refresh, markEnquiryViewed } = useAppData();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const attentionOnly = searchParams.get('attention') === '1';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -148,32 +148,6 @@ export default function EnquiriesPage() {
         }
       />
       <ErrorBanner message={error || formError} />
-      {unviewedEnquiries.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary-light)]">
-          <p className="text-sm text-[var(--foreground)]">
-            <span className="font-semibold">{unviewedEnquiries.length} not opened yet</span>
-            {' — '}
-            highlighted in the list with a green badge.
-          </p>
-          {attentionOnly ? (
-            <button
-              type="button"
-              onClick={() => setSearchParams({})}
-              className="text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
-              Show all enquiries
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSearchParams({ attention: '1' })}
-              className="text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
-              Show only new ({unviewedEnquiries.length})
-            </button>
-          )}
-        </div>
-      )}
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6">
           <h3 className="font-semibold mb-4 text-[var(--foreground)]">New enquiry (owner)</h3>
@@ -264,8 +238,8 @@ export default function EnquiriesPage() {
                     key={e.id}
                     onClick={() => setSelected(e.id)}
                     className={`border-t border-[var(--border)] cursor-pointer hover:bg-[var(--background)] ${
-                      selected === e.id ? 'bg-[var(--primary-light)]' : ''
-                    } ${unread ? 'border-l-4 border-l-[var(--primary)]' : ''}`}
+                      unread ? 'attention-unread-row' : selected === e.id ? 'bg-[var(--primary-light)]' : ''
+                    }`}
                   >
                     <td className="p-4">
                       <div className="flex items-center gap-2 flex-wrap">

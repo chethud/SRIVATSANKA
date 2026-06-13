@@ -35,6 +35,7 @@
   --accent: #7ac943;
   --accent-hover: #6bb838;
   --accent-soft: rgba(122, 201, 67, 0.2);
+  --attention-border: rgba(11, 107, 58, 0.28);
 
   --chart-forest: #0b6b3a;
   --chart-lime: #7ac943;
@@ -94,6 +95,7 @@
   --primary-light: #1e3a2f;
   --accent: #7ac943;
   --accent-soft: rgba(122, 201, 67, 0.15);
+  --attention-border: rgba(122, 201, 67, 0.35);
 
   --success-bg: #1e3a2f;
   --success-text: #7ac943;
@@ -123,6 +125,17 @@ body {
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+.attention-unread {
+  background: var(--primary-light);
+  border-color: var(--attention-border) !important;
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.attention-unread-row td {
+  background: var(--primary-light);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
 }
 
 .glass-panel {

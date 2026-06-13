@@ -9,7 +9,7 @@ import { isUnviewedOrder, sortOrdersForAttention } from '../utils/attention';
 
 export default function OrdersPage() {
   const { enquiries } = useAppData();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const attentionOnly = searchParams.get('attention') === '1';
 
   const allOrders = useMemo(
@@ -37,32 +37,6 @@ export default function OrdersPage() {
             : 'Converted clients — open an order to manage dishes, copies, and bills'
         }
       />
-      {unviewedOrders.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary-light)]">
-          <p className="text-sm text-[var(--foreground)]">
-            <span className="font-semibold">{unviewedOrders.length} not opened yet</span>
-            {' — '}
-            marked with a green badge below.
-          </p>
-          {attentionOnly ? (
-            <button
-              type="button"
-              onClick={() => setSearchParams({})}
-              className="text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
-              Show all orders
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSearchParams({ attention: '1' })}
-              className="text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
-              Show only new ({unviewedOrders.length})
-            </button>
-          )}
-        </div>
-      )}
       {orders.length === 0 ? (
         <EmptyState
           message={
@@ -79,7 +53,7 @@ export default function OrdersPage() {
               <Link key={e.id} to={`/orders/${e.id}`} className="block">
                 <Card
                   className={`p-5 hover:border-[var(--primary)] transition-colors flex items-center justify-between gap-4 ${
-                    unread ? 'border-[var(--primary)]/50 border-l-4 border-l-[var(--primary)]' : ''
+                    unread ? 'attention-unread' : ''
                   }`}
                 >
                   <div>
