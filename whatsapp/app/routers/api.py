@@ -245,8 +245,15 @@ async def mark_enquiry_viewed(
     enquiry = result.scalar_one_or_none()
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    changed = False
+    if enquiry.status == EnquiryStatus.NEW:
+        enquiry.status = EnquiryStatus.SEEN
+        changed = True
     if enquiry.ownerViewedAt is None:
         enquiry.ownerViewedAt = datetime.now()
+        changed = True
+    if changed:
         await db.commit()
         await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)

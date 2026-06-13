@@ -16,11 +16,11 @@ export const ENQUIRY_STATUS_FILTERS = [
   { id: 'NOT_CONVERTED', label: 'Not converted' },
 ];
 
-/** Status options in dropdown — never includes NEW unless it is the current value. */
+/** Status options in dropdown — NEW and SEEN are automatic only, not manual choices. */
 export function statusOptionsForDropdown(current: string) {
   return Object.entries(ENQUIRY_STATUS_LABELS)
     .filter(([id]) => id !== 'CLOSED')
-    .filter(([id]) => id === current || id !== 'NEW')
+    .filter(([id]) => id === current || (id !== 'NEW' && id !== 'SEEN'))
     .map(([id, label]) => ({ id, label }));
 }
 

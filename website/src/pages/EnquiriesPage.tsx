@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
@@ -9,6 +9,8 @@ import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { createEnquiry, updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
 import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention';
 import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../utils/enquiryStatus';
+import { MONTH_FILTERS, matchesMonthFilter } from '../utils/monthFilter';
+import { buildSerialNumberMap } from '../utils/serialNumbers';
 
 const EVENT_TYPES = ['Wedding', 'House Warming', 'Baby Shower', 'Reception', 'Corporate Lunch', 'Naming Ceremony', 'Other'];
 
@@ -51,7 +53,9 @@ export default function EnquiriesPage() {
   const attentionOnly = searchParams.get('attention') === '1';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [monthFilter, setMonthFilter] = useState('ALL');
   const [selected, setSelected] = useState<string | null>(null);
+  const markedSeenRef = useRef(new Set<string>());
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -64,12 +68,15 @@ export default function EnquiriesPage() {
     [enquiries],
   );
 
+  const serialNumbers = useMemo(() => buildSerialNumberMap(enquiries), [enquiries]);
+
   const filtered = useMemo(() => {
     let list = enquiries.filter((e) => {
       const matchStatus =
         statusFilter === 'ALL' ||
         e.status === statusFilter ||
         (statusFilter === 'NOT_CONVERTED' && e.status === 'CLOSED');
+      const matchMonth = matchesMonthFilter(e.createdAt, monthFilter);
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -77,13 +84,13 @@ export default function EnquiriesPage() {
         e.eventType.toLowerCase().includes(q) ||
         e.phoneNumber.includes(q) ||
         e.eventLocation.toLowerCase().includes(q);
-      return matchStatus && matchSearch;
+      return matchStatus && matchMonth && matchSearch;
     });
     if (attentionOnly) {
       list = list.filter(isUnviewedEnquiry);
     }
     return sortEnquiriesForAttention(list);
-  }, [enquiries, search, statusFilter, attentionOnly]);
+  }, [enquiries, search, statusFilter, monthFilter, attentionOnly]);
 
   const detail = enquiries.find((e) => e.id === selected);
 
@@ -92,13 +99,11 @@ export default function EnquiriesPage() {
     setSelected(unviewedEnquiries[0].id);
   }, [unviewedEnquiries, selected]);
 
-  useEffect(() => {
-    if (!selected) return;
-    const e = enquiries.find((x) => x.id === selected);
-    if (e?.status === 'NEW' && !e.ownerViewedAt) {
-      void markEnquiryViewed(selected);
-    }
-  }, [selected, enquiries, markEnquiryViewed]);
+  function handleRowHover(enquiry: (typeof enquiries)[0]) {
+    if (!isUnviewedEnquiry(enquiry) || markedSeenRef.current.has(enquiry.id)) return;
+    markedSeenRef.current.add(enquiry.id);
+    void markEnquiryViewed(enquiry.id);
+  }
 
   async function changeStatus(id: string, status: string) {
     await updateEnquiryStatus(id, status);
@@ -208,8 +213,9 @@ export default function EnquiriesPage() {
           </form>
         </Card>
       )}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col gap-3 mb-6">
         <SearchInput value={search} onChange={setSearch} placeholder="Search name, event, phone..." />
+        <FilterChips options={MONTH_FILTERS} selected={monthFilter} onSelect={setMonthFilter} />
         <FilterChips options={ENQUIRY_STATUS_FILTERS} selected={statusFilter} onSelect={setStatusFilter} />
       </div>
 
@@ -221,6 +227,7 @@ export default function EnquiriesPage() {
             <table className="w-full text-sm">
               <thead className="bg-[var(--background)]">
                 <tr>
+                  <th className="text-left p-4 w-12">#</th>
                   <th className="text-left p-4">Customer</th>
                   <th className="text-left p-4">Event</th>
                   <th className="text-left p-4">Status</th>
@@ -229,14 +236,17 @@ export default function EnquiriesPage() {
               <tbody>
                 {filtered.map((e) => {
                   const unread = isUnviewedEnquiry(e);
+                  const serial = serialNumbers.get(e.id);
                   return (
                   <tr
                     key={e.id}
                     onClick={() => setSelected(e.id)}
+                    onMouseEnter={() => handleRowHover(e)}
                     className={`border-t border-[var(--border)] cursor-pointer hover:bg-[var(--background)] ${
                       unread ? 'attention-unread-row' : selected === e.id ? 'bg-[var(--primary-light)]' : ''
                     }`}
                   >
+                    <td className="p-4 text-[var(--muted)] font-medium tabular-nums">{serial}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{e.customerName}</span>
@@ -272,6 +282,9 @@ export default function EnquiriesPage() {
             {detail ? (
               <>
                 <div className="flex items-center gap-2 flex-wrap mb-4">
+                  <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">
+                    #{serialNumbers.get(detail.id)}
+                  </span>
                   <h3 className="font-semibold text-lg">{detail.customerName}</h3>
                   {isUnviewedEnquiry(detail) && <AttentionBadge />}
                 </div>

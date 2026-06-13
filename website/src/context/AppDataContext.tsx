@@ -71,8 +71,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           if (!prev) return prev;
           return {
             ...prev,
-            new_enquiries:
-              updated.status === 'NEW' ? Math.max(0, prev.new_enquiries - 1) : prev.new_enquiries,
+            new_enquiries: Math.max(0, prev.new_enquiries - 1),
             new_orders:
               updated.status === 'CONVERTED' ? Math.max(0, prev.new_orders - 1) : prev.new_orders,
           };
