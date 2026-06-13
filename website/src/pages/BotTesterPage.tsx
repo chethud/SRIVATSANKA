@@ -142,6 +142,7 @@ export default function BotTesterPage() {
       if (sendMode === 'owner') {
         await sendOwnerChatMessage(selectedPhone, text.trim());
         setSendMode('owner');
+        refresh();
       } else {
         const res = await testBotMessage(selectedPhone, text.trim());
         if (res.enquiry_saved) refresh();

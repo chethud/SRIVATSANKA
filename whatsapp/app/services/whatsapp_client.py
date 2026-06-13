@@ -13,8 +13,15 @@ WHATSAPP_API = "https://graph.facebook.com/v21.0"
 
 
 def normalize_phone(phone: str) -> str:
-    """Strip to digits only – Meta WhatsApp API format (e.g. 917899102165)."""
-    return re.sub(r"\D", "", phone or "")
+    """Strip to digits — normalize common India formats (e.g. 078… → 9178…)."""
+    digits = re.sub(r"\D", "", phone or "")
+    if not digits:
+        return ""
+    if digits.startswith("0") and len(digits) >= 11:
+        digits = "91" + digits.lstrip("0")
+    elif len(digits) == 10 and digits[0] in "6789":
+        digits = "91" + digits
+    return digits
 
 
 def is_whatsapp_configured() -> bool:

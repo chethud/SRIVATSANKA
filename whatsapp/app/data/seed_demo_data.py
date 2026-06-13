@@ -186,7 +186,7 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
             "eventLocation": "Koramangala, Bengaluru",
             "guestCount": 40,
             "preferredCallbackAt": now - timedelta(days=20),
-            "status": EnquiryStatus.CLOSED,
+            "status": EnquiryStatus.NOT_CONVERTED,
             "cuisines": ["Snacks", "Desserts"],
         },
     ]

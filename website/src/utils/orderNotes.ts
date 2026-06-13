@@ -304,8 +304,11 @@ export function statusLabel(status: string): string {
       return 'Confirmed';
     case 'CONTACTED':
       return 'In progress';
+    case 'SEEN':
+      return 'Seen';
+    case 'NOT_CONVERTED':
     case 'CLOSED':
-      return 'Closed';
+      return 'Not converted';
     default:
       return 'New';
   }

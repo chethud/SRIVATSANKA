@@ -126,6 +126,33 @@ async def _migrate_sqlite_columns() -> None:
             for sql in alters:
                 connection.execute(sa.text(sql))
 
+            if "Enquiry" in tables:
+                connection.execute(
+                    sa.text("UPDATE Enquiry SET status = 'NOT_CONVERTED' WHERE status = 'CLOSED'")
+                )
+
+            from app.services.whatsapp_client import normalize_phone
+
+            if "WhatsappChatMessage" in tables:
+                rows = connection.execute(sa.text("SELECT id, phoneNumber FROM WhatsappChatMessage")).fetchall()
+                for row_id, phone in rows:
+                    normalized = normalize_phone(phone)
+                    if normalized and normalized != phone:
+                        connection.execute(
+                            sa.text("UPDATE WhatsappChatMessage SET phoneNumber = :n WHERE id = :id"),
+                            {"n": normalized, "id": row_id},
+                        )
+
+            if "Enquiry" in tables:
+                rows = connection.execute(sa.text("SELECT id, phoneNumber FROM Enquiry")).fetchall()
+                for row_id, phone in rows:
+                    normalized = normalize_phone(phone)
+                    if normalized and normalized != phone:
+                        connection.execute(
+                            sa.text("UPDATE Enquiry SET phoneNumber = :n WHERE id = :id"),
+                            {"n": normalized, "id": row_id},
+                        )
+
             if "Dish" in tables:
                 from app.data.meal_sessions import OLD_DISH_ENUM_MAP, OLD_ENQUIRY_CATEGORY_MAP
 

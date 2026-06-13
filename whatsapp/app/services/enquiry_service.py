@@ -1,5 +1,8 @@
 import logging
 
+from datetime import datetime, timezone
+
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -143,3 +146,29 @@ async def notify_owner_callback_reminder(enquiry: Enquiry) -> None:
     sent, _err = await send_whatsapp_message(owner, message)
     if sent:
         logger.info("Callback reminder sent to owner for enquiry %s", enquiry.id)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+async def mark_enquiry_seen_for_phone(db: AsyncSession, phone: str) -> None:
+    """When the owner replies manually, mark the latest NEW enquiry as SEEN."""
+    phone = normalize_phone(phone)
+    if not phone:
+        return
+
+    result = await db.execute(
+        select(Enquiry)
+        .where(Enquiry.phoneNumber == phone)
+        .order_by(desc(Enquiry.createdAt))
+        .limit(1)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry or enquiry.status != EnquiryStatus.NEW:
+        return
+
+    enquiry.status = EnquiryStatus.SEEN
+    enquiry.ownerViewedAt = _utcnow()
+    await db.commit()
+    logger.info("Enquiry %s marked SEEN after owner reply to %s", enquiry.id, phone)

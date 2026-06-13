@@ -8,14 +8,7 @@ import { ErrorBanner, SearchInput, FilterChips, LoadingScreen } from '../compone
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { createEnquiry, updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
 import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention';
-
-const STATUS_FILTERS = [
-  { id: 'ALL', label: 'All' },
-  { id: 'NEW', label: 'New' },
-  { id: 'CONTACTED', label: 'Contacted' },
-  { id: 'CONVERTED', label: 'Converted' },
-  { id: 'CLOSED', label: 'Closed' },
-];
+import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../utils/enquiryStatus';
 
 const EVENT_TYPES = ['Wedding', 'House Warming', 'Baby Shower', 'Reception', 'Corporate Lunch', 'Naming Ceremony', 'Other'];
 
@@ -73,7 +66,10 @@ export default function EnquiriesPage() {
 
   const filtered = useMemo(() => {
     let list = enquiries.filter((e) => {
-      const matchStatus = statusFilter === 'ALL' || e.status === statusFilter;
+      const matchStatus =
+        statusFilter === 'ALL' ||
+        e.status === statusFilter ||
+        (statusFilter === 'NOT_CONVERTED' && e.status === 'CLOSED');
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -214,7 +210,7 @@ export default function EnquiriesPage() {
       )}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <SearchInput value={search} onChange={setSearch} placeholder="Search name, event, phone..." />
-        <FilterChips options={STATUS_FILTERS} selected={statusFilter} onSelect={setStatusFilter} />
+        <FilterChips options={ENQUIRY_STATUS_FILTERS} selected={statusFilter} onSelect={setStatusFilter} />
       </div>
 
       {filtered.length === 0 ? (
@@ -256,11 +252,11 @@ export default function EnquiriesPage() {
                     <td className="p-4">{e.eventType}</td>
                     <td className="p-4" onClick={(ev) => ev.stopPropagation()}>
                       <select
-                        value={e.status}
+                        value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
                         onChange={(ev) => changeStatus(e.id, ev.target.value)}
                         className="form-select text-xs px-2 py-1 rounded-lg"
                       >
-                        {STATUS_FILTERS.filter((s) => s.id !== 'ALL').map((s) => (
+                        {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
                           <option key={s.id} value={s.id}>{s.label}</option>
                         ))}
                       </select>

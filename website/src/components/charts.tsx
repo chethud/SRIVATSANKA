@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import type { Analytics } from '../api/client';
 import { formatCurrency } from '../api/client';
+import { ENQUIRY_STATUS_LABELS } from '../utils/enquiryStatus';
 
 const GREEN = '#006837';
 const GREEN_LIGHT = '#8cc63f';
@@ -119,14 +120,8 @@ export function ProfitBreakdownPie({ analytics }: { analytics: Analytics }) {
 }
 
 export function EnquiryStatusChart({ analytics }: { analytics: Analytics }) {
-  const statusLabels: Record<string, string> = {
-    NEW: 'New',
-    CONTACTED: 'Contacted',
-    CONVERTED: 'Converted',
-    CLOSED: 'Closed',
-  };
   const data = Object.entries(analytics.by_status ?? {}).map(([k, v]) => ({
-    name: statusLabels[k] || k,
+    name: ENQUIRY_STATUS_LABELS[k] || k,
     count: v,
   }));
 

@@ -14,9 +14,10 @@ def cuid() -> str:
 
 class EnquiryStatus(str, enum.Enum):
     NEW = "NEW"
+    SEEN = "SEEN"
     CONTACTED = "CONTACTED"
     CONVERTED = "CONVERTED"
-    CLOSED = "CLOSED"
+    NOT_CONVERTED = "NOT_CONVERTED"
 
 
 class NotificationType(str, enum.Enum):

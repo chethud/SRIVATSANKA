@@ -190,6 +190,9 @@ async def update_enquiry_status(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid status") from exc
 
+    if new_status == EnquiryStatus.NEW:
+        raise HTTPException(status_code=400, detail="Cannot set status to NEW")
+
     result = await db.execute(
         select(Enquiry)
         .options(selectinload(Enquiry.dish_items))

@@ -7,6 +7,7 @@ import {
 import { formatDate, updateEnquiryStatus } from '../../api/client';
 import type { Enquiry, Notification, Vendor, Worker } from '../../api/client';
 import type { ChartPeriod } from '../../utils/dashboardData';
+import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../../utils/enquiryStatus';
 
 const fade = {
   initial: { opacity: 0, y: 8 },
@@ -111,14 +112,6 @@ export function DashboardTabBar({
   );
 }
 
-const ENQUIRY_STATUS_FILTERS = [
-  { id: 'ALL', label: 'All' },
-  { id: 'NEW', label: 'New' },
-  { id: 'CONTACTED', label: 'Contacted' },
-  { id: 'CONVERTED', label: 'Converted' },
-  { id: 'CLOSED', label: 'Closed' },
-];
-
 export function DashboardEnquiriesPanel({
   enquiries,
   onRefresh,
@@ -128,7 +121,12 @@ export function DashboardEnquiriesPanel({
 }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const filtered = enquiries.filter((e) => statusFilter === 'ALL' || e.status === statusFilter);
+  const filtered = enquiries.filter(
+    (e) =>
+      statusFilter === 'ALL' ||
+      e.status === statusFilter ||
+      (statusFilter === 'NOT_CONVERTED' && e.status === 'CLOSED'),
+  );
 
   async function changeStatus(id: string, status: string) {
     await updateEnquiryStatus(id, status);
@@ -184,11 +182,11 @@ export function DashboardEnquiriesPanel({
                   <td className="px-4 py-3 text-[var(--muted)]">{formatDate(e.eventDate)}</td>
                   <td className="px-4 py-3">
                     <select
-                      value={e.status}
+                      value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
                       onChange={(ev) => void changeStatus(e.id, ev.target.value)}
                       className="form-select text-xs px-2 py-1 rounded-lg"
                     >
-                      {ENQUIRY_STATUS_FILTERS.filter((s) => s.id !== 'ALL').map((s) => (
+                      {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
                         <option key={s.id} value={s.id}>{s.label}</option>
                       ))}
                     </select>
