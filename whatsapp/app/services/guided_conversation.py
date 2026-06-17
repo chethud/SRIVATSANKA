@@ -3,6 +3,7 @@
 import logging
 
 from app.data.company_knowledge import COMPANY, EVENT_TYPE_DETAILS, POPULAR_DISHES
+from app.services.conversation_turns import customer_wants_to_proceed, natural_continue_hint
 from app.services.gemini_conversation import (
     generate_details_phase_reply,
     generate_showcase_reply,
@@ -14,48 +15,6 @@ from app.services.session_store import ConversationSession
 from app.services.website_gallery import customer_wants_photos
 
 logger = logging.getLogger(__name__)
-
-READY_PHRASES = (
-    "ok",
-    "okay",
-    "yes",
-    "ready",
-    "proceed",
-    "continue",
-    "fine",
-    "good",
-    "done",
-    "next",
-    "no questions",
-    "looks good",
-    "sounds good",
-    "let's go",
-    "lets go",
-    "go ahead",
-    "move on",
-    "that's all",
-    "thats all",
-)
-
-
-def customer_wants_to_proceed(text: str) -> bool:
-    t = text.lower().strip().rstrip("!.,")
-    if t in READY_PHRASES:
-        return True
-    return any(
-        phrase in t
-        for phrase in (
-            "no question",
-            "no doubt",
-            "all good",
-            "i am ready",
-            "im ready",
-            "please continue",
-            "take my detail",
-            "note my detail",
-            "share my detail",
-        )
-    )
 
 
 def customer_is_asking(text: str) -> bool:
@@ -75,24 +34,28 @@ def _fallback_answer(
     details = EVENT_TYPE_DETAILS.get(event, EVENT_TYPE_DETAILS["General"])
     hook = details.get("short_reply") or "Happy to help!"
     t = user_text.lower()
+    hint = natural_continue_hint()
 
     if sharing_photos or customer_wants_photos(user_text):
-        return f"Here are some photos 👇 Reply *ok* when ready to continue."
+        return f"Here are some photos from our events 👇 {hint}"
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
-        return f"We're *{COMPANY['brand_name']}* — pure veg catering in Bengaluru since {COMPANY['established']}. Reply *ok* to continue."
+        return (
+            f"We're *{COMPANY['brand_name']}* — pure veg catering in Bengaluru since {COMPANY['established']}. "
+            f"{hint}"
+        )
 
     if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio", "wedding")):
-        return f"We've done hundreds of events in Bengaluru. {hook} Reply *ok* or ask more."
+        return f"We've catered hundreds of occasions in Bengaluru. {hook} {hint}"
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
-        return "Pricing depends on menu & guests — our team shares it on a call. Reply *ok* to continue."
+        return f"Pricing depends on menu and guest count — our team walks you through it on a call. {hint}"
 
     if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "service")):
         dishes = ", ".join(POPULAR_DISHES[:3])
-        return f"100% veg — {dishes} & more. Reply *ok* when ready."
+        return f"We're 100% vegetarian — favourites include {dishes}, and plenty more. {hint}"
 
-    return f"Happy to help, *{name}*! Reply *ok* when ready for date & call time."
+    return f"Happy to help, *{name}*! {hint}"
 
 
 async def _gemini_or_fallback(

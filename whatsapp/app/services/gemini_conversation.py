@@ -32,8 +32,17 @@ def _build_chat_history(session: ConversationSession) -> list[dict]:
     return history
 
 
-def trim_whatsapp_reply(text: str, max_chars: int = 260) -> str:
-    """Keep bot replies short — WhatsApp should feel like texting, not email."""
+NATURAL_STYLE = """HOW YOU THINK AND REPLY
+1. Read the customer's latest message carefully — understand what they mean, not just keywords.
+2. Reply to that specific point first, in your own words (like a real person on WhatsApp).
+3. Keep it warm and concise — 1–3 short sentences, under 320 characters.
+4. One question at a time. No bullet lists, brochures, or copy-paste marketing.
+5. Never say you are a bot or AI. At most one emoji, only if it fits naturally.
+6. Match their tone — casual if they're casual, polite if they're formal."""
+
+
+def trim_whatsapp_reply(text: str, max_chars: int = 320) -> str:
+    """Keep bot replies concise — WhatsApp should feel like texting, not email."""
     text = re.sub(r"\n{3,}", "\n\n", (text or "").strip())
     if len(text) <= max_chars:
         return text
@@ -47,7 +56,8 @@ def trim_whatsapp_reply(text: str, max_chars: int = 260) -> str:
 
 def _generate_reply(system_instruction: str, session: ConversationSession, user_text: str) -> str:
     genai.configure(api_key=settings.gemini_api_key)
-    models = [settings.gemini_model.strip(), "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"]
+    primary = settings.gemini_model.strip() or "gemini-flash-latest"
+    models = [primary, "gemini-2.0-flash"]
     seen: set[str] = set()
     last_error: Exception | None = None
 
@@ -59,7 +69,7 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
             model = genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_instruction,
-                generation_config=genai.GenerationConfig(temperature=0.65, max_output_tokens=100),
+                generation_config=genai.GenerationConfig(temperature=0.7, max_output_tokens=180),
             )
             chat = model.start_chat(history=_build_chat_history(session))
             response = chat.send_message(user_text)
@@ -87,19 +97,18 @@ def _showcase_system(session: ConversationSession, *, sharing_photos: bool = Fal
         else "\nDo NOT send or mention sharing photos unless the customer explicitly asked."
     )
     return f"""You are a friendly human catering consultant for {COMPANY['brand_name']} on WhatsApp.
-You work with {COMPANY['managing_director']}'s team in Bengaluru. Never say you are a bot or AI.
+You work with {COMPANY['managing_director']}'s team in Bengaluru.
 
-Chatting with *{name}* about *{event}*.
+Chatting with *{name}* about their *{event}*.
 
 {context}
 
-HOW TO REPLY
-- Write like a quick WhatsApp text — max 2 short sentences, under 220 characters total.
-- One idea per message. No brochures, no long lists, no multiple paragraphs.
-- Use at most one emoji. Skip the website link unless they ask.
-- Answer their question first, then stop — don't add extra selling lines.
-- Do NOT ask for date, venue, or callback yet unless they ask what's next.
-- They can reply *ok* when ready to share details.{photo_note}"""
+{NATURAL_STYLE}
+
+RIGHT NOW
+- Answer what they asked — pricing, menu, experience, photos, etc. — before anything else.
+- Do NOT ask for date, venue, or callback unless they ask what you need next.
+- If they seem ready to move on, you can gently mention you'll note date & location next.{photo_note}"""
 
 
 def _collect_details_system(session: ConversationSession, next_prompt: str | None) -> str:
@@ -112,11 +121,16 @@ def _collect_details_system(session: ConversationSession, next_prompt: str | Non
 
 {context}
 
-Helping *{name}* with *{event}*. Already noted: {collected}
-Still need: {pending}
+Helping *{name}* plan their *{event}*.
+Already noted: {collected}
+Still need from them: {pending}
 
-If they ask about the company or services: one short sentence only, then remind what detail we still need ({pending}).
-Max 2 sentences, under 220 characters. Do NOT invent dates or callback times."""
+{NATURAL_STYLE}
+
+RIGHT NOW
+- If they gave the detail we asked for, acknowledge it naturally.
+- If they asked something else, answer that first — then gently ask for: {pending}
+- Do NOT invent dates, locations, or callback times they didn't say."""
 
 
 async def generate_showcase_reply(

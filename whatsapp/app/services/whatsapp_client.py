@@ -10,6 +10,14 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 WHATSAPP_API = "https://graph.facebook.com/v21.0"
+_http_client: httpx.AsyncClient | None = None
+
+
+def _client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=30)
+    return _http_client
 
 
 def normalize_phone(phone: str) -> str:
@@ -53,28 +61,27 @@ async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
         logger.info("[WhatsApp Mock] To: %s | %s", to, text[:120])
         return True, None
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
-            headers={
-                "Authorization": f"Bearer {settings.whatsapp_token}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": to,
-                "type": "text",
-                "text": {"preview_url": False, "body": text},
-            },
-            timeout=30,
-        )
-        if response.status_code >= 400:
-            logger.error("WhatsApp send failed (%s): %s", response.status_code, response.text)
-            detail = response.text[:240] if response.text else f"HTTP {response.status_code}"
-            return False, f"WhatsApp API error: {detail}"
-        logger.info("WhatsApp message sent to %s", to)
-        return True, None
+    client = _client()
+    response = await client.post(
+        f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
+        headers={
+            "Authorization": f"Bearer {settings.whatsapp_token}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "text",
+            "text": {"preview_url": False, "body": text},
+        },
+    )
+    if response.status_code >= 400:
+        logger.error("WhatsApp send failed (%s): %s", response.status_code, response.text)
+        detail = response.text[:240] if response.text else f"HTTP {response.status_code}"
+        return False, f"WhatsApp API error: {detail}"
+    logger.info("WhatsApp message sent to %s", to)
+    return True, None
 
 
 async def send_whatsapp_image(to: str, image_url: str, caption: str | None = None) -> bool:
@@ -97,18 +104,17 @@ async def send_whatsapp_image(to: str, image_url: str, caption: str | None = Non
     if caption:
         payload["image"]["caption"] = caption[:1024]
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
-            headers={
-                "Authorization": f"Bearer {settings.whatsapp_token}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-        if response.status_code >= 400:
-            logger.error("WhatsApp image failed (%s): %s", response.status_code, response.text)
-            return False
-        logger.info("WhatsApp image sent to %s", to)
-        return True
+    client = _client()
+    response = await client.post(
+        f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
+        headers={
+            "Authorization": f"Bearer {settings.whatsapp_token}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+    )
+    if response.status_code >= 400:
+        logger.error("WhatsApp image failed (%s): %s", response.status_code, response.text)
+        return False
+    logger.info("WhatsApp image sent to %s", to)
+    return True

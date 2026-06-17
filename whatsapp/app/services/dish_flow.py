@@ -28,21 +28,21 @@ def _parse_numbers(text: str) -> list[str]:
 
 def _format_session_prompt() -> str:
     lines = [
-        "Which meal services do you need? Pick numbers or names (e.g. *1,3* or *breakfast, dinner*):",
+        "Which meal services do you need? You can reply with numbers or names (e.g. *1,3* or *breakfast, dinner*):",
         "",
     ]
     for key, label in MEAL_SESSION_OPTIONS:
         lines.append(f"{key}. {label}")
-    lines.append("\nReply *skip* to discuss on the call.")
+    lines.append("\nOr say *skip* if you'd rather discuss this on the call.")
     return "\n".join(lines)
 
 
 def _format_confirmation(session: ConversationSession) -> str:
     f = session.fields
-    meals = ", ".join(d.dish_name for d in session.selected_dishes) if session.selected_dishes else "Team will suggest on call"
+    meals = ", ".join(d.dish_name for d in session.selected_dishes) if session.selected_dishes else "We'll suggest options on the call"
     return (
-        f"Thank you, {f.customer_name}! ✅ We'll call you at {f.preferred_callback}.\n"
-        f"Meals: {meals}. Send *new* for another enquiry."
+        f"All set, *{f.customer_name}*! ✅ Our team will call you around {f.preferred_callback}.\n"
+        f"Meals noted: {meals}. Send *new* anytime to plan another occasion."
     )
 
 
