@@ -31,6 +31,7 @@ from app.schemas import (
     OrderDishUpdate,
 )
 from app.quantity_units import normalize_quantity, normalize_quantity_unit
+from app.services.bill_recognition import recognize_bill
 
 router = APIRouter(prefix="/api", tags=["orders"])
 
