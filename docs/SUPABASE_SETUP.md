@@ -12,7 +12,8 @@ Project example: `https://hlzndlmcvpmsxzkawsbz.supabase.co`
 |------|-----------------------------|---------|
 | **Database** (`DATABASE_URL`) | Settings → **Database** → Connection string → **Session pooler** (for Render) | Render + `whatsapp/.env` |
 | **Sign-in** (`VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`) | Settings → **API** → Project URL + **anon / publishable** key | Vercel + `website/.env` |
-| **API token check** (`SUPABASE_JWT_SECRET`) | Settings → **API** → **JWT Settings** → JWT Secret | Render + `whatsapp/.env` |
+| **API token check** (`SUPABASE_URL` + `SUPABASE_ANON_KEY`) | Settings → **API** → Project URL + **publishable** key | Render |
+| **API token check (legacy)** (`SUPABASE_JWT_SECRET`) | Settings → **API** → **JWT Settings** → JWT Secret | Only if HS256 signing |
 
 **Do not** use API keys as `DATABASE_URL`.  
 **Do not** use the database password for sign-in.
