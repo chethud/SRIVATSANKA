@@ -59,10 +59,11 @@ Save → redeploy. Tables are created on first API start.
 Vercel → Project → **Settings** → **Environment Variables**:
 
 ```env
-VITE_API_URL=https://srivatsanka.onrender.com
 VITE_SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+- **VITE_API_URL** — leave **empty** on Vercel (built-in `/api` proxy to Render). Only set if you host the dashboard elsewhere.
 
 - **VITE_SUPABASE_ANON_KEY** — Settings → API → **anon public** or **publishable** key (safe in the browser)
 

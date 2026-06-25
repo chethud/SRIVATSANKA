@@ -102,8 +102,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const ok = await checkApiHealth();
       setConnected(ok);
       if (!ok) {
-        const base = getApiBaseUrl() || '(not set — using Vite proxy in dev)';
-        setError(`API offline at ${base}. Set VITE_API_URL on Vercel to your Render URL (e.g. https://srivatsanka.onrender.com) and redeploy.`);
+        const base = getApiBaseUrl();
+        setError(
+          `API offline (${base}/api/health). On Vercel delete VITE_API_URL to use the built-in /api proxy, or set it to https://srivatsanka.onrender.com, then redeploy.`,
+        );
         return;
       }
       const [s, e, d, n, v, w, a] = await Promise.all([
@@ -132,8 +134,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       if (msg.includes('sign in') || msg.includes('Session expired')) {
         setError('Session expired. Please sign in again.');
       } else if (msg === 'Failed to fetch') {
+        const base = getApiBaseUrl();
         setError(
-          'Cannot reach the API (network/CORS). Confirm VITE_API_URL=https://srivatsanka.onrender.com on Vercel and redeploy.',
+          `Cannot reach the API (${base}). On Vercel delete VITE_API_URL (uses /api proxy) or set it to https://srivatsanka.onrender.com, then redeploy.`,
         );
       } else {
         setError(msg || 'Failed to load data from API.');

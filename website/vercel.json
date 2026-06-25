@@ -1,3 +1,13 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://srivatsanka.onrender.com/api/:path*"
+    },
+    {
+      "source": "/dev/:path*",
+      "destination": "https://srivatsanka.onrender.com/dev/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

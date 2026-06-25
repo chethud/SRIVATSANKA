@@ -1,12 +1,18 @@
-/** Live Render API — used when Vercel env VITE_API_URL is not set */
+/** Fallback when not using Vercel /api proxy (set VITE_API_URL instead). */
 const DEFAULT_LIVE_API = 'https://srivatsanka.onrender.com';
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? DEFAULT_LIVE_API : '');
+function resolveApiBase(): string {
+  const fromEnv = (import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  // Vercel production: vercel.json proxies /api → Render (same-origin, no CORS).
+  if (import.meta.env.PROD) return '';
+  return '';
+}
+
+const API_BASE = resolveApiBase();
 
 export function getApiBaseUrl(): string {
-  return API_BASE;
+  return API_BASE || (typeof window !== 'undefined' ? window.location.origin : DEFAULT_LIVE_API);
 }
 
 const AUTH_STORAGE_KEY = 'kannans_auth_token';
