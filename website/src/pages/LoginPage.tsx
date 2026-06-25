@@ -2,10 +2,11 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
+import { LoadingScreen } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
-  const { login, token, loading: authLoading, usesSupabase } = useAuth();
+  const { login, isAuthenticated, loading: authLoading, usesSupabase } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
@@ -15,15 +16,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (authLoading && token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
-        <p className="text-sm text-[var(--muted)]">Checking session…</p>
-      </div>
-    );
+  if (authLoading) {
+    return <LoadingScreen text="Checking sign-in…" />;
   }
 
-  if (token) {
+  if (isAuthenticated) {
     return <Navigate to={from} replace />;
   }
 

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/Layout';
+import { GuestOnly } from './components/GuestOnly';
 import { RequireAuth } from './components/RequireAuth';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -19,7 +20,9 @@ import BotTesterPage from './pages/BotTesterPage';
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route element={<GuestOnly />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
       <Route element={<RequireAuth />}>
       <Route element={<DashboardLayout />}>
         <Route index element={<DashboardPage />} />
@@ -38,7 +41,7 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
