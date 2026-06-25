@@ -34,7 +34,8 @@ Enable **Email** provider under **Authentication** → **Providers** if it is of
 Render → **srivatsanka-api** → **Environment**:
 
 ```env
-DATABASE_URL=postgresql://postgres.hlzndlmcvpmsxzkawsbz:YOUR_DB_PASSWORD@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+PYTHON_VERSION=3.12.8
+DATABASE_URL=postgresql://postgres.hlzndlmcvpmsxzkawsbz:YOUR_DB_PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
 SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co
 SUPABASE_JWT_SECRET=paste-jwt-secret-from-supabase-api-settings
 GEMINI_API_KEY=your-gemini-key
@@ -43,9 +44,9 @@ OWNER_PHONE_NUMBER=917899410254
 SEED_DEMO_ON_STARTUP=true
 ```
 
-- **DATABASE_URL** — Settings → Database → URI → **Session pooler** (port **5432**).  
-  **Do not use Direct** (`db.xxx.supabase.co`) on Render — it often fails with `Network is unreachable`.
-- Copy the **exact** URI from Supabase (region in host may differ, e.g. `aws-0-ap-south-1`).
+- **PYTHON_VERSION** — set to `3.12.8` (Render defaults to 3.14; `runtime.txt` is ignored). Also add `whatsapp/.python-version` from the repo.
+- **DATABASE_URL** — Settings → Database → URI → **Session pooler** (port **5432**).
+- Copy the **exact** URI from Supabase (your project uses `aws-0-ap-southeast-1`).
 - If password has `@`, `#`, etc., URL-encode it (`@` → `%40`).
 
 Save → redeploy. Tables are created on first API start.
@@ -112,6 +113,7 @@ Sign in at http://localhost:5173 with the Supabase user email/password.
 | Database connection failed | Check `DATABASE_URL` uses **database password**, URL-encode special chars |
 | Render crash: `Name or service not known` | Wrong `DATABASE_URL` host, or `@` in password breaks the URI — encode `@` as `%40` |
 | Render crash: `Network is unreachable` | Switch from **Direct** to **Session pooler** URI in `DATABASE_URL` (Supabase → Database) |
+| Build uses Python 3.14 / pip hangs forever | Set `PYTHON_VERSION=3.12.8` in Render Environment and redeploy |
 | Still shows old Admin login | Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` on Vercel and redeploy |
 
 ---
