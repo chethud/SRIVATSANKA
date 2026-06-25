@@ -30,13 +30,36 @@ def validate_database_url(url: str) -> None:
     if is_sqlite_database(url):
         return
 
+    lower = url.lower()
+    if any(
+        marker in lower
+        for marker in (
+            "host-from-connect",
+            "paste-full",
+            "your_db_password",
+            "your-password",
+            "[your-password]",
+            "connect-button",
+        )
+    ):
+        raise ValueError(
+            "DATABASE_URL still contains placeholder text from the docs. On Render, set the real "
+            "Session pooler URI from Supabase → Connect (port 5432) and URL-encode @ in the password."
+        )
+
     parse_target = url
     for prefix in ("postgresql+asyncpg://", "postgresql://", "postgres://"):
         if parse_target.startswith(prefix):
             parse_target = "postgresql://" + parse_target[len(prefix) :]
             break
 
-    parsed = urlparse(parse_target)
+    try:
+        parsed = urlparse(parse_target)
+    except ValueError as exc:
+        raise ValueError(
+            f"DATABASE_URL is not a valid Postgres URI ({exc}). "
+            "Copy Session pooler URI from Supabase → Connect and URL-encode special characters in the password."
+        ) from exc
     host = (parsed.hostname or "").strip()
     user = (parsed.username or "").strip()
     if host and user and "pooler.supabase.com" in host:
