@@ -5,12 +5,12 @@ import { BrandLogo } from '../components/BrandLogo';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
-  const { login, token, loading: authLoading } = useAuth();
+  const { login, token, loading: authLoading, usesSupabase } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
 
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -32,7 +32,7 @@ export default function LoginPage() {
     setError('');
     setSubmitting(true);
     try {
-      await login(username.trim(), password);
+      await login(email.trim(), password);
       navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
@@ -54,23 +54,25 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-[var(--foreground)]">Sign in</h1>
-              <p className="text-sm text-[var(--muted)] mt-0.5">SRIVATSANKA catering dashboard</p>
+              <p className="text-sm text-[var(--muted)] mt-0.5">
+                {usesSupabase ? 'Sign in with your Supabase account' : 'SRIVATSANKA catering dashboard'}
+              </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-xs font-medium text-[var(--muted)] uppercase tracking-wide mb-1.5">
-                Username
+              <label htmlFor="email" className="block text-xs font-medium text-[var(--muted)] uppercase tracking-wide mb-1.5">
+                {usesSupabase ? 'Email' : 'Username'}
               </label>
               <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type={usesSupabase ? 'email' : 'text'}
+                autoComplete={usesSupabase ? 'email' : 'username'}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
-                placeholder="Admin"
+                placeholder={usesSupabase ? 'you@example.com' : 'Admin'}
                 required
               />
             </div>

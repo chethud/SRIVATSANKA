@@ -13,7 +13,11 @@ services:
       - key: PYTHON_VERSION
         value: "3.12.8"
       - key: DATABASE_URL
-        value: sqlite+aiosqlite:///./kannans.db
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
       - key: CORS_ORIGINS
         value: http://localhost:5173,https://srivatsanka.onrender.com
       - key: SEED_DEMO_ON_STARTUP

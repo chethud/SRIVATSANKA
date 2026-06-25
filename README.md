@@ -75,6 +75,7 @@ See `docs/META_WHATSAPP_SETUP.md`
 
 - **Dashboard:** [Vercel](https://vercel.com) — root folder `website`, env `VITE_API_URL`
 - **API:** [Render](https://render.com) — root folder `whatsapp`, use `render.yaml`
+- **Database:** [Supabase](https://supabase.com) (PostgreSQL) — see `docs/SUPABASE_SETUP.md`
 
 Full steps: **[docs/DEPLOY_VERCEL_RENDER.md](docs/DEPLOY_VERCEL_RENDER.md)**
 

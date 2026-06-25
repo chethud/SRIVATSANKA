@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from app.auth_tokens import create_access_token, decode_access_token
 from app.config import settings
 
+from app.supabase_auth import is_supabase_auth_configured
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
 
@@ -24,6 +26,7 @@ class LoginOut(BaseModel):
 
 class MeOut(BaseModel):
     username: str
+    auth_provider: str = "legacy"
 
 
 def _verify_login(username: str, password: str) -> bool:
@@ -36,6 +39,11 @@ def _verify_login(username: str, password: str) -> bool:
 
 @router.post("/login", response_model=LoginOut)
 async def login(payload: LoginIn) -> LoginOut:
+    if is_supabase_auth_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="Dashboard sign-in uses Supabase. Open the website and sign in with your email.",
+        )
     if not _verify_login(payload.username, payload.password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     name = payload.username.strip()
@@ -48,4 +56,5 @@ async def me(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)
     if not credentials or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Login required")
     username = decode_access_token(credentials.credentials)
-    return MeOut(username=username)
+    provider = "supabase" if is_supabase_auth_configured() else "legacy"
+    return MeOut(username=username, auth_provider=provider)

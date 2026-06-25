@@ -4,6 +4,7 @@ import jwt
 from fastapi import HTTPException
 
 from app.config import settings
+from app.supabase_auth import decode_supabase_access_token, is_supabase_auth_configured
 
 ALGORITHM = "HS256"
 
@@ -14,7 +15,7 @@ def create_access_token(username: str) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
 
 
-def decode_access_token(token: str) -> str:
+def _decode_legacy_access_token(token: str) -> str:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
     except jwt.PyJWTError as exc:
@@ -23,3 +24,10 @@ def decode_access_token(token: str) -> str:
     if not sub:
         raise HTTPException(status_code=401, detail="Invalid token")
     return str(sub)
+
+
+def decode_access_token(token: str) -> str:
+    """Accept Supabase Auth tokens (production) or legacy dashboard JWT (local dev)."""
+    if is_supabase_auth_configured():
+        return decode_supabase_access_token(token)
+    return _decode_legacy_access_token(token)

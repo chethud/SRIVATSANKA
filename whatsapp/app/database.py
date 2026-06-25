@@ -3,9 +3,25 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from app.config import settings
+from app.config import is_sqlite_database, settings
 
-engine = create_async_engine(settings.database_url, echo=False)
+
+def _engine_connect_args() -> dict:
+    if is_sqlite_database(settings.database_url):
+        return {}
+    args: dict = {"ssl": "require"}
+    # Supabase transaction pooler (port 6543) + asyncpg
+    if ":6543" in settings.database_url:
+        args["statement_cache_size"] = 0
+    return args
+
+
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    connect_args=_engine_connect_args(),
+    pool_pre_ping=not is_sqlite_database(settings.database_url),
+)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -179,7 +195,7 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    await _migrate_sqlite_columns()
+    await _migrate_sqlite_columns() if is_sqlite_database(settings.database_url) else None
 
     from app.data.seed_dishes import seed_dishes
 
