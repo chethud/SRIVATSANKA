@@ -10,7 +10,7 @@ Project example: `https://hlzndlmcvpmsxzkawsbz.supabase.co`
 
 | What | Where to get it in Supabase | Used on |
 |------|-----------------------------|---------|
-| **Database** (`DATABASE_URL`) | Settings → **Database** → Connection string → **Direct** | Render + `whatsapp/.env` |
+| **Database** (`DATABASE_URL`) | Settings → **Database** → Connection string → **Session pooler** (for Render) | Render + `whatsapp/.env` |
 | **Sign-in** (`VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`) | Settings → **API** → Project URL + **anon / publishable** key | Vercel + `website/.env` |
 | **API token check** (`SUPABASE_JWT_SECRET`) | Settings → **API** → **JWT Settings** → JWT Secret | Render + `whatsapp/.env` |
 
@@ -34,7 +34,7 @@ Enable **Email** provider under **Authentication** → **Providers** if it is of
 Render → **srivatsanka-api** → **Environment**:
 
 ```env
-DATABASE_URL=postgresql://postgres:YOUR_DB_PASSWORD@db.hlzndlmcvpmsxzkawsbz.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres.hlzndlmcvpmsxzkawsbz:YOUR_DB_PASSWORD@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
 SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co
 SUPABASE_JWT_SECRET=paste-jwt-secret-from-supabase-api-settings
 GEMINI_API_KEY=your-gemini-key
@@ -43,8 +43,10 @@ OWNER_PHONE_NUMBER=917899410254
 SEED_DEMO_ON_STARTUP=true
 ```
 
-- **DATABASE_URL** — Settings → Database → URI → **Direct connection**
-- **SUPABASE_JWT_SECRET** — Settings → API → JWT Settings → **JWT Secret** (long string, not anon key)
+- **DATABASE_URL** — Settings → Database → URI → **Session pooler** (port **5432**).  
+  **Do not use Direct** (`db.xxx.supabase.co`) on Render — it often fails with `Network is unreachable`.
+- Copy the **exact** URI from Supabase (region in host may differ, e.g. `aws-0-ap-south-1`).
+- If password has `@`, `#`, etc., URL-encode it (`@` → `%40`).
 
 Save → redeploy. Tables are created on first API start.
 
@@ -108,6 +110,8 @@ Sign in at http://localhost:5173 with the Supabase user email/password.
 | Invalid username/password on login | User must exist in Supabase **Authentication → Users** |
 | API returns 401 after login | `SUPABASE_JWT_SECRET` on Render must match Supabase JWT Secret |
 | Database connection failed | Check `DATABASE_URL` uses **database password**, URL-encode special chars |
+| Render crash: `Name or service not known` | Wrong `DATABASE_URL` host, or `@` in password breaks the URI — encode `@` as `%40` |
+| Render crash: `Network is unreachable` | Switch from **Direct** to **Session pooler** URI in `DATABASE_URL` (Supabase → Database) |
 | Still shows old Admin login | Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` on Vercel and redeploy |
 
 ---

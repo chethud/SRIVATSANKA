@@ -19,7 +19,7 @@ services:
       - key: SUPABASE_JWT_SECRET
         sync: false
       - key: CORS_ORIGINS
-        value: http://localhost:5173,https://srivatsanka.onrender.com
+        sync: false
       - key: SEED_DEMO_ON_STARTUP
         value: "true"
       - key: GEMINI_API_KEY

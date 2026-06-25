@@ -1,6 +1,10 @@
 from pathlib import Path
+from urllib.parse import urlparse
+import logging
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 # Always load whatsapp/.env regardless of process working directory
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
@@ -9,11 +13,50 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 def normalize_database_url(url: str) -> str:
     """Accept Supabase/Render URLs and convert to SQLAlchemy async PostgreSQL."""
     raw = url.strip().strip('"').strip("'")
+    if raw.lower().startswith(("http://", "https://")):
+        raise ValueError(
+            "DATABASE_URL must be the Postgres connection URI from Supabase → Database, "
+            "not the project URL (https://xxxx.supabase.co)."
+        )
     if raw.startswith("postgres://"):
         raw = "postgresql://" + raw[len("postgres://") :]
     if raw.startswith("postgresql://") and "+asyncpg" not in raw and "+psycopg" not in raw:
         raw = "postgresql+asyncpg://" + raw[len("postgresql://") :]
     return raw
+
+
+def validate_database_url(url: str) -> None:
+    """Fail fast with a helpful message when DATABASE_URL is malformed."""
+    if is_sqlite_database(url):
+        return
+
+    parse_target = url
+    for prefix in ("postgresql+asyncpg://", "postgresql://", "postgres://"):
+        if parse_target.startswith(prefix):
+            parse_target = "postgresql://" + parse_target[len(prefix) :]
+            break
+
+    parsed = urlparse(parse_target)
+    host = (parsed.hostname or "").strip()
+    if not host:
+        raise ValueError(
+            "DATABASE_URL could not be parsed — the database host is missing. "
+            "If your password contains @, #, /, or %, URL-encode it, or reset the Supabase DB password to letters and numbers only."
+        )
+
+    if host.startswith("db.") and host.endswith(".supabase.co"):
+        logger.warning(
+            "DATABASE_URL uses Supabase direct host (%s). On Render, use Session pooler "
+            "(aws-0-REGION.pooler.supabase.com:5432) or deploy may fail with 'Network is unreachable'.",
+            host,
+        )
+
+    if host.endswith(".supabase.co") and not host.startswith("db.") and "pooler" not in host:
+        raise ValueError(
+            f"DATABASE_URL host '{host}' is the Supabase API domain, not the database host. "
+            "Copy the URI from Supabase → Project Settings → Database → Connection string → Direct. "
+            "Host should look like: db.hlzndlmcvpmsxzkawsbz.supabase.co"
+        )
 
 
 def is_sqlite_database(url: str) -> bool:
@@ -60,6 +103,7 @@ class Settings(BaseSettings):
 def _load_settings() -> Settings:
     s = Settings()
     s.database_url = normalize_database_url(s.database_url)
+    validate_database_url(s.database_url)
     # Strip quotes if present in .env
     for attr in ("gemini_api_key", "jwt_secret", "dashboard_password", "supabase_jwt_secret"):
         val = getattr(s, attr, None)

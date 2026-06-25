@@ -17,7 +17,28 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    await init_db()
+    log = logging.getLogger(__name__)
+    try:
+        await init_db()
+    except OSError as exc:
+        if getattr(exc, "errno", None) == 101:
+            log.error(
+                "Database host unreachable (errno 101). On Render set DATABASE_URL to Supabase "
+                "Session pooler (pooler.supabase.com:5432), not Direct (db.xxx.supabase.co)."
+            )
+        raise
+    except Exception as exc:
+        err = str(exc).lower()
+        if "name or service not known" in err or "gaierror" in err:
+            log.error(
+                "Invalid DATABASE_URL host. Use Supabase Session pooler URI and URL-encode @ in password."
+            )
+        elif "password authentication failed" in err:
+            log.error("Supabase rejected DATABASE_URL password — check password and URL-encoding.")
+        else:
+            log.error("Database startup failed: %s", exc)
+        raise
+
     from sqlalchemy import func, select
 
     from app.data.seed_demo_data import seed_demo_data

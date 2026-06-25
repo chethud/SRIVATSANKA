@@ -94,8 +94,11 @@ Copy the final Vercel URL and add it to Render `CORS_ORIGINS`, then **Manual Dep
 ## 3. Quick checklist
 
 - [ ] Render service live: `https://YOUR-API.onrender.com/api/health` returns `{"status":"ok"}`
+- [ ] Render `DATABASE_URL` = Supabase **Session pooler** URI (see `docs/SUPABASE_SETUP.md`)
+- [ ] Render `SUPABASE_JWT_SECRET` set (Supabase → API → JWT Secret)
 - [ ] Vercel `VITE_API_URL` points to Render URL
-- [ ] Render `CORS_ORIGINS` includes Vercel URL
+- [ ] Vercel `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` set
+- [ ] Render `CORS_ORIGINS` includes your Vercel URL
 - [ ] `GEMINI_API_KEY` set on Render (for AI features)
 - [ ] Share Vercel link with client
 
