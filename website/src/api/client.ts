@@ -73,12 +73,8 @@ async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
   return h;
 }
 
-async function clearSessionAndRedirect(path: string): Promise<void> {
-  if (isSupabaseAuth && supabase) {
-    await supabase.auth.signOut();
-  } else {
-    setAuthToken(null);
-  }
+async function clearLegacySession(path: string): Promise<void> {
+  setAuthToken(null);
   if (path !== '/api/auth/me' && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
     window.location.assign('/login');
   }
@@ -306,12 +302,12 @@ async function fetchWithAuth(path: string, options?: RequestInit, retried = fals
     ...options,
     headers: await authHeaders(options?.headers),
   });
-  if (res.status === 401) {
-    if (!retried) {
-      const refreshed = await refreshBearerToken();
-      if (refreshed) return fetchWithAuth(path, options, true);
-    }
-    await clearSessionAndRedirect(path);
+  if (res.status === 401 && !retried) {
+    const refreshed = await refreshBearerToken();
+    if (refreshed) return fetchWithAuth(path, options, true);
+  }
+  if (res.status === 401 && !isSupabaseAuth) {
+    await clearLegacySession(path);
   }
   return res;
 }

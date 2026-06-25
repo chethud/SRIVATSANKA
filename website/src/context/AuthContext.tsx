@@ -14,9 +14,29 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function applySupabaseSession(
+  session: { access_token: string; user: { email?: string | null; id: string } } | null,
+  setToken: (t: string | null) => void,
+  setUsername: (u: string | null) => void,
+  setAuthenticated: (v: boolean) => void,
+) {
+  if (session?.access_token) {
+    setAuthToken(session.access_token);
+    setToken(session.access_token);
+    setUsername(session.user.email ?? session.user.id);
+    setAuthenticated(true);
+    return;
+  }
+  setAuthToken(null);
+  setToken(null);
+  setUsername(null);
+  setAuthenticated(false);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,28 +45,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function bootstrap() {
       if (isSupabaseAuth && supabase) {
         const { data } = await supabase.auth.getSession();
-        const session = data.session;
         if (cancelled) return;
-        if (session?.access_token) {
-          setAuthToken(session.access_token);
-          setToken(session.access_token);
-          setUsername(session.user.email ?? session.user.id);
-          try {
-            const me = await verifySession();
-            setUsername(me.username);
-          } catch {
-            // Keep Supabase session on network errors; fetchWithAuth signs out only after refresh fails.
-            const { data: retry } = await supabase.auth.getSession();
-            if (!retry.session) {
-              setAuthToken(null);
-              setToken(null);
-              setUsername(null);
-            }
-          }
+        if (data.session) {
+          applySupabaseSession(data.session, setToken, setUsername, setAuthenticated);
+          void verifySession()
+            .then((me) => {
+              if (!cancelled) setUsername(me.username);
+            })
+            .catch(() => {
+              /* Supabase session stays valid even if API is temporarily unreachable */
+            });
         } else {
-          setAuthToken(null);
-          setToken(null);
-          setUsername(null);
+          applySupabaseSession(null, setToken, setUsername, setAuthenticated);
         }
         setLoading(false);
         return;
@@ -58,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       setToken(t);
+      setAuthenticated(true);
       verifySession()
         .then((me) => {
           if (!cancelled) setUsername(me.username);
@@ -67,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAuthToken(null);
             setToken(null);
             setUsername(null);
+            setAuthenticated(false);
           }
         })
         .finally(() => {
@@ -77,15 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     bootstrap();
 
     if (isSupabaseAuth && supabase) {
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.access_token) {
-          setAuthToken(session.access_token);
-          setToken(session.access_token);
-          setUsername(session.user.email ?? session.user.id);
-        } else {
-          setAuthToken(null);
-          setToken(null);
-          setUsername(null);
+          applySupabaseSession(session, setToken, setUsername, setAuthenticated);
+          return;
+        }
+        if (event === 'SIGNED_OUT') {
+          applySupabaseSession(null, setToken, setUsername, setAuthenticated);
         }
       });
       return () => {
@@ -106,22 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
       if (error) throw new Error(error.message);
-      const accessToken = data.session?.access_token;
-      if (!accessToken) throw new Error('Sign in failed — no session returned');
-      setAuthToken(accessToken);
-      setToken(accessToken);
-      setUsername(data.user?.email ?? data.user?.id ?? emailOrUsername.trim());
-      try {
-        const me = await verifySession();
-        setUsername(me.username);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '';
-        throw new Error(
-          msg.includes('Session expired')
-            ? 'Signed in to Supabase but the API rejected the token. On Render set SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co and redeploy.'
-            : msg || 'Could not reach the API after sign-in.',
-        );
-      }
+      const session = data.session;
+      if (!session?.access_token) throw new Error('Sign in failed — no session returned');
+      applySupabaseSession(session, setToken, setUsername, setAuthenticated);
+      void verifySession()
+        .then((me) => setUsername(me.username))
+        .catch(() => {
+          /* Dashboard loads; API errors show in the data banner */
+        });
       return;
     }
 
@@ -129,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(res.access_token);
     setToken(res.access_token);
     setUsername(res.username);
+    setAuthenticated(true);
   }, []);
 
   const logout = useCallback(async () => {
@@ -138,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(null);
     setToken(null);
     setUsername(null);
+    setAuthenticated(false);
   }, []);
 
   const value = useMemo(
@@ -147,10 +151,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       logout,
-      isAuthenticated: Boolean(token),
+      isAuthenticated: isSupabaseAuth ? authenticated : Boolean(token),
       usesSupabase: isSupabaseAuth,
     }),
-    [token, username, loading, login, logout],
+    [token, username, loading, login, logout, authenticated],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

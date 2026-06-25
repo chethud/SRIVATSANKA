@@ -113,6 +113,7 @@ class Settings(BaseSettings):
 
     # Supabase — PostgreSQL data + dashboard auth (JWT from Supabase Auth)
     supabase_url: str = ""
+    supabase_anon_key: str = ""  # publishable/anon key — fallback token verification via Auth API
     supabase_jwt_secret: str = ""
 
     # Demo dashboard data (Settings → Load demo data, or POST /dev/seed)
@@ -131,7 +132,7 @@ def _load_settings() -> Settings:
     s.database_url = normalize_database_url(s.database_url)
     validate_database_url(s.database_url)
     # Strip quotes if present in .env
-    for attr in ("gemini_api_key", "jwt_secret", "dashboard_password", "supabase_jwt_secret"):
+    for attr in ("gemini_api_key", "jwt_secret", "dashboard_password", "supabase_jwt_secret", "supabase_anon_key"):
         val = getattr(s, attr, None)
         if val and isinstance(val, str):
             setattr(s, attr, val.strip().strip('"').strip("'"))

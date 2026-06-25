@@ -2,6 +2,7 @@
 
 import logging
 
+import httpx
 import jwt
 from fastapi import HTTPException
 from jwt import PyJWKClient
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 ALGORITHM = "HS256"
 AUDIENCE = "authenticated"
+JWT_ALGORITHMS = ("ES256", "HS256", "RS256")
 _JWK_CLIENT: PyJWKClient | None = None
 
 
@@ -39,6 +41,8 @@ def _get_jwk_client() -> PyJWKClient | None:
 def is_supabase_auth_configured() -> bool:
     if _jwks_url():
         return True
+    if len((settings.supabase_anon_key or "").strip()) >= 10:
+        return True
     return len((settings.supabase_jwt_secret or "").strip()) >= 16
 
 
@@ -58,7 +62,7 @@ def _decode_with_jwks(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Supabase auth not configured")
     try:
         signing_key = client.get_signing_key_from_jwt(token)
-        algorithms = [signing_key.algorithm_name] if signing_key.algorithm_name else ["ES256", "HS256", "RS256"]
+        algorithms = [signing_key.algorithm_name] if signing_key.algorithm_name else list(JWT_ALGORITHMS)
         return jwt.decode(
             token,
             signing_key.key,
@@ -68,7 +72,7 @@ def _decode_with_jwks(token: str) -> dict:
         )
     except jwt.InvalidAudienceError:
         signing_key = client.get_signing_key_from_jwt(token)
-        algorithms = [signing_key.algorithm_name] if signing_key.algorithm_name else ["ES256", "HS256", "RS256"]
+        algorithms = [signing_key.algorithm_name] if signing_key.algorithm_name else list(JWT_ALGORITHMS)
         return jwt.decode(
             token,
             signing_key.key,
@@ -81,6 +85,33 @@ def _decode_with_jwks(token: str) -> dict:
     except Exception as exc:
         logger.warning("Supabase JWKS verification failed: %s", exc)
         raise HTTPException(status_code=401, detail="Invalid or expired session") from exc
+
+
+def _verify_via_supabase_user_api(token: str) -> str:
+    """Fallback: ask Supabase Auth if the access token is valid (works with ES256 signing keys)."""
+    base = _supabase_base_url()
+    apikey = (settings.supabase_anon_key or "").strip()
+    if not base or not apikey:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    try:
+        response = httpx.get(
+            f"{base}/auth/v1/user",
+            headers={"Authorization": f"Bearer {token}", "apikey": apikey},
+            timeout=15.0,
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("Supabase user API check failed: %s", exc)
+        raise HTTPException(status_code=401, detail="Invalid or expired session") from exc
+    if response.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    user = response.json()
+    email = user.get("email")
+    if email:
+        return str(email)
+    user_id = user.get("id")
+    if user_id:
+        return str(user_id)
+    raise HTTPException(status_code=401, detail="Invalid token")
 
 
 def _decode_with_shared_secret(token: str) -> dict:
@@ -118,5 +149,12 @@ def warmup_jwks() -> None:
 def decode_supabase_access_token(token: str) -> str:
     """Return the signed-in user's email (or user id) from a Supabase access token."""
     if _jwks_url():
-        return _identity_from_payload(_decode_with_jwks(token))
+        try:
+            return _identity_from_payload(_decode_with_jwks(token))
+        except HTTPException:
+            if (settings.supabase_anon_key or "").strip():
+                return _verify_via_supabase_user_api(token)
+            raise
+    if (settings.supabase_anon_key or "").strip():
+        return _verify_via_supabase_user_api(token)
     return _identity_from_payload(_decode_with_shared_secret(token))

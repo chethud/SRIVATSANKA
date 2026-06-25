@@ -37,6 +37,7 @@ Render → **srivatsanka-api** → **Environment**:
 PYTHON_VERSION=3.12.8
 DATABASE_URL=postgresql://postgres.hlzndlmcvpmsxzkawsbz:YOUR_PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
 SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_your-key-here
 SUPABASE_JWT_SECRET=
 GEMINI_API_KEY=your-gemini-key
 CORS_ORIGINS=https://YOUR-VERCEL-APP.vercel.app,http://localhost:5173
@@ -44,8 +45,9 @@ OWNER_PHONE_NUMBER=917899410254
 SEED_DEMO_ON_STARTUP=true
 ```
 
-- **SUPABASE_URL** — required for API auth (verifies Supabase ES256 JWTs via JWKS).
-- **SUPABASE_JWT_SECRET** — optional for asymmetric signing keys; only needed for legacy HS256 projects.
+- **SUPABASE_URL** — required for API auth (JWKS + Auth API verification).
+- **SUPABASE_ANON_KEY** — publishable/anon key from Supabase → API (set on Render).
+- **SUPABASE_JWT_SECRET** — optional; only for legacy HS256 projects.
 
 - **PYTHON_VERSION** — set to `3.12.8` (Render defaults to 3.14; `runtime.txt` is ignored).
 - **DATABASE_URL** — Supabase → **Connect** → **Session pooler** (port **5432**). Replace `YOUR_PASSWORD`; encode `@` as `%40`. If deploy fails with `tenant/user not found`, try `aws-1-ap-southeast-1` instead of `aws-0` in the host (or copy the exact host from Connect).
@@ -111,7 +113,7 @@ Sign in at http://localhost:5173 with the Supabase user email/password.
 | Problem | Fix |
 |---------|-----|
 | Invalid username/password on login | User must exist in Supabase **Authentication → Users** |
-| API returns 401 after login | Set `SUPABASE_URL` on Render; JWTs are verified via JWKS (ES256). Legacy projects also need `SUPABASE_JWT_SECRET`. |
+| API returns 401 after login | Set `SUPABASE_URL` + `SUPABASE_ANON_KEY` on Render and redeploy |
 | Database connection failed | Check `DATABASE_URL` uses **database password**, URL-encode special chars |
 | Render crash: `Name or service not known` | Wrong `DATABASE_URL` host, or `@` in password breaks the URI — encode `@` as `%40` |
 | Render crash: `Network is unreachable` | Switch from **Direct** to **Session pooler** URI in `DATABASE_URL` (Supabase → Connect) |

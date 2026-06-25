@@ -132,7 +132,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setConnected(false);
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('sign in') || msg.includes('Session expired')) {
-        setError('Session expired. Please sign in again.');
+        setError(
+          'API rejected your sign-in token. On Render set SUPABASE_URL and SUPABASE_ANON_KEY (publishable key), then redeploy.',
+        );
       } else if (msg.includes('rejected the token')) {
         setError(msg);
       } else if (msg === 'Failed to fetch') {
