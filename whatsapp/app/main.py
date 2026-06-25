@@ -49,6 +49,8 @@ app = FastAPI(
 )
 
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+# Auth runs inside CORS so 401 responses still get CORS headers (browser otherwise shows "Failed to fetch").
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -57,7 +59,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(AuthMiddleware)
 
 app.include_router(auth.router)
 app.include_router(webhook.router)
