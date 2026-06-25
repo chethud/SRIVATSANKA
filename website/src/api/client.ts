@@ -5,6 +5,10 @@ const API_BASE =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? DEFAULT_LIVE_API : '');
 
+export function getApiBaseUrl(): string {
+  return API_BASE;
+}
+
 const AUTH_STORAGE_KEY = 'kannans_auth_token';
 
 export function getAuthToken(): string | null {

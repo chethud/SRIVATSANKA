@@ -8,6 +8,7 @@ import {
   fetchWorkers,
   fetchAnalytics,
   checkApiHealth,
+  getApiBaseUrl,
   markEnquiryViewed as markEnquiryViewedApi,
   type DashboardStats,
   type Enquiry,
@@ -101,7 +102,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const ok = await checkApiHealth();
       setConnected(ok);
       if (!ok) {
-        setError('API offline. Check VITE_API_URL on Vercel or wait for Render to wake up.');
+        const base = getApiBaseUrl() || '(not set — using Vite proxy in dev)';
+        setError(`API offline at ${base}. Set VITE_API_URL on Vercel to your Render URL (e.g. https://srivatsanka.onrender.com) and redeploy.`);
         return;
       }
       const [s, e, d, n, v, w, a] = await Promise.all([

@@ -5,7 +5,7 @@ Temporary hosting to share with your client.
 | Part | Platform | URL example |
 |------|----------|-------------|
 | React dashboard | [Vercel](https://vercel.com) | `https://your-app.vercel.app` |
-| FastAPI backend | [Render](https://render.com) | `https://srivatsanka-api.onrender.com` |
+| FastAPI backend | [Render](https://render.com) | `https://srivatsanka.onrender.com` |
 
 ---
 
@@ -16,11 +16,11 @@ Temporary hosting to share with your client.
 1. Push this repo to GitHub (already at `chethud/SRIVATSANKA`).
 2. Go to [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
 3. Connect the **SRIVATSANKA** repository.
-4. Render reads `render.yaml` and creates **srivatsanka-api**.
+4. Render reads `render.yaml` and creates the **srivatsanka** web service (URL may be `https://srivatsanka.onrender.com`).
 5. Set **secret** environment variables in the service:
    - `GEMINI_API_KEY` – required for AI + bill OCR
    - `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` – optional for live WhatsApp
-6. After deploy, copy the service URL, e.g. `https://srivatsanka-api.onrender.com`.
+6. After deploy, copy the service URL from Render, e.g. `https://srivatsanka.onrender.com`.
 
 ### Option B – Manual Web Service
 
@@ -79,7 +79,7 @@ Demo rows are tagged `[demo]` and are replaced when you seed again.
 
 | Name | Value |
 |------|--------|
-| `VITE_API_URL` | `https://srivatsanka-api.onrender.com` (your Render URL, **no** trailing slash) |
+| `VITE_API_URL` | `https://srivatsanka.onrender.com` (your Render URL from the dashboard, **no** trailing slash) |
 
 7. Click **Deploy**.
 
