@@ -1,4 +1,5 @@
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -36,7 +37,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=401, content={"detail": "Login required"})
         try:
             request.state.user = decode_access_token(token)
-        except HTTPException as exc:
+        except StarletteHTTPException as exc:
             return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        except Exception:
+            return JSONResponse(status_code=401, content={"detail": "Invalid or expired session"})
 
         return await call_next(request)

@@ -133,7 +133,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         setError('Session expired. Please sign in again.');
       } else if (msg === 'Failed to fetch') {
         setError(
-          'Cannot reach the API. On Render set DATABASE_URL, SUPABASE_JWT_SECRET, and CORS_ORIGINS (your Vercel URL). Then redeploy both services.',
+          'Cannot reach the API (network/CORS). Confirm VITE_API_URL=https://srivatsanka.onrender.com on Vercel and redeploy.',
         );
       } else {
         setError(msg || 'Failed to load data from API.');
