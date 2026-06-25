@@ -1,3 +1,5 @@
+import { isSupabaseAuth, supabase } from '../lib/supabase';
+
 /** Fallback when not using Vercel /api proxy (set VITE_API_URL instead). */
 const DEFAULT_LIVE_API = 'https://srivatsanka.onrender.com';
 
@@ -34,8 +36,29 @@ export function setAuthToken(token: string | null): void {
   }
 }
 
-function authHeaders(extra?: HeadersInit): HeadersInit {
-  const token = getAuthToken();
+async function getBearerToken(): Promise<string | null> {
+  if (isSupabaseAuth && supabase) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token ?? null;
+    if (token) setAuthToken(token);
+    return token;
+  }
+  return getAuthToken();
+}
+
+async function refreshBearerToken(): Promise<string | null> {
+  if (isSupabaseAuth && supabase) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session?.access_token) return null;
+    const token = data.session.access_token;
+    setAuthToken(token);
+    return token;
+  }
+  return getAuthToken();
+}
+
+async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
+  const token = await getBearerToken();
   const h: Record<string, string> = {};
   if (token) h.Authorization = `Bearer ${token}`;
   if (extra instanceof Headers) {
@@ -48,6 +71,17 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
     Object.assign(h, extra as Record<string, string>);
   }
   return h;
+}
+
+async function clearSessionAndRedirect(path: string): Promise<void> {
+  if (isSupabaseAuth && supabase) {
+    await supabase.auth.signOut();
+  } else {
+    setAuthToken(null);
+  }
+  if (path !== '/api/auth/me' && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    window.location.assign('/login');
+  }
 }
 
 export interface LoginResponse {
@@ -257,17 +291,8 @@ async function apiErrorMessage(res: Response, path: string): Promise<string> {
   return `Request failed (${res.status}) at ${path}`;
 }
 
-function redirectToLoginIfNeeded(path: string): void {
-  if (path === '/api/auth/me') return;
-  setAuthToken(null);
-  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-    window.location.assign('/login');
-  }
-}
-
 async function parseApiResponse<T>(res: Response, path: string): Promise<T> {
   if (res.status === 401) {
-    redirectToLoginIfNeeded(path);
     throw new Error(
       path === '/api/auth/me' ? 'Session expired' : 'Session expired. Please sign in again.',
     );
@@ -276,11 +301,23 @@ async function parseApiResponse<T>(res: Response, path: string): Promise<T> {
   return res.json();
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function fetchWithAuth(path: string, options?: RequestInit, retried = false): Promise<Response> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: authHeaders(options?.headers),
+    headers: await authHeaders(options?.headers),
   });
+  if (res.status === 401) {
+    if (!retried) {
+      const refreshed = await refreshBearerToken();
+      if (refreshed) return fetchWithAuth(path, options, true);
+    }
+    await clearSessionAndRedirect(path);
+  }
+  return res;
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetchWithAuth(path, options);
   return parseApiResponse<T>(res, path);
 }
 
@@ -402,10 +439,9 @@ export interface InvoiceUploadResult extends InvoiceUpload {
 export async function recognizeExpenseInvoice(file: File): Promise<InvoiceRecognizePreview> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`${API_BASE}/api/invoices/recognize`, {
+  const res = await fetchWithAuth('/api/invoices/recognize', {
     method: 'POST',
     body: fd,
-    headers: authHeaders(),
   });
   return parseApiResponse<InvoiceRecognizePreview>(res, '/api/invoices/recognize');
 }

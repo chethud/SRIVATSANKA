@@ -35,10 +35,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const me = await verifySession();
             setUsername(me.username);
           } catch {
-            setAuthToken(null);
-            setToken(null);
-            setUsername(null);
-            await supabase.auth.signOut();
+            // Keep Supabase session on network errors; fetchWithAuth signs out only after refresh fails.
+            const { data: retry } = await supabase.auth.getSession();
+            if (!retry.session) {
+              setAuthToken(null);
+              setToken(null);
+              setUsername(null);
+            }
           }
         } else {
           setAuthToken(null);
@@ -108,6 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(accessToken);
       setToken(accessToken);
       setUsername(data.user?.email ?? data.user?.id ?? emailOrUsername.trim());
+      try {
+        const me = await verifySession();
+        setUsername(me.username);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '';
+        throw new Error(
+          msg.includes('Session expired')
+            ? 'Signed in to Supabase but the API rejected the token. On Render set SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co and redeploy.'
+            : msg || 'Could not reach the API after sign-in.',
+        );
+      }
       return;
     }
 

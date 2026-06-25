@@ -45,6 +45,11 @@ async def lifespan(_app: FastAPI):
             log.error("Database startup failed: %s", exc)
         raise
 
+    from app.supabase_auth import is_supabase_auth_configured, warmup_jwks
+
+    if is_supabase_auth_configured():
+        warmup_jwks()
+
     from sqlalchemy import func, select
 
     from app.data.seed_demo_data import seed_demo_data
@@ -57,7 +62,6 @@ async def lifespan(_app: FastAPI):
             result = await seed_demo_data(session, force=settings.seed_demo_on_startup or count == 0)
             logging.getLogger(__name__).info("Demo data seeded on startup: %s", result)
     start_scheduler()
-    log = logging.getLogger(__name__)
     if is_gemini_configured():
         log.info("Gemini AI enabled for WhatsApp conversations (model=%s)", settings.gemini_model)
     else:

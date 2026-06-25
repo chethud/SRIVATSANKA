@@ -64,6 +64,7 @@ def _decode_with_jwks(token: str) -> dict:
             signing_key.key,
             algorithms=algorithms,
             audience=AUDIENCE,
+            leeway=30,
         )
     except jwt.InvalidAudienceError:
         signing_key = client.get_signing_key_from_jwt(token)
@@ -73,6 +74,7 @@ def _decode_with_jwks(token: str) -> dict:
             signing_key.key,
             algorithms=algorithms,
             options={"verify_aud": False},
+            leeway=30,
         )
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired session") from exc
@@ -99,6 +101,18 @@ def _decode_with_shared_secret(token: str) -> dict:
         )
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired session") from exc
+
+
+def warmup_jwks() -> None:
+    """Load Supabase public keys at startup so the first API request does not fail auth."""
+    client = _get_jwk_client()
+    if client is None:
+        return
+    try:
+        client.fetch_data()
+        logger.info("Supabase JWKS loaded from %s", _jwks_url())
+    except Exception as exc:
+        logger.warning("Supabase JWKS warmup failed: %s", exc)
 
 
 def decode_supabase_access_token(token: str) -> str:

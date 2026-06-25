@@ -133,6 +133,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('sign in') || msg.includes('Session expired')) {
         setError('Session expired. Please sign in again.');
+      } else if (msg.includes('rejected the token')) {
+        setError(msg);
       } else if (msg === 'Failed to fetch') {
         const base = getApiBaseUrl();
         setError(
