@@ -10,9 +10,11 @@ def _engine_connect_args() -> dict:
     if is_sqlite_database(settings.database_url):
         return {}
     args: dict = {"ssl": "require"}
-    # Supabase transaction pooler (port 6543) + asyncpg
-    if ":6543" in settings.database_url:
+    url = settings.database_url
+    # Supabase Supavisor (session or transaction pooler) + asyncpg
+    if ":6543" in url or "pooler.supabase.com" in url:
         args["statement_cache_size"] = 0
+        args["prepared_statement_cache_size"] = 0
     return args
 
 

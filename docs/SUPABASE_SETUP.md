@@ -35,7 +35,7 @@ Render → **srivatsanka-api** → **Environment**:
 
 ```env
 PYTHON_VERSION=3.12.8
-DATABASE_URL=postgresql://postgres.hlzndlmcvpmsxzkawsbz:YOUR_DB_PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
+DATABASE_URL=paste-full-session-pooler-uri-from-supabase-connect-button
 SUPABASE_URL=https://hlzndlmcvpmsxzkawsbz.supabase.co
 SUPABASE_JWT_SECRET=paste-jwt-secret-from-supabase-api-settings
 GEMINI_API_KEY=your-gemini-key
@@ -44,10 +44,10 @@ OWNER_PHONE_NUMBER=917899410254
 SEED_DEMO_ON_STARTUP=true
 ```
 
-- **PYTHON_VERSION** — set to `3.12.8` (Render defaults to 3.14; `runtime.txt` is ignored). Also add `whatsapp/.python-version` from the repo.
-- **DATABASE_URL** — Settings → Database → URI → **Session pooler** (port **5432**).
-- Copy the **exact** URI from Supabase (your project uses `aws-0-ap-southeast-1`).
-- If password has `@`, `#`, etc., URL-encode it (`@` → `%40`).
+- **PYTHON_VERSION** — set to `3.12.8` (Render defaults to 3.14; `runtime.txt` is ignored).
+- **DATABASE_URL** — Supabase dashboard → **Connect** → **Session pooler** (port **5432**). Copy the **entire** URI; do not type the hostname by hand (`aws-0` vs `aws-1` and region must match your project).
+- Username must be `postgres.hlzndlmcvpmsxzkawsbz` (from the copied URI).
+- If password has `@`, `#`, etc., URL-encode it (`@` → `%40`). Example: `Che123@nd12` → `Che123%40nd12`.
 
 Save → redeploy. Tables are created on first API start.
 
@@ -112,7 +112,8 @@ Sign in at http://localhost:5173 with the Supabase user email/password.
 | API returns 401 after login | `SUPABASE_JWT_SECRET` on Render must match Supabase JWT Secret |
 | Database connection failed | Check `DATABASE_URL` uses **database password**, URL-encode special chars |
 | Render crash: `Name or service not known` | Wrong `DATABASE_URL` host, or `@` in password breaks the URI — encode `@` as `%40` |
-| Render crash: `Network is unreachable` | Switch from **Direct** to **Session pooler** URI in `DATABASE_URL` (Supabase → Database) |
+| Render crash: `Network is unreachable` | Switch from **Direct** to **Session pooler** URI in `DATABASE_URL` (Supabase → Connect) |
+| `tenant/user postgres.xxx not found` | Wrong pooler hostname — paste Session pooler URI from **Connect** (not a guessed `aws-0-ap-southeast-1`) |
 | Build uses Python 3.14 / pip hangs forever | Set `PYTHON_VERSION=3.12.8` in Render Environment and redeploy |
 | Still shows old Admin login | Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` on Vercel and redeploy |
 

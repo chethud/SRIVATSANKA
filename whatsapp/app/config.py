@@ -38,6 +38,9 @@ def validate_database_url(url: str) -> None:
 
     parsed = urlparse(parse_target)
     host = (parsed.hostname or "").strip()
+    user = (parsed.username or "").strip()
+    if host and user and "pooler.supabase.com" in host:
+        logger.info("DATABASE_URL pooler host=%s user=%s", host, user)
     if not host:
         raise ValueError(
             "DATABASE_URL could not be parsed — the database host is missing. "

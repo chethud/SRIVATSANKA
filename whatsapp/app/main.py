@@ -29,7 +29,13 @@ async def lifespan(_app: FastAPI):
         raise
     except Exception as exc:
         err = str(exc).lower()
-        if "name or service not known" in err or "gaierror" in err:
+        if "tenant/user" in err or "tenant or user not found" in err:
+            log.error(
+                "Supabase pooler host/region does not match your project (tenant/user not found). "
+                "Open Supabase → Connect → Session pooler and paste the full URI — do not guess "
+                "aws-0 vs aws-1 or the region in the hostname."
+            )
+        elif "name or service not known" in err or "gaierror" in err:
             log.error(
                 "Invalid DATABASE_URL host. Use Supabase Session pooler URI and URL-encode @ in password."
             )
