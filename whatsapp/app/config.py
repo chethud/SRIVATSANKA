@@ -132,10 +132,23 @@ def _load_settings() -> Settings:
     s.database_url = normalize_database_url(s.database_url)
     validate_database_url(s.database_url)
     # Strip quotes if present in .env
-    for attr in ("gemini_api_key", "jwt_secret", "dashboard_password", "supabase_jwt_secret", "supabase_anon_key"):
+    strip_attrs = (
+        "gemini_api_key",
+        "jwt_secret",
+        "dashboard_password",
+        "supabase_jwt_secret",
+        "supabase_anon_key",
+        "whatsapp_token",
+        "whatsapp_phone_number_id",
+        "whatsapp_verify_token",
+        "meta_app_secret",
+    )
+    for attr in strip_attrs:
         val = getattr(s, attr, None)
         if val and isinstance(val, str):
             setattr(s, attr, val.strip().strip('"').strip("'"))
+    if not s.whatsapp_verify_token.strip():
+        s.whatsapp_verify_token = "kannans-verify-token"
     return s
 
 

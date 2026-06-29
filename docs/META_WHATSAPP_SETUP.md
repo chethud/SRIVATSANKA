@@ -82,8 +82,11 @@ https://abc123.ngrok-free.app/webhook
 
 If verification fails, check:
 - FastAPI is running  
-- `WHATSAPP_VERIFY_TOKEN` in `.env` matches Meta exactly  
+- `WHATSAPP_VERIFY_TOKEN` on Render is **not empty** (must be `kannans-verify-token` or your chosen string)  
+- Token in Meta matches Render **exactly** (no quotes, no spaces)  
 - ngrok URL is correct and uses **HTTPS**
+
+**Important:** Configure under **WhatsApp → Configuration** (or API Setup → Webhook), not the generic **Webhooks** product for Facebook Pages.
 
 ---
 

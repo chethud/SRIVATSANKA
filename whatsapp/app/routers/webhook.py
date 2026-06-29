@@ -18,11 +18,21 @@ router = APIRouter(tags=["webhook"])
 @router.get("/webhook")
 async def verify_webhook(request: Request) -> Response:
     mode = request.query_params.get("hub.mode")
-    token = request.query_params.get("hub.verify_token")
+    token = (request.query_params.get("hub.verify_token") or "").strip()
     challenge = request.query_params.get("hub.challenge")
+    expected = settings.whatsapp_verify_token.strip()
 
-    if mode == "subscribe" and token == settings.whatsapp_verify_token:
-        return Response(content=challenge or "", media_type="text/plain")
+    if mode == "subscribe" and token and token == expected:
+        logger.info("Meta webhook verified")
+        return Response(content=challenge or "", media_type="text/plain", status_code=200)
+
+    logger.warning(
+        "Meta webhook verify failed (mode=%s, token_match=%s, expected_len=%d, got_len=%d)",
+        mode,
+        token == expected,
+        len(expected),
+        len(token),
+    )
     return Response(status_code=403)
 
 
