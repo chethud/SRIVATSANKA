@@ -9,6 +9,7 @@ import {
   dishesForColumn,
   formatPaxTimeLine,
   resolveMenuColumns,
+  sortMenuColumns,
 } from './orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from './mealSessions';
 
@@ -47,7 +48,6 @@ const alignLeftMiddle = {
   wrapText: true,
 };
 
-/** Approximate Excel row height so wrapped text is not clipped. */
 function wrappedRowHeight(text: string, charsPerLine: number, linePx = 15, min = 22): number {
   const lines = String(text || '')
     .split(/\n/)
@@ -61,7 +61,6 @@ function formatMenuDate(iso: string): Date | string {
   return d;
 }
 
-/** Keep only short kitchen-useful notes; skip bot CRM callback/date chatter. */
 function kitchenBannerNotes(regionalStyle: string | null | undefined, dietary: string[]): string[] {
   const notes: string[] = [];
   if (regionalStyle?.trim()) notes.push(`Style: ${regionalStyle.trim()}`);
@@ -87,16 +86,94 @@ function clientTitle(enquiry: Enquiry): string {
   return `Client : ${enquiry.customerName}${event}${datePart}`;
 }
 
-type SheetCol = {
-  column: MenuColumn | null;
+type SessionBlock = {
+  label: string;
+  paxLine: string;
+  amount: number | null;
   dishNames: string[];
-  extraTitle?: string;
-  extraQty?: string;
-  extraAmount?: number | null;
+  fillSession: string;
+};
+
+type DayColumn = {
+  date: string;
+  sessions: SessionBlock[];
 };
 
 /**
- * Append a Menu sheet matching Nithin / Muralidharan wedding-menu Excels.
+ * One Excel column per service day. Breakfast, coffee, lunch, dinner for that
+ * day stack top-to-bottom in the same column (Nithin / Muralidharan style).
+ */
+function buildDayColumns(
+  enquiry: Enquiry,
+  copyType: 'kitchen' | 'billing',
+): DayColumn[] {
+  const extras = parseOrderNotes(enquiry.notes);
+  const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
+  const columns = sortMenuColumns(resolveMenuColumns(extras, enquiry, menuItems));
+
+  const byDate = new Map<string, SessionBlock[]>();
+
+  for (const column of columns) {
+    const date = (column.date || enquiry.eventDate || '').slice(0, 10);
+    if (!date) continue;
+    const list = byDate.get(date) ?? [];
+    list.push({
+      label: column.sessionLabel,
+      paxLine: formatPaxTimeLine(column) || (column.pax ? `${column.pax} Pax` : ''),
+      amount: typeof column.amount === 'number' ? column.amount : null,
+      dishNames: dishesForColumn(column, menuItems, extras).map((d) =>
+        copyType === 'kitchen' && d.served ? `${d.dishName} ✓` : d.dishName,
+      ),
+      fillSession: FILL.session,
+    });
+    byDate.set(date, list);
+  }
+
+  const dayColumns: DayColumn[] = [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, sessions]) => ({ date, sessions }));
+
+  if (extras.extrasEnabled) {
+    const extraSessions: SessionBlock[] = activeOrderExtraItems(extras.extraItems).map((item) => ({
+      label: item.title,
+      paxLine: item.quantity?.trim() || '',
+      amount: typeof item.amount === 'number' ? item.amount : null,
+      dishNames: item.description ? [item.description] : [],
+      fillSession: FILL.extra,
+    }));
+    if (extraSessions.length > 0) {
+      if (dayColumns.length > 0) {
+        dayColumns[dayColumns.length - 1].sessions.push(...extraSessions);
+      } else {
+        dayColumns.push({
+          date: (enquiry.eventDate || new Date().toISOString()).slice(0, 10),
+          sessions: extraSessions,
+        });
+      }
+    }
+  }
+
+  if (dayColumns.length === 0) {
+    dayColumns.push({
+      date: (enquiry.eventDate || new Date().toISOString()).slice(0, 10),
+      sessions: [
+        {
+          label: enquiry.eventType || 'Event',
+          paxLine: enquiry.guestCount ? `${enquiry.guestCount} Pax` : '',
+          amount: null,
+          dishNames: ['No dishes added yet'],
+          fillSession: FILL.session,
+        },
+      ],
+    });
+  }
+
+  return dayColumns;
+}
+
+/**
+ * Append a Menu sheet matching Nithin / Muralidharan wedding-menu Excels:
+ * one column per day; all sessions that day stack in that column.
  */
 export async function appendMenuSheet(
   wb: Workbook,
@@ -108,56 +185,20 @@ export async function appendMenuSheet(
   });
 
   const extras = parseOrderNotes(enquiry.notes);
-  const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
-  const columns = resolveMenuColumns(extras, enquiry, menuItems);
-
-  const sheetCols: SheetCol[] = columns.map((column) => ({
-    column,
-    dishNames: dishesForColumn(column, menuItems, extras).map((d) =>
-      copyType === 'kitchen' && d.served ? `${d.dishName} ✓` : d.dishName,
-    ),
-  }));
-
-  if (extras.extrasEnabled) {
-    for (const item of activeOrderExtraItems(extras.extraItems)) {
-      sheetCols.push({
-        column: null,
-        dishNames: item.description ? [item.description] : [],
-        extraTitle: item.title,
-        extraQty: item.quantity,
-        extraAmount: item.amount ?? null,
-      });
-    }
-  }
-
-  if (sheetCols.length === 0) {
-    sheetCols.push({
-      column: {
-        id: 'empty',
-        date: enquiry.eventDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-        sessionLabel: enquiry.eventType || 'Event',
-        baseSession: 'Lunch',
-        pax: enquiry.guestCount ?? null,
-        timeFrom: null,
-        timeTo: null,
-        amount: null,
-      },
-      dishNames: ['No dishes added yet'],
-    });
-  }
-
-  const colCount = sheetCols.length;
+  const dayColumns = buildDayColumns(enquiry, copyType);
+  const colCount = dayColumns.length;
   const border = thinBorder();
   const bold = { name: 'Calibri', size: 11, bold: true };
   const normal = { name: 'Calibri', size: 11 };
   const colWidth = 34;
   const totalCharsWide = Math.max(40, Math.floor(colWidth * colCount * 0.9));
+  const perColChars = Math.floor(colWidth * 0.9);
 
   for (let i = 1; i <= colCount; i++) {
     ws.getColumn(i).width = colWidth;
   }
 
-  // Row 1 — Client (centered, auto-height)
+  // Row 1 — Client
   ws.mergeCells(1, 1, 1, colCount);
   const clientText = clientTitle(enquiry);
   const c1 = ws.getCell(1, 1);
@@ -179,12 +220,11 @@ export async function appendMenuSheet(
   c2.border = border;
   ws.getRow(2).height = wrappedRowHeight(venueText, totalCharsWide, 15, 22);
 
-  // Row 3 — Dates
+  // Row 3 — one date per column
   ws.getRow(3).height = 20;
-  sheetCols.forEach((col, i) => {
+  dayColumns.forEach((day, i) => {
     const cell = ws.getCell(3, i + 1);
-    const raw = col.column?.date || enquiry.eventDate || '';
-    cell.value = raw ? formatMenuDate(raw) : '';
+    cell.value = formatMenuDate(day.date);
     if (cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
     cell.font = bold;
     cell.alignment = alignCenter;
@@ -192,7 +232,7 @@ export async function appendMenuSheet(
   });
 
   const notes = kitchenBannerNotes(extras.regionalStyle, extras.dietary);
-  let dataStart = 4;
+  let cursorStart = 4;
   if (notes.length > 0) {
     ws.mergeCells(4, 1, 4, colCount);
     const noteText = notes.join(' — ');
@@ -203,70 +243,77 @@ export async function appendMenuSheet(
     noteCell.alignment = alignCenter;
     noteCell.border = border;
     ws.getRow(4).height = wrappedRowHeight(noteText, totalCharsWide, 15, 28);
-    dataStart = 5;
+    cursorStart = 5;
   }
 
-  const sessionRow = dataStart;
-  const paxRow = dataStart + 1;
-  const amountRow = dataStart + 2;
-  const dishStart = dataStart + 3;
+  // Track max row used so we can border-fill empty cells evenly
+  let maxRowUsed = cursorStart;
 
-  let maxDishes = 0;
-  let maxSessionLen = 0;
-  let maxPaxLen = 0;
+  dayColumns.forEach((day, i) => {
+    const col = i + 1;
+    let row = cursorStart;
 
-  sheetCols.forEach((col, i) => {
-    const c = i + 1;
+    day.sessions.forEach((session, sessionIndex) => {
+      if (sessionIndex > 0) {
+        // Blank spacer between sessions in the same day column
+        const spacer = ws.getCell(row, col);
+        spacer.border = border;
+        row += 1;
+      }
 
-    const sessionLabel = col.column?.sessionLabel || col.extraTitle || 'Extras';
-    maxSessionLen = Math.max(maxSessionLen, sessionLabel.length);
-    const sessionCell = ws.getCell(sessionRow, c);
-    sessionCell.value = sessionLabel;
-    sessionCell.font = bold;
-    sessionCell.fill = solidFill(col.column ? FILL.session : FILL.extra);
-    sessionCell.alignment = alignCenter;
-    sessionCell.border = border;
+      const sessionCell = ws.getCell(row, col);
+      sessionCell.value = session.label;
+      sessionCell.font = bold;
+      sessionCell.fill = solidFill(session.fillSession);
+      sessionCell.alignment = alignCenter;
+      sessionCell.border = border;
+      ws.getRow(row).height = Math.max(
+        ws.getRow(row).height || 0,
+        wrappedRowHeight(session.label, perColChars, 14, 22),
+      );
+      row += 1;
 
-    const paxText = col.column
-      ? formatPaxTimeLine(col.column) || (col.column.pax ? `${col.column.pax} Pax` : '')
-      : col.extraQty?.trim() || '';
-    maxPaxLen = Math.max(maxPaxLen, paxText.length);
-    const paxCell = ws.getCell(paxRow, c);
-    paxCell.value = paxText;
-    paxCell.font = bold;
-    paxCell.fill = solidFill(FILL.pax);
-    paxCell.alignment = alignCenter;
-    paxCell.border = border;
+      const paxCell = ws.getCell(row, col);
+      paxCell.value = session.paxLine;
+      paxCell.font = bold;
+      paxCell.fill = solidFill(FILL.pax);
+      paxCell.alignment = alignCenter;
+      paxCell.border = border;
+      ws.getRow(row).height = Math.max(
+        ws.getRow(row).height || 0,
+        wrappedRowHeight(session.paxLine || ' ', perColChars, 14, 20),
+      );
+      row += 1;
 
-    const amountCell = ws.getCell(amountRow, c);
-    const amount = col.column ? col.column.amount : col.extraAmount;
-    if (typeof amount === 'number' && amount > 0) {
-      amountCell.value = amount;
-      amountCell.numFmt = '#,##0';
-    } else {
-      amountCell.value = '';
-    }
-    amountCell.font = bold;
-    amountCell.fill = solidFill(FILL.amount);
-    amountCell.alignment = alignCenter;
-    amountCell.border = border;
+      const amountCell = ws.getCell(row, col);
+      if (typeof session.amount === 'number' && session.amount > 0) {
+        amountCell.value = session.amount;
+        amountCell.numFmt = '#,##0';
+      } else {
+        amountCell.value = '';
+      }
+      amountCell.font = bold;
+      amountCell.fill = solidFill(FILL.amount);
+      amountCell.alignment = alignCenter;
+      amountCell.border = border;
+      ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 18);
+      row += 1;
 
-    col.dishNames.forEach((name, di) => {
-      const dishCell = ws.getCell(dishStart + di, c);
-      dishCell.value = name;
-      dishCell.font = normal;
-      dishCell.alignment = alignLeftMiddle;
-      dishCell.border = border;
+      for (const name of session.dishNames) {
+        const dishCell = ws.getCell(row, col);
+        dishCell.value = name;
+        dishCell.font = normal;
+        dishCell.alignment = alignLeftMiddle;
+        dishCell.border = border;
+        ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 18);
+        row += 1;
+      }
     });
-    maxDishes = Math.max(maxDishes, col.dishNames.length);
+
+    maxRowUsed = Math.max(maxRowUsed, row - 1);
   });
 
-  const perColChars = Math.floor(colWidth * 0.9);
-  ws.getRow(sessionRow).height = wrappedRowHeight('x'.repeat(maxSessionLen), perColChars, 14, 24);
-  ws.getRow(paxRow).height = wrappedRowHeight('x'.repeat(maxPaxLen), perColChars, 14, 22);
-  ws.getRow(amountRow).height = 20;
-
-  // Paint merged header / note cells across the full width
+  // Header / note fills across merge width
   for (let c = 1; c <= colCount; c++) {
     ws.getCell(1, c).fill = solidFill(FILL.header);
     ws.getCell(1, c).alignment = alignCenter;
@@ -281,12 +328,14 @@ export async function appendMenuSheet(
     }
   }
 
-  for (let r = dishStart; r < dishStart + Math.max(maxDishes, 1); r++) {
-    ws.getRow(r).height = 18;
+  // Light borders on empty cells so day columns align to the same height
+  for (let r = cursorStart; r <= maxRowUsed; r++) {
     for (let c = 1; c <= colCount; c++) {
       const cell = ws.getCell(r, c);
-      cell.alignment = alignLeftMiddle;
-      cell.border = border;
+      if (!cell.border) cell.border = border;
+      if (cell.value == null || cell.value === '') {
+        if (!cell.alignment) cell.alignment = alignLeftMiddle;
+      }
     }
   }
 
