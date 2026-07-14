@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
 import { formatDate, type Enquiry } from '../api/client';
 import { BrandLogo } from './BrandLogo';
-import { parseOrderNotes, sumExtraItemAmounts, resolveRegionalStyles } from '../utils/orderNotes';
+import {
+  eventDatesForStyles,
+  parseOrderNotes,
+  resolveStyleForDate,
+  sumExtraItemAmounts,
+} from '../utils/orderNotes';
 import {
   dishesForColumn,
   formatColumnAmount,
@@ -28,6 +33,22 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
     return parts.reduce((sum, amount) => sum + amount, 0);
   }, [columns, copyType, extras.extrasEnabled, extras.extraItems]);
 
+  const stylesByDate = useMemo(() => {
+    return eventDatesForStyles(extras, enquiry.eventDate)
+      .map((date) => ({ date, style: resolveStyleForDate(extras, date) ?? '' }))
+      .filter((row) => row.style);
+  }, [extras, enquiry.eventDate]);
+
+  const shownDayStyle = useMemo(() => {
+    const seen = new Set<string>();
+    return columns.map((col) => {
+      const key = col.date.slice(0, 10);
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return resolveStyleForDate(extras, key);
+    });
+  }, [columns, extras]);
+
   return (
     <div id="order-copy-print" className="order-copy-print">
       <header className="copy-header">
@@ -44,7 +65,7 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
           <p className="copy-client-line">{enquiry.eventLocation}</p>
         </div>
 
-        <OrderRegionalStylePrint styles={resolveRegionalStyles(extras)} />
+        <OrderRegionalStylePrint stylesByDate={stylesByDate} />
       </div>
 
       <div className="copy-menu">
@@ -52,13 +73,19 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
           <p className="copy-empty">No dishes on this order yet.</p>
         ) : (
           <div className="copy-sessions">
-          {columns.map((col) => {
+          {columns.map((col, index) => {
             const items = dishesForColumn(col, menuItems, extras);
             const paxLine = formatPaxTimeLine(col);
+            const dayStyle = shownDayStyle[index];
 
             return (
               <section key={col.id} className="copy-session-block">
                 <div className="copy-session-date">{formatDate(col.date)}</div>
+                {dayStyle && (
+                  <div className="copy-session-style font-semibold text-[var(--primary)]">
+                    {dayStyle}
+                  </div>
+                )}
                 <div className="copy-session-label">{col.sessionLabel}</div>
                 {paxLine && <div className="copy-session-pax">{paxLine}</div>}
 

@@ -457,7 +457,12 @@ export function OrderDetailView({
         </p>
       </div>
 
-      <OrderRegionalStyleSection orderId={order.id} extras={extras} onOrderUpdated={onOrderUpdated} />
+      <OrderRegionalStyleSection
+        orderId={order.id}
+        order={order}
+        extras={extras}
+        onOrderUpdated={onOrderUpdated}
+      />
 
       <OrderVenueMapSection orderId={order.id} extras={extras} onOrderUpdated={onOrderUpdated} />
 

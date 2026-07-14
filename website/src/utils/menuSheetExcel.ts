@@ -3,7 +3,7 @@ import type { Enquiry } from '../api/client';
 import {
   activeOrderExtraItems,
   parseOrderNotes,
-  resolveRegionalStyles,
+  resolveStyleForDate,
 } from './orderNotes';
 import {
   dishesForColumn,
@@ -61,11 +61,8 @@ function formatMenuDate(iso: string): Date | string {
   return d;
 }
 
-function kitchenBannerNotes(styles: string[], dietary: string[]): string[] {
+function kitchenBannerNotes(dietary: string[]): string[] {
   const notes: string[] = [];
-  const cleanStyles = styles.map((s) => s.trim()).filter(Boolean);
-  if (cleanStyles.length === 1) notes.push(`Style: ${cleanStyles[0]}`);
-  else if (cleanStyles.length > 1) notes.push(`Styles: ${cleanStyles.join(' · ')}`);
   for (const item of dietary) {
     const t = item.trim();
     if (!t) continue;
@@ -227,19 +224,36 @@ export async function appendMenuSheet(
     cell.border = border;
   });
 
-  const notes = kitchenBannerNotes(resolveRegionalStyles(extras), extras.dietary);
-  let cursorStart = 4;
+  // Row 4 — per-day cuisine style under each date (Kerala / Tamil Nadu / …)
+  const hasDayStyles = dayColumns.some((day) => resolveStyleForDate(extras, day.date));
+  let nextRow = 4;
+  if (hasDayStyles) {
+    ws.getRow(4).height = 20;
+    dayColumns.forEach((day, i) => {
+      const cell = ws.getCell(4, i + 1);
+      const style = resolveStyleForDate(extras, day.date) || '';
+      cell.value = style;
+      cell.font = bold;
+      cell.fill = solidFill(FILL.extra);
+      cell.alignment = alignCenter;
+      cell.border = border;
+    });
+    nextRow = 5;
+  }
+
+  const notes = kitchenBannerNotes(extras.dietary);
+  let cursorStart = nextRow;
   if (notes.length > 0) {
-    ws.mergeCells(4, 1, 4, colCount);
+    ws.mergeCells(nextRow, 1, nextRow, colCount);
     const noteText = notes.join(' — ');
-    const noteCell = ws.getCell(4, 1);
+    const noteCell = ws.getCell(nextRow, 1);
     noteCell.value = noteText;
     noteCell.font = { ...bold, color: { argb: 'FFFFFFFF' } };
     noteCell.fill = solidFill(FILL.note);
     noteCell.alignment = alignCenter;
     noteCell.border = border;
-    ws.getRow(4).height = wrappedRowHeight(noteText, totalCharsWide, 15, 28);
-    cursorStart = 5;
+    ws.getRow(nextRow).height = wrappedRowHeight(noteText, totalCharsWide, 15, 28);
+    cursorStart = nextRow + 1;
   }
 
   // Track max row used so we can border-fill empty cells evenly
@@ -408,11 +422,6 @@ export async function appendMenuSheet(
     ws.getCell(2, c).fill = solidFill(FILL.header);
     ws.getCell(2, c).alignment = alignCenter;
     ws.getCell(2, c).border = border;
-    if (notes.length > 0) {
-      ws.getCell(4, c).fill = solidFill(FILL.note);
-      ws.getCell(4, c).alignment = alignCenter;
-      ws.getCell(4, c).border = border;
-    }
   }
 
   // Light borders on empty cells so day columns align to the same height

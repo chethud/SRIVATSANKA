@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { MapPin, Plus, X } from 'lucide-react';
-import { updateEnquiry, type Enquiry } from '../../api/client';
+import { useEffect, useMemo, useState } from 'react';
+import { MapPin } from 'lucide-react';
+import { formatDate, updateEnquiry, type Enquiry } from '../../api/client';
 import {
-  resolveRegionalStyles,
+  eventDatesForStyles,
+  resolveStyleForDate,
   serializeOrderNotes,
   type OrderExtras,
 } from '../../utils/orderNotes';
@@ -15,60 +16,71 @@ export const REGIONAL_STYLE_PRESETS = [
   'Andhra style',
 ] as const;
 
-function persistStyles(styles: string[]): Pick<OrderExtras, 'regionalStyles' | 'regionalStyle'> {
-  const unique = [...new Set(styles.map((s) => s.trim()).filter(Boolean))];
-  return {
-    regionalStyles: unique,
-    regionalStyle: unique[0] ?? null,
-  };
-}
-
 export function OrderRegionalStyleSection({
   orderId,
+  order,
   extras,
   onOrderUpdated,
 }: {
   orderId: string;
+  order: Enquiry;
   extras: OrderExtras;
   onOrderUpdated: (order: Enquiry) => void;
 }) {
-  const [selected, setSelected] = useState<string[]>(() => resolveRegionalStyles(extras));
-  const [custom, setCustom] = useState('');
+  const days = useMemo(
+    () => eventDatesForStyles(extras, order.eventDate),
+    [extras, order.eventDate],
+  );
+
+  const [byDate, setByDate] = useState<Record<string, string>>(() => ({
+    ...(extras.regionalStylesByDate ?? {}),
+  }));
+  const [customByDate, setCustomByDate] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setSelected(resolveRegionalStyles(extras));
-  }, [extras]);
+    const next: Record<string, string> = { ...(extras.regionalStylesByDate ?? {}) };
+    // Seed from legacy single/global styles if no per-day values yet
+    if (Object.keys(next).length === 0) {
+      const legacy =
+        extras.regionalStyles?.[0]?.trim() || extras.regionalStyle?.trim() || '';
+      if (legacy) {
+        for (const day of days) next[day] = legacy;
+      }
+    }
+    setByDate(next);
+  }, [extras, days]);
 
-  async function save(next: string[]) {
+  function setDayStyle(date: string, style: string) {
+    setByDate((prev) => {
+      const next = { ...prev };
+      const trimmed = style.trim();
+      if (!trimmed) delete next[date];
+      else next[date] = trimmed;
+      return next;
+    });
+  }
+
+  async function save() {
     setSaving(true);
     try {
+      const cleaned = Object.fromEntries(
+        Object.entries(byDate)
+          .map(([k, v]) => [k.slice(0, 10), v.trim()] as const)
+          .filter(([, v]) => Boolean(v)),
+      );
+      const unique = [...new Set(Object.values(cleaned))];
       const merged: OrderExtras = {
         ...extras,
-        ...persistStyles(next),
+        regionalStylesByDate: cleaned,
+        regionalStyles: unique,
+        regionalStyle: unique[0] ?? null,
       };
       const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
       onOrderUpdated(updated);
     } finally {
       setSaving(false);
     }
-  }
-
-  function togglePreset(preset: string) {
-    setSelected((prev) =>
-      prev.includes(preset) ? prev.filter((s) => s !== preset) : [...prev, preset],
-    );
-  }
-
-  function removeStyle(style: string) {
-    setSelected((prev) => prev.filter((s) => s !== style));
-  }
-
-  function addCustom() {
-    const name = custom.trim();
-    if (!name) return;
-    setSelected((prev) => (prev.includes(name) ? prev : [...prev, name]));
-    setCustom('');
   }
 
   return (
@@ -82,98 +94,90 @@ export function OrderRegionalStyleSection({
         </div>
       </div>
       <p className="order-section-sub">
-        Select one or more styles for this order — shown on kitchen and order copies. Use this when one
-        booking needs different cuisines (e.g. Tamil Nadu + Kerala).
+        Set a style for each event day — e.g. Day 1 Kerala, Day 2 Tamil Nadu. Printed on kitchen and
+        order copies under that day.
       </p>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {REGIONAL_STYLE_PRESETS.map((preset) => {
-          const active = selected.includes(preset);
+      <div className="space-y-5">
+        {days.map((date, index) => {
+          const value = byDate[date] ?? '';
           return (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => togglePreset(preset)}
-              className={`order-preset-chip ${active ? 'order-preset-chip--active' : ''}`}
+            <div
+              key={date}
+              className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4"
             >
-              {preset}
-            </button>
+              <p className="text-sm font-bold text-[var(--foreground)] mb-3">
+                Day {index + 1} · {formatDate(date)}
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {REGIONAL_STYLE_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDayStyle(date, value === preset ? '' : preset)}
+                    className={`order-preset-chip ${value === preset ? 'order-preset-chip--active' : ''}`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+                {value && !REGIONAL_STYLE_PRESETS.includes(value as (typeof REGIONAL_STYLE_PRESETS)[number]) && (
+                  <span className="order-preset-chip order-preset-chip--active">{value}</span>
+                )}
+              </div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-1.5">
+                Custom style for this day
+              </label>
+              <input
+                type="text"
+                value={customByDate[date] ?? (REGIONAL_STYLE_PRESETS.includes(value as never) ? '' : value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCustomByDate((prev) => ({ ...prev, [date]: next }));
+                  setDayStyle(date, next);
+                }}
+                placeholder="e.g. Iyengar style…"
+                className="form-input w-full px-3 py-2 rounded-lg text-sm font-semibold"
+              />
+            </div>
           );
         })}
       </div>
 
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {selected.map((style) => (
-            <span
-              key={style}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/30"
-            >
-              {style}
-              <button
-                type="button"
-                onClick={() => removeStyle(style)}
-                className="hover:opacity-70"
-                aria-label={`Remove ${style}`}
-              >
-                <X size={14} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      <p className="text-xs text-[var(--muted)] mt-3 mb-4">
+        Days come from the event schedule date range. Edit Event schedule if you need more days.
+      </p>
 
-      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-1.5">
-        Add custom style
-      </label>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <input
-          type="text"
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-          placeholder="e.g. Iyengar style, Chettinad…"
-          className="form-input flex-1 min-w-[200px] px-3 py-2.5 rounded-lg text-base font-semibold"
-        />
-        <Button
-          type="button"
-          onClick={addCustom}
-          disabled={!custom.trim()}
-          className="!py-2 !px-3 text-sm inline-flex items-center gap-1"
-        >
-          <Plus size={16} /> Add
-        </Button>
-      </div>
-
-      <Button
-        type="button"
-        onClick={() => void save(selected)}
-        disabled={saving}
-        className="!py-2 !px-4 text-sm"
-      >
-        {saving ? 'Saving…' : 'Save styles'}
+      <Button type="button" onClick={() => void save()} disabled={saving} className="!py-2 !px-4 text-sm">
+        {saving ? 'Saving…' : 'Save day styles'}
       </Button>
     </div>
   );
 }
 
-export function OrderRegionalStylePrint({ styles }: { styles: string[] }) {
-  const list = styles.map((s) => s.trim()).filter(Boolean);
+export function OrderRegionalStylePrint({
+  stylesByDate,
+}: {
+  stylesByDate: { date: string; style: string }[];
+}) {
+  const list = stylesByDate.filter((row) => row.style.trim());
   if (list.length === 0) return null;
 
   return (
     <div className="copy-regional-style">
       <div className="copy-grid-meta font-bold text-center border-b border-[var(--border)] bg-[var(--table-header-bg)]">
-        Regional / cuisine style{list.length > 1 ? 's' : ''}
+        Regional / cuisine style by day
       </div>
-      <div className="px-4 py-4 text-center copy-client-line font-bold">
-        {list.join(' · ')}
+      <div className="px-4 py-3 space-y-1.5">
+        {list.map((row) => (
+          <p key={row.date} className="text-center copy-client-line font-bold">
+            {formatDate(row.date)} — {row.style}
+          </p>
+        ))}
       </div>
     </div>
   );
+}
+
+export function styleLabelForCopyDate(extras: OrderExtras, date: string): string | null {
+  return resolveStyleForDate(extras, date);
 }

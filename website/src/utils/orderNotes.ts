@@ -121,8 +121,10 @@ export type OrderExtras = {
   extraItems?: OrderExtraItem[];
   /** Regional cuisine style(s) — printed on kitchen / order copy before the menu */
   regionalStyle?: string | null;
-  /** Multiple styles on one order (preferred). Falls back to regionalStyle. */
+  /** Multiple styles on one order (legacy multi-select). Prefer regionalStylesByDate. */
   regionalStyles?: string[];
+  /** Per-day cuisine style: YYYY-MM-DD → style label (e.g. day1 Kerala, day2 Tamil Nadu). */
+  regionalStylesByDate?: Record<string, string>;
   /** Google Maps link — QR printed at bottom of kitchen copy only */
   venueMapLink?: string | null;
   /** @deprecated use assignedWorkerIds */
@@ -144,6 +146,11 @@ export function resolveAssignedWorkerIds(extras: OrderExtras): string[] {
 
 /** Unique cuisine styles for an order (supports multi-select + legacy single field). */
 export function resolveRegionalStyles(extras: OrderExtras): string[] {
+  const byDate = Object.values(extras.regionalStylesByDate ?? {})
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (byDate.length > 0) return [...new Set(byDate)];
+
   const fromList = Array.isArray(extras.regionalStyles)
     ? extras.regionalStyles.map((s) => s.trim()).filter(Boolean)
     : [];
@@ -152,6 +159,48 @@ export function resolveRegionalStyles(extras: OrderExtras): string[] {
   }
   const legacy = extras.regionalStyle?.trim();
   return legacy ? [legacy] : [];
+}
+
+/** Style for a specific service day (YYYY-MM-DD). */
+export function resolveStyleForDate(extras: OrderExtras, date: string): string | null {
+  const key = date.slice(0, 10);
+  const fromMap = extras.regionalStylesByDate?.[key]?.trim();
+  if (fromMap) return fromMap;
+  // Single global style applies to every day when no per-day map
+  const byDateEntries = Object.entries(extras.regionalStylesByDate ?? {}).filter(([, v]) => v?.trim());
+  if (byDateEntries.length > 0) return null;
+  return resolveRegionalStyles(extras)[0] ?? null;
+}
+
+/** Event days to assign styles for (schedule range ∪ menu columns ∪ event date). */
+export function eventDatesForStyles(
+  extras: OrderExtras,
+  eventDate: string | null | undefined,
+): string[] {
+  const dates = new Set<string>();
+  const from = extras.scheduleDateFrom?.slice(0, 10);
+  const to = (extras.scheduleDateTo ?? extras.scheduleDateFrom)?.slice(0, 10);
+  if (from && to) {
+    const cursor = new Date(`${from}T00:00:00`);
+    const end = new Date(`${to}T00:00:00`);
+    if (!Number.isNaN(cursor.getTime()) && !Number.isNaN(end.getTime())) {
+      while (cursor <= end) {
+        dates.add(cursor.toISOString().slice(0, 10));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+  }
+  for (const col of extras.menuColumns ?? []) {
+    if (col.date) dates.add(col.date.slice(0, 10));
+  }
+  for (const key of Object.keys(extras.regionalStylesByDate ?? {})) {
+    if (key) dates.add(key.slice(0, 10));
+  }
+  if (eventDate) dates.add(eventDate.slice(0, 10));
+  if (dates.size === 0) {
+    dates.add(new Date().toISOString().slice(0, 10));
+  }
+  return [...dates].sort();
 }
 
 const EMPTY: OrderExtras = {
@@ -185,6 +234,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'extraItems' in parsed ||
     'regionalStyle' in parsed ||
     'regionalStyles' in parsed ||
+    'regionalStylesByDate' in parsed ||
     'venueMapLink' in parsed ||
     'primaryWorkerId' in parsed ||
     'assignedWorkerIds' in parsed ||
@@ -217,6 +267,14 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
           : parsed.regionalStyle?.trim()
             ? [parsed.regionalStyle.trim()]
             : [],
+        regionalStylesByDate:
+          parsed.regionalStylesByDate && typeof parsed.regionalStylesByDate === 'object'
+            ? Object.fromEntries(
+                Object.entries(parsed.regionalStylesByDate)
+                  .map(([k, v]) => [String(k).slice(0, 10), String(v ?? '').trim()] as const)
+                  .filter(([, v]) => Boolean(v)),
+              )
+            : {},
         venueMapLink: parsed.venueMapLink ?? null,
         primaryWorkerId: parsed.primaryWorkerId ?? null,
         assignedWorkerIds: Array.isArray(parsed.assignedWorkerIds)
