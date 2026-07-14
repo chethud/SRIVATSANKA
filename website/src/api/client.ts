@@ -392,6 +392,8 @@ export async function addOrderDish(
     customizations?: string;
     notes?: string;
     unitPrice?: number;
+    /** When false with dishName, order-only (not added to Dish catalog). */
+    saveToCatalog?: boolean;
   },
 ) {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/dishes`, {

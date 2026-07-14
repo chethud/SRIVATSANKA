@@ -9,6 +9,8 @@ export function DishSearchSelect({
   onChange,
   onCustomNameChange,
   onSelectDish,
+  onConfirmCustom,
+  onConfirmDish,
 }: {
   dishes: Dish[];
   value: string;
@@ -16,6 +18,10 @@ export function DishSearchSelect({
   onChange: (dishId: string) => void;
   onCustomNameChange?: (name: string) => void;
   onSelectDish?: (dish: Dish | null) => void;
+  /** Enter with typed custom name — parent can add immediately */
+  onConfirmCustom?: (name: string) => void;
+  /** Enter with exact catalog match — parent can add immediately */
+  onConfirmDish?: (dish: Dish) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -59,6 +65,18 @@ export function DishSearchSelect({
     setOpen(false);
   }
 
+  function commitTypedName() {
+    if (!trimmedQuery) return;
+    const exact = filtered.find((d) => d.name.toLowerCase() === trimmedQuery.toLowerCase());
+    if (exact) {
+      pick(exact);
+      onConfirmDish?.(exact);
+      return;
+    }
+    pickCustom(trimmedQuery);
+    onConfirmCustom?.(trimmedQuery);
+  }
+
   const displayValue = open
     ? query
     : selected
@@ -69,7 +87,7 @@ export function DishSearchSelect({
 
   return (
     <div className="relative flex-1 min-w-[220px]">
-      <label className="text-xs text-[var(--muted)] font-medium mb-1 block">Search dish</label>
+      <label className="text-xs text-[var(--muted)] font-medium mb-1 block">Dish name</label>
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
         <input
@@ -90,7 +108,13 @@ export function DishSearchSelect({
             setOpen(true);
             setQuery(selected ? selected.name : hasCustom ? customName : query);
           }}
-          placeholder="Search menu or type a new dish…"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitTypedName();
+            }
+          }}
+          placeholder="Search menu or type any dish name…"
           className="form-input w-full pl-9 pr-8 py-2.5 rounded-lg text-sm"
         />
         {(selected || hasCustom) && !open && (
@@ -108,7 +132,7 @@ export function DishSearchSelect({
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
           <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-sm text-[var(--foreground)]">
             {filtered.length === 0 && !trimmedQuery ? (
-              <li className="px-3 py-2 text-[var(--muted)]">Type to search the menu</li>
+              <li className="px-3 py-2 text-[var(--muted)]">Type a dish name</li>
             ) : (
               filtered.map((d) => (
                 <li key={d.id}>
@@ -131,7 +155,7 @@ export function DishSearchSelect({
                   onClick={() => pickCustom(trimmedQuery)}
                 >
                   <Plus size={15} />
-                  Add &quot;{trimmedQuery}&quot; to menu
+                  Use &quot;{trimmedQuery}&quot; on this order
                 </button>
               </li>
             )}
@@ -140,7 +164,7 @@ export function DishSearchSelect({
       )}
       {hasCustom && (
         <p className="text-xs text-[var(--muted)] mt-1.5">
-          New dish — will be saved to the menu catalog and added to this order.
+          Custom name for this order — toggle “Save to menu catalog” below if you also want it in the dish list.
         </p>
       )}
     </div>

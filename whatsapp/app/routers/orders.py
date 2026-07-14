@@ -125,38 +125,65 @@ async def add_order_dish(
             raise HTTPException(404, "Dish not found in menu")
         if not payload.category:
             session_label = CATEGORY_LABELS.get(menu.category, MEAL_SESSION_LABELS[DishCategory.LUNCH])
+        item = EnquiryDish(
+            enquiryId=enquiry.id,
+            dishId=menu.id,
+            dishName=menu.name,
+            category=session_label,
+            customizations=payload.customizations,
+            notes=payload.notes,
+            quantity=normalize_quantity(payload.quantity),
+            quantityUnit=normalize_quantity_unit(payload.quantityUnit),
+            unitPrice=0.0 if payload.unitPrice is None else payload.unitPrice,
+            served=False,
+        )
     else:
         name = (payload.dishName or "").strip()
         if not name:
             raise HTTPException(400, "Dish name is required")
-        result = await db.execute(
-            select(Dish).where(Dish.isActive.is_(True)).where(Dish.name.ilike(name))
-        )
-        menu = result.scalar_one_or_none()
-        if not menu:
-            cat = LABEL_TO_CATEGORY.get(session_label, DishCategory.LUNCH)
-            menu = Dish(
-                name=name,
-                category=cat,
-                price=0.0,
-                description="Added from order menu",
-                isActive=True,
-            )
-            db.add(menu)
-            await db.flush()
 
-    item = EnquiryDish(
-        enquiryId=enquiry.id,
-        dishId=menu.id,
-        dishName=menu.name,
-        category=session_label,
-        customizations=payload.customizations,
-        notes=payload.notes,
-        quantity=normalize_quantity(payload.quantity),
-        quantityUnit=normalize_quantity_unit(payload.quantityUnit),
-        unitPrice=0.0 if payload.unitPrice is None else payload.unitPrice,
-        served=False,
-    )
+        if not payload.saveToCatalog:
+            item = EnquiryDish(
+                enquiryId=enquiry.id,
+                dishId=None,
+                dishName=name,
+                category=session_label,
+                customizations=payload.customizations,
+                notes=payload.notes,
+                quantity=normalize_quantity(payload.quantity),
+                quantityUnit=normalize_quantity_unit(payload.quantityUnit),
+                unitPrice=0.0 if payload.unitPrice is None else payload.unitPrice,
+                served=False,
+            )
+        else:
+            result = await db.execute(
+                select(Dish).where(Dish.isActive.is_(True)).where(Dish.name.ilike(name))
+            )
+            menu = result.scalar_one_or_none()
+            if not menu:
+                cat = LABEL_TO_CATEGORY.get(session_label, DishCategory.LUNCH)
+                menu = Dish(
+                    name=name,
+                    category=cat,
+                    price=0.0,
+                    description="Added from order menu",
+                    isActive=True,
+                )
+                db.add(menu)
+                await db.flush()
+            item = EnquiryDish(
+                enquiryId=enquiry.id,
+                dishId=menu.id,
+                dishName=menu.name,
+                category=session_label,
+                customizations=payload.customizations,
+                notes=payload.notes,
+                quantity=normalize_quantity(payload.quantity),
+                quantityUnit=normalize_quantity_unit(payload.quantityUnit),
+                unitPrice=0.0 if payload.unitPrice is None else payload.unitPrice,
+                served=False,
+            )
+
     db.add(item)
     await db.commit()
     await db.refresh(enquiry, ["dish_items"])

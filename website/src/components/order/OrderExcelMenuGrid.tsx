@@ -13,6 +13,7 @@ import {
   type MenuColumn,
 } from '../../utils/orderMenuGrid';
 import { OrderMenuItem } from './OrderMenuItem';
+import { AmPmTimeInput } from '../AmPmTimeInput';
 
 export function OrderExcelMenuGrid({
   order,
@@ -270,27 +271,25 @@ function SessionTimeField({
     <div className="excel-meta-field excel-meta-field--time">
       <span className="excel-meta-label">Time</span>
       <div className="excel-meta-time-row">
-        <input
+        <AmPmTimeInput
           id={`time-from-${column.id}`}
-          type="time"
           value={timeFrom}
-          onChange={(e) => setTimeFrom(e.target.value)}
+          onChange={setTimeFrom}
           onBlur={handleBlur}
           disabled={saving}
-          className="excel-meta-time-input"
+          className="excel-meta-ampm"
           aria-label={`Start time for ${column.sessionLabel}`}
         />
         <span className="excel-meta-time-sep" aria-hidden>
           –
         </span>
-        <input
+        <AmPmTimeInput
           id={`time-to-${column.id}`}
-          type="time"
           value={timeTo}
-          onChange={(e) => setTimeTo(e.target.value)}
+          onChange={setTimeTo}
           onBlur={handleBlur}
           disabled={saving}
-          className="excel-meta-time-input"
+          className="excel-meta-ampm"
           aria-label={`End time for ${column.sessionLabel}`}
         />
       </div>

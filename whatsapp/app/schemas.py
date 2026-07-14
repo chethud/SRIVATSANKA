@@ -58,6 +58,8 @@ class OrderDishIn(BaseModel):
     customizations: str | None = None
     notes: str | None = None
     unitPrice: float | None = None
+    # When False with dishName, add to this order only (do not create Dish catalog).
+    saveToCatalog: bool = True
 
     @model_validator(mode="after")
     def require_dish_reference(self) -> "OrderDishIn":

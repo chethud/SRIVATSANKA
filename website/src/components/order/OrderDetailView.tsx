@@ -11,6 +11,7 @@ import {
   updateEnquiry,
 } from '../../api/client';
 import { DishSearchSelect } from '../DishSearchSelect';
+import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderExtrasSection } from './OrderExtrasSection';
@@ -92,6 +93,7 @@ export function OrderDetailView({
   const [columnDate, setColumnDate] = useState(() => extras.scheduleDateFrom ?? defaultEventDate);
   const [columnPax, setColumnPax] = useState('');
   const [sessionLabel, setSessionLabel] = useState('');
+  const [saveToCatalog, setSaveToCatalog] = useState(false);
 
   const menuItems = useMemo(
     () => (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category)),
@@ -142,11 +144,12 @@ export function OrderDetailView({
     setColumnPax(existing?.pax != null ? String(existing.pax) : '');
   }
 
-  async function handleAdd() {
+  async function handleAdd(opts?: { dishIdOverride?: string; dishNameOverride?: string }) {
     setAddError('');
-    const customName = customDishName.trim();
-    if (!dishId && !customName) {
-      setAddError('Select a menu item or add a new dish name.');
+    const resolvedDishId = opts?.dishIdOverride ?? dishId;
+    const customName = (opts?.dishNameOverride ?? customDishName).trim();
+    if (!resolvedDishId && !customName) {
+      setAddError('Select a menu item or type a dish name.');
       return;
     }
     if (!mealSession) {
@@ -157,19 +160,32 @@ export function OrderDetailView({
       setAddError('Pick the service date for this column (like Excel row 3).');
       return;
     }
-    if (!columnPax.trim()) {
+
+    const currentColumns = resolveMenuColumns(extras, order, menuItems);
+    const label = sessionLabel.trim() || sessionLabelOptions(mealSession);
+    const existingCol = currentColumns.find(
+      (c) =>
+        c.date === columnDate &&
+        c.baseSession === mealSession &&
+        c.sessionLabel === label,
+    );
+
+    let paxNum: number | null = null;
+    if (columnPax.trim()) {
+      paxNum = Number(columnPax);
+      if (Number.isNaN(paxNum) || paxNum < 1) {
+        setAddError('Enter a valid pax count for this session.');
+        return;
+      }
+    } else if (existingCol?.pax != null && existingCol.pax > 0) {
+      paxNum = existingCol.pax;
+    } else {
       setAddError('Enter pax for this session (e.g. 60 for breakfast, 100 for lunch).');
       return;
     }
-    const paxNum = Number(columnPax);
-    if (Number.isNaN(paxNum) || paxNum < 1) {
-      setAddError('Enter a valid pax count for this session.');
-      return;
-    }
+
     setSaving(true);
     try {
-      const currentColumns = resolveMenuColumns(extras, order, menuItems);
-      const label = sessionLabel.trim() || sessionLabelOptions(mealSession);
       const { columns, columnId } = findOrCreateColumn(currentColumns, {
         date: columnDate,
         baseSession: mealSession,
@@ -190,24 +206,27 @@ export function OrderDetailView({
           },
         },
       };
-      await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
 
       const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
       let updated = await addOrderDish(order.id, {
-        ...(dishId ? { dishId } : { dishName: customName }),
+        ...(resolvedDishId
+          ? { dishId: resolvedDishId }
+          : { dishName: customName, saveToCatalog }),
         category: mealSession,
       });
       const newDish = updated.dishes.find(
         (d) =>
           !prevIds.has(d.id) &&
-          (dishId ? d.dishId === dishId : d.dishName.toLowerCase() === customName.toLowerCase()),
+          (resolvedDishId
+            ? d.dishId === resolvedDishId
+            : d.dishName.toLowerCase() === customName.toLowerCase()),
       );
       if (newDish) {
         merged = assignDishColumn(merged, newDish.id, columnId);
-        updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
       }
+      updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
 
-      if (customName) {
+      if (customName && saveToCatalog) {
         await onDishesCatalogUpdated?.();
       }
 
@@ -379,33 +398,31 @@ export function OrderDetailView({
                   {orderedSessions.map((session) => (
                     <div key={session} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
                       <span className="font-medium text-[var(--foreground)]">{session}</span>
-                      <input
-                        type="time"
+                      <AmPmTimeInput
                         value={draftSchedule.sessions[session]?.timeFrom ?? ''}
-                        onChange={(e) =>
+                        onChange={(hhmm) =>
                           setDraftSchedule({
                             ...draftSchedule,
                             sessions: {
                               ...draftSchedule.sessions,
-                              [session]: { ...draftSchedule.sessions[session], timeFrom: e.target.value },
+                              [session]: { ...draftSchedule.sessions[session], timeFrom: hhmm },
                             },
                           })
                         }
-                        className="form-input px-3 py-2 rounded-lg"
+                        aria-label={`${session} from`}
                       />
-                      <input
-                        type="time"
+                      <AmPmTimeInput
                         value={draftSchedule.sessions[session]?.timeTo ?? ''}
-                        onChange={(e) =>
+                        onChange={(hhmm) =>
                           setDraftSchedule({
                             ...draftSchedule,
                             sessions: {
                               ...draftSchedule.sessions,
-                              [session]: { ...draftSchedule.sessions[session], timeTo: e.target.value },
+                              [session]: { ...draftSchedule.sessions[session], timeTo: hhmm },
                             },
                           })
                         }
-                        className="form-input px-3 py-2 rounded-lg"
+                        aria-label={`${session} to`}
                       />
                     </div>
                   ))}
@@ -465,7 +482,7 @@ export function OrderDetailView({
         {showAddForm && (
           <div className="order-add-panel">
             <p className="text-sm text-[var(--muted)] mb-4">
-              Set pax per session (breakfast, lunch, coffee, etc.) — each can be different. Then add dish names.
+              Pick session + date once, then keep adding dish names with Enter. Pax is remembered for the session.
             </p>
             <div className="flex flex-wrap gap-2 mb-4">
               {MEAL_SESSIONS.map((s) => (
@@ -483,7 +500,7 @@ export function OrderDetailView({
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
               <div>
                 <label className="text-xs text-[var(--muted)]">Service date</label>
                 <input
@@ -508,7 +525,6 @@ export function OrderDetailView({
                 <input
                   type="number"
                   min={1}
-                  required
                   value={columnPax}
                   onChange={(e) => setColumnPax(e.target.value)}
                   placeholder="e.g. 60 or 100"
@@ -517,21 +533,23 @@ export function OrderDetailView({
               </div>
               <div>
                 <label className="text-xs text-[var(--muted)]">Time from ({mealSession})</label>
-                <input
-                  type="time"
-                  value={sessionTimeFrom}
-                  onChange={(e) => setSessionTimeFrom(e.target.value)}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                />
+                <div className="mt-1">
+                  <AmPmTimeInput
+                    value={sessionTimeFrom}
+                    onChange={setSessionTimeFrom}
+                    aria-label={`${mealSession} from`}
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-xs text-[var(--muted)]">Time to ({mealSession})</label>
-                <input
-                  type="time"
-                  value={sessionTimeTo}
-                  onChange={(e) => setSessionTimeTo(e.target.value)}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                />
+                <div className="mt-1">
+                  <AmPmTimeInput
+                    value={sessionTimeTo}
+                    onChange={setSessionTimeTo}
+                    aria-label={`${mealSession} to`}
+                  />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
@@ -542,19 +560,36 @@ export function OrderDetailView({
                   customName={customDishName}
                   onChange={setDishId}
                   onCustomNameChange={setCustomDishName}
+                  onConfirmCustom={(name) => {
+                    void handleAdd({ dishNameOverride: name });
+                  }}
+                  onConfirmDish={(d) => {
+                    void handleAdd({ dishIdOverride: d.id });
+                  }}
                 />
               </div>
               <div className="lg:col-span-2">
                 <Button
                   type="button"
-                  onClick={handleAdd}
+                  onClick={() => void handleAdd()}
                   disabled={saving || (!dishId && !customDishName.trim())}
                   className="w-full !py-2"
                 >
-                  Add
+                  {saving ? 'Adding…' : 'Add'}
                 </Button>
               </div>
             </div>
+            {!!customDishName.trim() && !dishId && (
+              <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveToCatalog}
+                  onChange={(e) => setSaveToCatalog(e.target.checked)}
+                  className="rounded border-[var(--border)]"
+                />
+                Also save this dish to the menu catalog
+              </label>
+            )}
             {addError && <p className="text-sm text-red-600 mt-2">{addError}</p>}
           </div>
         )}
