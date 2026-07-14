@@ -41,7 +41,7 @@ SKIP_NAMES = {"hi", "hello", "hey", "hii", "namaste", "vanakkam", "start", "help
 def _welcome_message() -> str:
     return (
         f"Hi! You've reached *{COMPANY['brand_name']}* 🌿 "
-        "We do pure-veg catering across Bengaluru. What should I call you?"
+        "We do pure-veg events across Bengaluru. What should I call you?"
     )
 
 

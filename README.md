@@ -1,6 +1,6 @@
-# Kannans Catering Management Platform
+# SRIVATSANKA EVENTS Management Platform
 
-Single-owner catering platform: customers use **WhatsApp**, owner uses **React dashboard**.
+Single-owner events platform: customers use **WhatsApp**, owner uses **React dashboard**.
 
 ## Structure
 

@@ -164,7 +164,7 @@ async def answer_dashboard_query(query: str, db: AsyncSession) -> str:
         )
 
     return (
-        "I can help you with your catering data. Try asking:\n\n"
+        "I can help you with your events data. Try asking:\n\n"
         "• Show all upcoming events\n"
         "• Show wedding enquiries\n"
         "• Show enquiries above 200 guests\n"

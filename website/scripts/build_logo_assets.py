@@ -76,7 +76,7 @@ def write_svg_vertical(icon_uri: str, out: Path) -> None:
   </g>
   <text class="brand" x="140" y="114" text-anchor="middle" font-size="20">SRIVATSANKA</text>
   <text class="tag" x="140" y="134" text-anchor="middle" font-size="8.8">
-    <tspan x="140" dy="0">Pure Veg Catering Services</tspan>
+    <tspan x="140" dy="0">Pure Veg Events</tspan>
     <tspan x="140" dy="11">for All Occasions</tspan>
   </text>
 </svg>"""
@@ -96,7 +96,7 @@ def write_svg_horizontal(icon_uri: str, out: Path) -> None:
     <image xlink:href="{icon_uri}" width="76" height="76" preserveAspectRatio="xMidYMid meet"/>
   </g>
   <text class="brand" x="92" y="48" font-size="26">SRIVATSANKA</text>
-  <text class="tag" x="94" y="72" font-size="11.5">Pure Veg Catering Services for All Occasions</text>
+  <text class="tag" x="94" y="72" font-size="11.5">Pure Veg Events for All Occasions</text>
 </svg>"""
     out.write_text(svg, encoding="utf-8")
 
@@ -136,7 +136,7 @@ def rasterize_layout(icon: Image.Image, mode: str, size: tuple[int, int]) -> Ima
         name = "SRIVATSANKA"
         tw = draw.textlength(name, font=font_b)
         draw.text(((W - tw) / 2, iy + icon_h + 10), name, fill=(11, 107, 58, 255), font=font_b)
-        tag1, tag2 = "Pure Veg Catering Services", "for All Occasions"
+        tag1, tag2 = "Pure Veg Events", "for All Occasions"
         t1w = draw.textlength(tag1, font=font_t)
         t2w = draw.textlength(tag2, font=font_t)
         draw.text(((W - t1w) / 2, iy + icon_h + 34), tag1, fill=(11, 107, 58, 230), font=font_t)
@@ -154,7 +154,7 @@ def rasterize_layout(icon: Image.Image, mode: str, size: tuple[int, int]) -> Ima
             font_b = ImageFont.load_default()
             font_t = font_b
         draw.text((icon_w + 20, int(H * 0.28)), "SRIVATSANKA", fill=(11, 107, 58, 255), font=font_b)
-        draw.text((icon_w + 22, int(H * 0.58)), "Pure Veg Catering Services for All Occasions", fill=(11, 107, 58, 230), font=font_t)
+        draw.text((icon_w + 22, int(H * 0.58)), "Pure Veg Events for All Occasions", fill=(11, 107, 58, 230), font=font_t)
     else:  # favicon
         icon_scaled = icon_scaled.resize((H - 8, H - 8), Image.Resampling.LANCZOS)
         canvas.paste(icon_scaled, (4, 4), icon_scaled)

@@ -82,7 +82,7 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
 
   if (lines.length === 0) {
     lines.push({
-      description: `${enquiry.eventType || 'Catering'} — ${enquiry.customerName}`,
+      description: `${enquiry.eventType || 'Event'} — ${enquiry.customerName}`,
       hsn: INVOICE_COMPANY.hsnSac,
       qty: enquiry.guestCount || 'NA',
       unitRate: 'NA',

@@ -1,6 +1,6 @@
 # Connect WhatsApp Bot via Meta (Cloud API)
 
-Step-by-step guide to connect Kannans Catering bot to Meta WhatsApp Business.
+Step-by-step guide to connect SRIVATSANKA EVENTS bot to Meta WhatsApp Business.
 
 ## What you need
 

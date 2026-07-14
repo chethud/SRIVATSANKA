@@ -71,7 +71,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Kannans Catering API",
+    title="SRIVATSANKA EVENTS API",
     description="WhatsApp AI agent and owner dashboard API",
     version="1.0.0",
     lifespan=lifespan,

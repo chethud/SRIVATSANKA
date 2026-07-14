@@ -96,7 +96,7 @@ def _showcase_system(session: ConversationSession, *, sharing_photos: bool = Fal
         if sharing_photos
         else "\nDo NOT send or mention sharing photos unless the customer explicitly asked."
     )
-    return f"""You are a friendly human catering consultant for {COMPANY['brand_name']} on WhatsApp.
+    return f"""You are a friendly human events consultant for {COMPANY['brand_name']} on WhatsApp.
 You work with {COMPANY['managing_director']}'s team in Bengaluru.
 
 Chatting with *{name}* about their *{event}*.
@@ -117,7 +117,7 @@ def _collect_details_system(session: ConversationSession, next_prompt: str | Non
     context = build_short_company_context()
     pending = next_prompt or "remaining event details"
     collected = session.fields.model_dump()
-    return f"""You are a friendly human catering consultant for {COMPANY['brand_name']} on WhatsApp.
+    return f"""You are a friendly human events consultant for {COMPANY['brand_name']} on WhatsApp.
 
 {context}
 

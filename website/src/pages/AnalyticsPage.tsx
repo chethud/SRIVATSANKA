@@ -164,7 +164,7 @@ export default function AnalyticsPage() {
         </Card>
         <Card className="p-6">
           <h3 className="font-semibold mb-1">Revenue from orders</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Converted catering orders</p>
+          <p className="text-xs text-[var(--muted)] mb-4">Converted event orders</p>
           {analytics && <ProfitBreakdownPie analytics={analytics} />}
         </Card>
       </div>

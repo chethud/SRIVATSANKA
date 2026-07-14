@@ -68,7 +68,7 @@ export default function DashboardPage() {
       <motion.header initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
-          <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA catering — live metrics and pipeline</p>
+          <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA EVENTS — live metrics and pipeline</p>
         </div>
         <DashboardTabBar
           tab={tab}

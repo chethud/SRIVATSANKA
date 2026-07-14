@@ -330,7 +330,7 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
             InvoiceUpload(
                 enquiryId=converted_ids[0],
                 docType="expense",
-                fileName="demo-catering-bill.pdf",
+                fileName="demo-events-bill.pdf",
                 filePath="/uploads/demo-expense.pdf",
                 amount=18500,
                 notes=f"Demo supplier invoice {DEMO_MARKER}",

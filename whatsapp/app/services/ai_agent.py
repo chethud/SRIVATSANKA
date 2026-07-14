@@ -9,9 +9,9 @@ from app.schemas import AgentTurnResult, EnquiryFields
 from app.services.gemini_conversation import is_gemini_configured, trim_whatsapp_reply
 from app.services.session_store import ConversationSession
 
-AGENT_SYSTEM_PROMPT = f"""You are a warm, professional human catering consultant for SRIVATSANKA on WhatsApp.
+AGENT_SYSTEM_PROMPT = f"""You are a warm, professional human events consultant for SRIVATSANKA EVENTS on WhatsApp.
 
-You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru pure-veg catering since {COMPANY['established']}.
+You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru pure-veg events since {COMPANY['established']}.
 Official site: {WEBSITE_URL}
 
 {build_short_company_context()}

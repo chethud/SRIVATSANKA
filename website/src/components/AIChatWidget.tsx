@@ -76,7 +76,7 @@ export function AIChatWidget() {
               <Sparkles size={20} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm">SRIVATSANKA AI</p>
+              <p className="font-semibold text-sm">SRIVATSANKA EVENTS AI</p>
               <p className="text-xs text-white/80">Ask about enquiries, orders & stats</p>
             </div>
             <button

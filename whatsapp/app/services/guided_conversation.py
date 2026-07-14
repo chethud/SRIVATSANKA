@@ -41,12 +41,12 @@ def _fallback_answer(
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We're *{COMPANY['brand_name']}* — pure veg catering in Bengaluru since {COMPANY['established']}. "
+            f"We're *{COMPANY['brand_name']}* — pure veg events in Bengaluru since {COMPANY['established']}. "
             f"{hint}"
         )
 
     if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio", "wedding")):
-        return f"We've catered hundreds of occasions in Bengaluru. {hook} {hint}"
+        return f"We've handled hundreds of occasions in Bengaluru. {hook} {hint}"
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
         return f"Pricing depends on menu and guest count — our team walks you through it on a call. {hint}"

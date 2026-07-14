@@ -12,7 +12,7 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
   return (
     <div
       className={`flex items-center justify-center w-full h-[72px] min-h-[72px] max-h-[72px] ${className}`}
-      title="SRIVATSANKA"
+      title="SRIVATSANKA EVENTS"
     >
       <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>
         <img
@@ -25,8 +25,8 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
           draggable={false}
         />
         {!sidebarCollapsed && (
-          <span className="text-[13px] font-bold tracking-[0.14em] text-[var(--primary)] leading-tight truncate">
-            SRIVATSANKA
+          <span className="text-[12px] font-bold tracking-[0.08em] text-[var(--primary)] leading-tight truncate">
+            SRIVATSANKA EVENTS
           </span>
         )}
       </div>
@@ -48,7 +48,7 @@ export function BrandLogo({ variant = 'sidebar', className = '' }: BrandLogoProp
     <div className={`flex items-center justify-center ${className}`}>
       <img
         src={src}
-        alt="SRIVATSANKA"
+        alt="SRIVATSANKA EVENTS"
         className={variant === 'compact' ? 'w-12 h-12' : 'w-full max-w-[280px] h-auto object-contain'}
         decoding="async"
         draggable={false}

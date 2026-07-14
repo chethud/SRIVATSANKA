@@ -6,18 +6,18 @@ WEBSITE_URL = "https://kannansharangapani.com/"
 
 COMPANY = {
     "legal_name": "Srivatsanka Events and Services Pvt Ltd",
-    "brand_name": "SRIVATSANKA",
+    "brand_name": "SRIVATSANKA EVENTS",
     "established": "2017",
     "managing_director": "Mr. Kannan Sharangapani",
     "phone": "+91-9945607074",
     "whatsapp": "+91-9945607074",
     "email": "srivatsankas@gmail.com",
     "address": "#1, 4th Cross, 4th Main, N R Colony, Bengaluru 560019",
-    "tagline": "Pure Veg Catering Services for All Occasions",
+    "tagline": "Pure Veg Events for All Occasions",
 }
 
 SERVICES = [
-    "Wedding Catering",
+    "Wedding Events",
     "Decor for Celebrations",
     "Wedding Pooja Setup",
     "Venues for Celebrations",
@@ -48,14 +48,14 @@ SOCIAL_PROOF = [
     "Trusted since 2017 in Bengaluru for weddings and family celebrations",
     "Guests praise our South Indian, North Indian & Kerala menus, live counters, and warm service",
     "Mr. Kannan personally oversees events — many families call him part of their celebration story",
-    "Known for Dumrot, Badam Puri, Pal Payasam, Pani Puri, chaat counters, and multi-day wedding catering",
+    "Known for Dumrot, Badam Puri, Pal Payasam, Pani Puri, chaat counters, and multi-day wedding events",
     "5-star feedback on food quality, presentation, and stress-free execution",
 ]
 
 WEBSITE_ABOUT = (
     "We believe great stories are told of celebrations in every family — weddings, house warmings, "
     "naming ceremonies, upanayanam, and baby showers filled with joy, satisfaction, and lifelong memories. "
-    "Srivatsanka Events and Services Pvt Ltd is a one-stop solution for wedding catering, decor, pooja setup, "
+    "Srivatsanka Events and Services Pvt Ltd is a one-stop solution for wedding events, decor, pooja setup, "
     "and venues. We execute with operational excellence, outstanding hospitality, innovative menus, and a "
     "traditional touch. Our vision is to make your celebration an ecstatic event in reality."
 )
@@ -98,7 +98,7 @@ GALLERY_ITEMS: list[dict[str, str]] = [
     },
     {
         "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1657811033159-1.png",
-        "caption": "Past event — guests enjoying our catering",
+        "caption": "Past event — guests enjoying our food",
     },
     {
         "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1657811142282-1.png",
@@ -106,7 +106,7 @@ GALLERY_ITEMS: list[dict[str, str]] = [
     },
     {
         "url": "https://kannansharangapani.com/wp-content/uploads/2024/11/1694611435098-1.png",
-        "caption": "Another glimpse from events we have catered",
+        "caption": "Another glimpse from events we have hosted",
     },
 ]
 
@@ -120,7 +120,7 @@ def gallery_urls() -> list[str]:
 
 EVENT_TYPE_DETAILS: dict[str, dict] = {
     "Wedding": {
-        "title": "Wedding Catering",
+        "title": "Wedding Events",
         "short_reply": "We do lovely pure-veg wedding menus with live counters 🌿",
         "description": (
             "Multi-day wedding menus with South Indian, North Indian & Kerala favourites — "
@@ -161,9 +161,9 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
     },
     "Corporate events": {
         "title": "Corporate Events",
-        "short_reply": "On-time pure-veg catering for office & corporate events 💼",
+        "short_reply": "On-time pure-veg food for office & corporate events 💼",
         "description": (
-            "Professional catering for office lunches, conferences, and team events — "
+            "Professional food & hospitality for office lunches, conferences, and team events — "
             "hygienic, on-time, and customisable pure-veg menus."
         ),
         "image_captions": WELCOME_IMAGE_CAPTIONS,
@@ -180,12 +180,12 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
         "title": "Upanayanam",
         "short_reply": "Sattvic pure-veg meals for upanayanam gatherings 🙏",
         "description": (
-            "Sacred ceremony catering with sattvic pure-veg meals prepared with care for family gatherings."
+            "Sacred ceremony menus with sattvic pure-veg meals prepared with care for family gatherings."
         ),
         "image_captions": WELCOME_IMAGE_CAPTIONS,
     },
     "General": {
-        "title": "Celebration Catering",
+        "title": "Celebration Events",
         "short_reply": "We plan custom pure-veg menus for all family celebrations 🌿",
         "description": (
             "Custom pure-veg menus for naming ceremonies, upanayanam, birthdays, and family functions — "
@@ -271,7 +271,7 @@ def match_event_type(text: str) -> str:
 def build_short_company_context() -> str:
     """Brief company facts for natural Q&A replies."""
     return (
-        f"{COMPANY['brand_name']} ({COMPANY['legal_name']}) — pure vegetarian catering in Bengaluru "
+        f"{COMPANY['brand_name']} ({COMPANY['legal_name']}) — pure vegetarian events in Bengaluru "
         f"since {COMPANY['established']}, led by {COMPANY['managing_director']}. "
         f"Phone {COMPANY['phone']}. Website {WEBSITE_URL}. "
         f"We handle weddings, house warmings, corporate events, and multi-cuisine veg menus with live counters."
@@ -292,7 +292,7 @@ COMPANY (official website: {WEBSITE_URL})
 - {COMPANY['legal_name']} ({COMPANY['brand_name']}), established {COMPANY['established']}
 - Managing Director: {COMPANY['managing_director']}
 - Tagline: {COMPANY['tagline']}
-- Pure vegetarian catering & events — Bengaluru
+- Pure vegetarian events — Bengaluru
 - Contact: {COMPANY['phone']} | WhatsApp {COMPANY['whatsapp']} | {COMPANY['email']}
 - Address: {COMPANY['address']}
 

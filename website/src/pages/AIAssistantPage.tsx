@@ -102,7 +102,7 @@ export default function AIAssistantPage() {
           {loading && (
             <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
               <Loader2 size={16} className="animate-spin" />
-              Searching your catering data...
+              Searching your events data...
             </div>
           )}
         </div>

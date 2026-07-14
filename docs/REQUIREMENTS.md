@@ -2,7 +2,7 @@
 
 ## Objective
 
-Single-owner catering platform. Customers interact via **WhatsApp bot**. Owner manages everything from the **React dashboard**.
+Single-owner events platform. Customers interact via **WhatsApp bot**. Owner manages everything from the **React dashboard**.
 
 ## WhatsApp Customer Flow
 

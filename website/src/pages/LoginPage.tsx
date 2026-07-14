@@ -52,7 +52,7 @@ export default function LoginPage() {
             <div>
               <h1 className="text-xl font-semibold text-[var(--foreground)]">Sign in</h1>
               <p className="text-sm text-[var(--muted)] mt-0.5">
-                {usesSupabase ? 'Sign in with your Supabase account' : 'SRIVATSANKA catering dashboard'}
+                {usesSupabase ? 'Sign in with your Supabase account' : 'SRIVATSANKA EVENTS dashboard'}
               </p>
             </div>
           </div>

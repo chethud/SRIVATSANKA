@@ -18,7 +18,7 @@ MIME_BY_EXT = {
     ".pdf": "application/pdf",
 }
 
-EXPENSE_PROMPT = """You are reading a catering business EXPENSE bill or receipt (India, INR).
+EXPENSE_PROMPT = """You are reading an events business EXPENSE bill or receipt (India, INR).
 Extract from the document and return ONLY valid JSON (no markdown):
 {
   "doc_type": "expense",

@@ -40,7 +40,7 @@ async def send_welcome_media(to: str, session: ConversationSession) -> None:
     await send_whatsapp_message(to, intro)
 
     for i, url in enumerate(GALLERY_IMAGE_URLS[:3]):
-        cap = WELCOME_IMAGE_CAPTIONS[i] if i < len(WELCOME_IMAGE_CAPTIONS) else "Our catering"
+        cap = WELCOME_IMAGE_CAPTIONS[i] if i < len(WELCOME_IMAGE_CAPTIONS) else "Our events"
         ok = await send_whatsapp_image(to, url, caption=cap)
         if not ok:
             logger.warning("Welcome image %s failed for %s", url, to)
