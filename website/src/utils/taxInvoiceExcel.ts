@@ -116,15 +116,16 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
     views: [{ showGridLines: false }],
   });
 
+  // Column widths match Casagrand / RA Hospitalities sales invoices
   ws.columns = [
-    { key: 'a', width: 16 },
-    { key: 'b', width: 14 },
-    { key: 'c', width: 22 },
-    { key: 'd', width: 12 },
-    { key: 'e', width: 8 },
-    { key: 'f', width: 10 },
-    { key: 'g', width: 6 },
-    { key: 'h', width: 16 },
+    { key: 'a', width: 15.66 },
+    { key: 'b', width: 13.1 },
+    { key: 'c', width: 21.89 },
+    { key: 'd', width: 11 },
+    { key: 'e', width: 5.22 },
+    { key: 'f', width: 7.33 },
+    { key: 'g', width: 3.78 },
+    { key: 'h', width: 17.11 },
   ];
 
   const border = thinBorder();
@@ -141,30 +142,31 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
     }
   };
 
-  // Row 2 — Original
+  // Row 2 — Original (logo sits in A2:A4 on paper invoices)
+  merge('A2:A4');
   ws.getCell('H2').value = 'Original';
   ws.getCell('H2').alignment = { horizontal: 'right' };
   ws.getCell('H2').font = { bold: true, size: 11 };
 
   // Row 3 — Company name
   merge('B3:H3');
-  ws.getRow(3).height = 42;
+  ws.getRow(3).height = 55.5;
   ws.getCell('B3').value = INVOICE_COMPANY.legalName;
   ws.getCell('B3').font = { name: 'Calibri', size: 20, bold: true };
   ws.getCell('B3').alignment = center;
 
   // Row 4 — FSSAI / address / email
   merge('B4:H4');
-  ws.getRow(4).height = 48;
+  ws.getRow(4).height = 45.75;
   ws.getCell('B4').value =
-    `FSSAI  Lic No:${INVOICE_COMPANY.fssai}\n${INVOICE_COMPANY.address}                                                                                                                              Email Id :${INVOICE_COMPANY.email}`;
+    `FSSAI  Lic No:${INVOICE_COMPANY.fssai}\n${INVOICE_COMPANY.address}\nEmail Id :${INVOICE_COMPANY.email}`;
   ws.getCell('B4').font = { size: 10, bold: true };
   ws.getCell('B4').alignment = { ...left, wrapText: true };
 
   // Row 5 — TAX INVOICE
   merge('A5:H5');
-  ws.getRow(5).height = 24;
-  ws.getCell('A5').value = copyType === 'kitchen' ? 'KITCHEN / TAX INVOICE' : 'TAX INVOICE  ';
+  ws.getRow(5).height = 23.25;
+  ws.getCell('A5').value = 'TAX INVOICE  ';
   ws.getCell('A5').font = { name: 'Calibri', size: 16, bold: true };
   ws.getCell('A5').alignment = center;
 
