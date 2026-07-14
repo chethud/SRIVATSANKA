@@ -11,7 +11,8 @@ from sqlalchemy.orm import selectinload
 
 from app.models import Enquiry, EnquiryDish, EnquiryStatus
 
-DEMO_MARKER = "[demo] excel-ref"
+# Do NOT use "[demo]" — startup clear_demo_rows wipes every notes row containing that substring.
+DEMO_MARKER = "[excel-ref]"
 
 
 def _col(cid: str, date: str, label: str, base: str, pax: int | None, t0: str | None, t1: str | None, amount: int | None):
@@ -307,6 +308,19 @@ async def clear_excel_ref_orders(session: AsyncSession) -> int:
         await session.delete(enquiry)
     await session.commit()
     return len(rows)
+
+
+async def excel_ref_order_count(session: AsyncSession) -> int:
+    result = await session.execute(select(Enquiry.id).where(Enquiry.notes.contains(DEMO_MARKER)))
+    return len(result.scalars().all())
+
+
+async def ensure_excel_reference_orders(session: AsyncSession) -> dict:
+    """Seed Excel-reference orders only when none exist (safe for every API restart)."""
+    existing = await excel_ref_order_count(session)
+    if existing > 0:
+        return {"removed": 0, "created": 0, "orders": [], "marker": DEMO_MARKER, "skipped": True, "existing": existing}
+    return await seed_excel_reference_orders(session, replace=False)
 
 
 async def seed_excel_reference_orders(session: AsyncSession, *, replace: bool = True) -> dict:

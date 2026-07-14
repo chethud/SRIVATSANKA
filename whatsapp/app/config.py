@@ -118,6 +118,8 @@ class Settings(BaseSettings):
 
     # Demo dashboard data (Settings → Load demo data, or POST /dev/seed)
     seed_demo_on_startup: bool = False
+    # Ensure 4 Excel-reference converted orders exist after each deploy/restart
+    seed_excel_refs_on_startup: bool = True
     dev_seed_token: str = ""  # optional X-Dev-Seed-Token header when set
 
     # Owner dashboard login (JWT — multiple members can sign in at once)

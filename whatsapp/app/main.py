@@ -51,6 +51,7 @@ async def lifespan(_app: FastAPI):
         warmup_jwks()
 
     from app.data.seed_demo_data import clear_demo_rows, seed_demo_data
+    from app.data.seed_excel_reference_orders import ensure_excel_reference_orders
 
     async with SessionLocal() as session:
         # Always strip demo-marked rows; keep dish catalog (seeded in init_db).
@@ -59,6 +60,9 @@ async def lifespan(_app: FastAPI):
         if settings.seed_demo_on_startup:
             result = await seed_demo_data(session, force=True)
             log.info("Demo data seeded on startup (SEED_DEMO_ON_STARTUP=true): %s", result)
+        if settings.seed_excel_refs_on_startup:
+            excel_refs = await ensure_excel_reference_orders(session)
+            log.info("Excel-reference orders on startup: %s", excel_refs)
     start_scheduler()
     if is_gemini_configured():
         log.info("Gemini AI enabled for WhatsApp conversations (model=%s)", settings.gemini_model)
