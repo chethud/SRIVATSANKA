@@ -18,10 +18,12 @@ import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
 import { OrderExtrasTable } from './order/OrderExtrasSection';
 import { OrderRegionalStylePrint } from './order/OrderRegionalStyleSection';
 import { VenueMapQrPrint } from './order/OrderVenueMapSection';
+import { kitchenSpecificationNotes } from '../utils/kitchenSpecs';
 
 export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: 'kitchen' | 'billing' }) {
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
   const extras = parseOrderNotes(enquiry.notes);
+  const kitchenSpecs = kitchenSpecificationNotes(extras.dietary);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, enquiry, menuItems);
   const grandTotal = useMemo(() => {
@@ -68,6 +70,16 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         <OrderRegionalStylePrint stylesByDate={stylesByDate} />
       </div>
 
+      {copyType === 'kitchen' && kitchenSpecs.length > 0 && (
+        <div className="copy-spec-banner" role="note">
+          {kitchenSpecs.map((note) => (
+            <p key={note} className="copy-spec-banner-line">
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
+
       <div className="copy-menu">
         {columns.length === 0 ? (
           <p className="copy-empty">No dishes on this order yet.</p>
@@ -79,7 +91,10 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
             const dayStyle = shownDayStyle[index];
 
             return (
-              <section key={col.id} className="copy-session-block">
+              <section
+                key={col.id}
+                className={`copy-session-block ${copyType === 'kitchen' ? 'copy-session-kitchen' : ''}`}
+              >
                 <div className="copy-session-date">{formatDate(col.date)}</div>
                 {dayStyle && (
                   <div className="copy-session-style font-semibold text-[var(--primary)]">
@@ -119,6 +134,7 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         <OrderExtrasTable
           items={extras.extraItems ?? []}
           hideAmounts={copyType === 'kitchen'}
+          highlightSpecs={copyType === 'kitchen'}
         />
       )}
 

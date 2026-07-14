@@ -10,6 +10,7 @@ import {
 } from '../../utils/orderNotes';
 import { Button } from '../Layout';
 import { formatColumnAmount } from '../../utils/orderMenuGrid';
+import { isKitchenSpecification } from '../../utils/kitchenSpecs';
 
 function newCustomExtraItem(): OrderExtraItem {
   return {
@@ -305,11 +306,14 @@ export function OrderExtrasTable({
   items,
   className = '',
   hideAmounts = false,
+  highlightSpecs = false,
 }: {
   items: OrderExtraItem[];
   className?: string;
   /** Kitchen copy: list extras without ₹ amounts */
   hideAmounts?: boolean;
+  /** Kitchen copy: Garlands / allergy-style titles in red */
+  highlightSpecs?: boolean;
 }) {
   const rows = activeOrderExtraItems(items);
   if (rows.length === 0) return null;
@@ -330,20 +334,32 @@ export function OrderExtrasTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-[var(--border)] last:border-0 align-top">
-                <td className="p-3 font-semibold border-r border-[var(--border)]">{row.title}</td>
-                <td className="p-3 border-r border-[var(--border)] whitespace-pre-wrap">{row.description}</td>
-                <td
-                  className={`p-3 font-semibold text-center ${hideAmounts ? '' : 'border-r border-[var(--border)]'}`}
-                >
-                  {row.quantity}
-                </td>
-                {!hideAmounts && (
-                  <td className="p-3 font-semibold text-right">{formatColumnAmount(row.amount) || '—'}</td>
-                )}
-              </tr>
-            ))}
+            {rows.map((row) => {
+              const titleSpec = highlightSpecs && isKitchenSpecification(row.title);
+              const descSpec = highlightSpecs && isKitchenSpecification(row.description);
+              return (
+                <tr key={row.id} className="border-b border-[var(--border)] last:border-0 align-top">
+                  <td
+                    className={`p-3 font-semibold border-r border-[var(--border)] ${titleSpec ? 'copy-spec-text' : ''}`}
+                  >
+                    {row.title}
+                  </td>
+                  <td
+                    className={`p-3 border-r border-[var(--border)] whitespace-pre-wrap ${descSpec ? 'copy-spec-text' : ''}`}
+                  >
+                    {row.description}
+                  </td>
+                  <td
+                    className={`p-3 font-semibold text-center ${hideAmounts ? '' : 'border-r border-[var(--border)]'}`}
+                  >
+                    {row.quantity}
+                  </td>
+                  {!hideAmounts && (
+                    <td className="p-3 font-semibold text-right">{formatColumnAmount(row.amount) || '—'}</td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

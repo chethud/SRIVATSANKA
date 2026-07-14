@@ -1,4 +1,4 @@
-import type { Workbook } from 'exceljs';
+import type { Workbook, Worksheet } from 'exceljs';
 import type { Enquiry } from '../api/client';
 import {
   activeOrderExtraItems,
@@ -12,6 +12,7 @@ import {
   sortMenuColumns,
 } from './orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from './mealSessions';
+import { isKitchenSpecification, kitchenSpecificationNotes } from './kitchenSpecs';
 
 /** Colours from Nithin / Muralidharan wedding menu Excels */
 const FILL = {
@@ -20,8 +21,11 @@ const FILL = {
   pax: 'FFFFFF00',
   amount: 'FFFFFF66',
   note: 'FFFF0000',
-  extra: 'FF92D050',
+  counter: 'FF92D050',
+  subtotal: 'FFFFFF00',
 } as const;
+
+const FONT_RED = 'FFFF0000';
 
 function solidFill(argb: string) {
   return {
@@ -61,18 +65,6 @@ function formatMenuDate(iso: string): Date | string {
   return d;
 }
 
-function kitchenBannerNotes(dietary: string[]): string[] {
-  const notes: string[] = [];
-  for (const item of dietary) {
-    const t = item.trim();
-    if (!t) continue;
-    if (/callback|occasion date|scheduled|requested:/i.test(t)) continue;
-    if (t.length > 120) continue;
-    notes.push(t);
-  }
-  return notes;
-}
-
 function clientTitle(enquiry: Enquiry): string {
   const datePart = enquiry.eventDate
     ? (() => {
@@ -85,12 +77,19 @@ function clientTitle(enquiry: Enquiry): string {
   return `Client : ${enquiry.customerName}${event}${datePart}`;
 }
 
+/** Green fill for counter / course sub-headers (Welcome Drink, Main Course, …). */
+function isCounterSubHeader(label: string): boolean {
+  return /\b(counter|welcome drink|main course|dosa counter|chat|chaat|juice counter)\b/i.test(label);
+}
+
 type SessionBlock = {
   label: string;
   paxLine: string;
   amount: number | null;
   dishNames: string[];
   fillSession: string;
+  /** Extra / ritual titles that print in red (Garlands, …) */
+  titleIsSpec: boolean;
 };
 
 type DayColumn = {
@@ -116,14 +115,16 @@ function buildDayColumns(
     const date = (column.date || enquiry.eventDate || '').slice(0, 10);
     if (!date) continue;
     const list = byDate.get(date) ?? [];
+    const label = column.sessionLabel;
     list.push({
-      label: column.sessionLabel,
+      label,
       paxLine: formatPaxTimeLine(column) || (column.pax ? `${column.pax} Pax` : ''),
       amount: typeof column.amount === 'number' ? column.amount : null,
       dishNames: dishesForColumn(column, menuItems, extras).map((d) =>
         copyType === 'kitchen' && d.served ? `${d.dishName} ✓` : d.dishName,
       ),
-      fillSession: FILL.session,
+      fillSession: isCounterSubHeader(label) ? FILL.counter : FILL.session,
+      titleIsSpec: false,
     });
     byDate.set(date, list);
   }
@@ -131,8 +132,6 @@ function buildDayColumns(
   const dayColumns: DayColumn[] = [...byDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, sessions]) => ({ date, sessions }));
-
-  // Extras are rendered below the day columns (not mixed into meal sessions).
 
   if (dayColumns.length === 0) {
     dayColumns.push({
@@ -144,6 +143,7 @@ function buildDayColumns(
           amount: null,
           dishNames: ['No dishes added yet'],
           fillSession: FILL.session,
+          titleIsSpec: false,
         },
       ],
     });
@@ -160,8 +160,38 @@ function activeExtrasAsBlocks(enquiry: Enquiry): SessionBlock[] {
     paxLine: item.quantity?.trim() || '',
     amount: typeof item.amount === 'number' ? item.amount : null,
     dishNames: item.description ? [item.description] : [],
-    fillSession: FILL.extra,
+    fillSession: FILL.counter,
+    titleIsSpec: isKitchenSpecification(item.title) || isKitchenSpecification(item.description || ''),
   }));
+}
+
+function paintMergedRow(
+  ws: Worksheet,
+  row: number,
+  colCount: number,
+  value: string,
+  opts: {
+    fill?: string;
+    font?: { name?: string; size?: number; bold?: boolean; color?: { argb: string } };
+    align?: typeof alignCenter | typeof alignLeftMiddle;
+    height?: number;
+  },
+) {
+  const border = thinBorder();
+  ws.mergeCells(row, 1, row, colCount);
+  const cell = ws.getCell(row, 1);
+  cell.value = value;
+  cell.font = opts.font ?? { name: 'Calibri', size: 11, bold: true };
+  if (opts.fill) cell.fill = solidFill(opts.fill);
+  cell.alignment = opts.align ?? alignCenter;
+  cell.border = border;
+  for (let c = 1; c <= colCount; c++) {
+    const side = ws.getCell(row, c);
+    if (opts.fill) side.fill = solidFill(opts.fill);
+    side.border = border;
+    side.alignment = opts.align ?? alignCenter;
+  }
+  if (opts.height) ws.getRow(row).height = opts.height;
 }
 
 /**
@@ -174,7 +204,7 @@ export async function appendMenuSheet(
   copyType: 'kitchen' | 'billing',
 ) {
   const ws = wb.addWorksheet('Menu', {
-    views: [{ showGridLines: true }],
+    views: [{ state: 'frozen', ySplit: 3, showGridLines: true }],
   });
 
   const extras = parseOrderNotes(enquiry.notes);
@@ -191,40 +221,33 @@ export async function appendMenuSheet(
     ws.getColumn(i).width = colWidth;
   }
 
-  // Row 1 — Client
-  ws.mergeCells(1, 1, 1, colCount);
-  const clientText = clientTitle(enquiry);
-  const c1 = ws.getCell(1, 1);
-  c1.value = clientText;
-  c1.font = bold;
-  c1.fill = solidFill(FILL.header);
-  c1.alignment = alignCenter;
-  c1.border = border;
-  ws.getRow(1).height = wrappedRowHeight(clientText, totalCharsWide, 16, 24);
+  // Row 1 — Client (light blue)
+  paintMergedRow(ws, 1, colCount, clientTitle(enquiry), {
+    fill: FILL.header,
+    font: bold,
+    height: wrappedRowHeight(clientTitle(enquiry), totalCharsWide, 16, 24),
+  });
 
-  // Row 2 — Venue
-  ws.mergeCells(2, 1, 2, colCount);
+  // Row 2 — Venue (light blue)
   const venueText = enquiry.eventLocation || 'Venue TBD';
-  const c2 = ws.getCell(2, 1);
-  c2.value = venueText;
-  c2.font = bold;
-  c2.fill = solidFill(FILL.header);
-  c2.alignment = alignCenter;
-  c2.border = border;
-  ws.getRow(2).height = wrappedRowHeight(venueText, totalCharsWide, 15, 22);
+  paintMergedRow(ws, 2, colCount, venueText, {
+    fill: FILL.header,
+    font: bold,
+    height: wrappedRowHeight(venueText, totalCharsWide, 15, 22),
+  });
 
   // Row 3 — one date per column
-  ws.getRow(3).height = 20;
+  ws.getRow(3).height = 22;
   dayColumns.forEach((day, i) => {
     const cell = ws.getCell(3, i + 1);
     cell.value = formatMenuDate(day.date);
-    if (cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
+    if (cell.value instanceof Date) cell.numFmt = 'dd-mmm-yy';
     cell.font = bold;
     cell.alignment = alignCenter;
     cell.border = border;
   });
 
-  // Row 4 — per-day cuisine style under each date (Kerala / Tamil Nadu / …)
+  // Row 4 — per-day cuisine style (green)
   const hasDayStyles = dayColumns.some((day) => resolveStyleForDate(extras, day.date));
   let nextRow = 4;
   if (hasDayStyles) {
@@ -234,29 +257,26 @@ export async function appendMenuSheet(
       const style = resolveStyleForDate(extras, day.date) || '';
       cell.value = style;
       cell.font = bold;
-      cell.fill = solidFill(FILL.extra);
+      cell.fill = solidFill(FILL.counter);
       cell.alignment = alignCenter;
       cell.border = border;
     });
     nextRow = 5;
   }
 
-  const notes = kitchenBannerNotes(extras.dietary);
+  // Specifications / dietary — red banner (allergy) like Muralidharan sheet
+  const notes = kitchenSpecificationNotes(extras.dietary);
   let cursorStart = nextRow;
   if (notes.length > 0) {
-    ws.mergeCells(nextRow, 1, nextRow, colCount);
     const noteText = notes.join(' — ');
-    const noteCell = ws.getCell(nextRow, 1);
-    noteCell.value = noteText;
-    noteCell.font = { ...bold, color: { argb: 'FFFFFFFF' } };
-    noteCell.fill = solidFill(FILL.note);
-    noteCell.alignment = alignCenter;
-    noteCell.border = border;
-    ws.getRow(nextRow).height = wrappedRowHeight(noteText, totalCharsWide, 15, 28);
+    paintMergedRow(ws, nextRow, colCount, noteText, {
+      fill: FILL.note,
+      font: { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF000000' } },
+      height: wrappedRowHeight(noteText, totalCharsWide, 15, 28),
+    });
     cursorStart = nextRow + 1;
   }
 
-  // Track max row used so we can border-fill empty cells evenly
   let maxRowUsed = cursorStart;
 
   dayColumns.forEach((day, i) => {
@@ -265,15 +285,17 @@ export async function appendMenuSheet(
 
     day.sessions.forEach((session, sessionIndex) => {
       if (sessionIndex > 0) {
-        // Blank spacer between sessions in the same day column
         const spacer = ws.getCell(row, col);
         spacer.border = border;
         row += 1;
       }
 
+      // Session header — orange (or green for counters)
       const sessionCell = ws.getCell(row, col);
       sessionCell.value = session.label;
-      sessionCell.font = bold;
+      sessionCell.font = isKitchenSpecification(session.label)
+        ? { ...bold, color: { argb: FONT_RED } }
+        : bold;
       sessionCell.fill = solidFill(session.fillSession);
       sessionCell.alignment = alignCenter;
       sessionCell.border = border;
@@ -283,19 +305,22 @@ export async function appendMenuSheet(
       );
       row += 1;
 
-      const paxCell = ws.getCell(row, col);
-      paxCell.value = session.paxLine;
-      paxCell.font = bold;
-      paxCell.fill = solidFill(FILL.pax);
-      paxCell.alignment = alignCenter;
-      paxCell.border = border;
-      ws.getRow(row).height = Math.max(
-        ws.getRow(row).height || 0,
-        wrappedRowHeight(session.paxLine || ' ', perColChars, 14, 20),
-      );
-      row += 1;
+      // Pax / time — bright yellow
+      if (session.paxLine) {
+        const paxCell = ws.getCell(row, col);
+        paxCell.value = session.paxLine;
+        paxCell.font = bold;
+        paxCell.fill = solidFill(FILL.pax);
+        paxCell.alignment = alignCenter;
+        paxCell.border = border;
+        ws.getRow(row).height = Math.max(
+          ws.getRow(row).height || 0,
+          wrappedRowHeight(session.paxLine, perColChars, 14, 20),
+        );
+        row += 1;
+      }
 
-      // Amounts only on order/billing copy — kitchen sees menu + pax only
+      // Amounts only on order/billing copy
       if (copyType !== 'kitchen') {
         const amountCell = ws.getCell(row, col);
         if (typeof session.amount === 'number' && session.amount > 0) {
@@ -315,7 +340,9 @@ export async function appendMenuSheet(
       for (const name of session.dishNames) {
         const dishCell = ws.getCell(row, col);
         dishCell.value = name;
-        dishCell.font = normal;
+        dishCell.font = isKitchenSpecification(name)
+          ? { ...bold, color: { argb: FONT_RED } }
+          : normal;
         dishCell.alignment = alignLeftMiddle;
         dishCell.border = border;
         ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 18);
@@ -326,54 +353,37 @@ export async function appendMenuSheet(
     maxRowUsed = Math.max(maxRowUsed, row - 1);
   });
 
-  // Extras section below all day columns (Nithin / Muralidharan footer list style)
+  // Sub Total bar (yellow) then extras — matches reference footer break
   const extraBlocks = activeExtrasAsBlocks(enquiry);
   if (extraBlocks.length > 0) {
     let row = maxRowUsed + 2;
 
-    ws.mergeCells(row, 1, row, colCount);
-    const extrasHead = ws.getCell(row, 1);
-    extrasHead.value = 'Extras';
-    extrasHead.font = bold;
-    extrasHead.fill = solidFill(FILL.extra);
-    extrasHead.alignment = alignCenter;
-    extrasHead.border = border;
-    for (let c = 1; c <= colCount; c++) {
-      ws.getCell(row, c).fill = solidFill(FILL.extra);
-      ws.getCell(row, c).border = border;
-    }
-    ws.getRow(row).height = 22;
+    paintMergedRow(ws, row, colCount, 'Sub Total', {
+      fill: FILL.subtotal,
+      font: bold,
+      height: 22,
+    });
     row += 1;
 
     for (const session of extraBlocks) {
-      // Title spanning full width
-      ws.mergeCells(row, 1, row, colCount);
-      const titleCell = ws.getCell(row, 1);
-      titleCell.value = session.label;
-      titleCell.font = bold;
-      titleCell.fill = solidFill(FILL.extra);
-      titleCell.alignment = alignLeftMiddle;
-      titleCell.border = border;
-      for (let c = 1; c <= colCount; c++) {
-        ws.getCell(row, c).fill = solidFill(FILL.extra);
-        ws.getCell(row, c).border = border;
-      }
-      ws.getRow(row).height = wrappedRowHeight(session.label, totalCharsWide, 14, 20);
+      const titleIsRed = session.titleIsSpec || isKitchenSpecification(session.label);
+      paintMergedRow(ws, row, colCount, session.label, {
+        fill: titleIsRed ? undefined : FILL.counter,
+        font: titleIsRed
+          ? { name: 'Calibri', size: 11, bold: true, color: { argb: FONT_RED } }
+          : bold,
+        align: alignLeftMiddle,
+        height: wrappedRowHeight(session.label, totalCharsWide, 14, 20),
+      });
       row += 1;
 
       if (session.paxLine) {
-        ws.mergeCells(row, 1, row, colCount);
-        const qtyCell = ws.getCell(row, 1);
-        qtyCell.value = session.paxLine;
-        qtyCell.font = bold;
-        qtyCell.fill = solidFill(FILL.pax);
-        qtyCell.alignment = alignLeftMiddle;
-        qtyCell.border = border;
-        for (let c = 1; c <= colCount; c++) {
-          ws.getCell(row, c).fill = solidFill(FILL.pax);
-          ws.getCell(row, c).border = border;
-        }
-        ws.getRow(row).height = 18;
+        paintMergedRow(ws, row, colCount, session.paxLine, {
+          fill: FILL.pax,
+          font: bold,
+          align: alignLeftMiddle,
+          height: 18,
+        });
         row += 1;
       }
 
@@ -395,33 +405,21 @@ export async function appendMenuSheet(
       }
 
       for (const name of session.dishNames) {
-        ws.mergeCells(row, 1, row, colCount);
-        const dishCell = ws.getCell(row, 1);
-        dishCell.value = name;
-        dishCell.font = normal;
-        dishCell.alignment = alignLeftMiddle;
-        dishCell.border = border;
-        for (let c = 1; c <= colCount; c++) {
-          ws.getCell(row, c).border = border;
-        }
-        ws.getRow(row).height = 18;
+        const lineIsSpec = isKitchenSpecification(name);
+        paintMergedRow(ws, row, colCount, name, {
+          font: lineIsSpec
+            ? { name: 'Calibri', size: 11, bold: true, color: { argb: FONT_RED } }
+            : normal,
+          align: alignLeftMiddle,
+          height: 18,
+        });
         row += 1;
       }
 
-      row += 1; // spacer between extras
+      row += 1;
     }
 
     maxRowUsed = row - 1;
-  }
-
-  // Header / note fills across merge width
-  for (let c = 1; c <= colCount; c++) {
-    ws.getCell(1, c).fill = solidFill(FILL.header);
-    ws.getCell(1, c).alignment = alignCenter;
-    ws.getCell(1, c).border = border;
-    ws.getCell(2, c).fill = solidFill(FILL.header);
-    ws.getCell(2, c).alignment = alignCenter;
-    ws.getCell(2, c).border = border;
   }
 
   // Light borders on empty cells so day columns align to the same height

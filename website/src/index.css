@@ -259,6 +259,32 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* Kitchen specs — red banner / text matching wedding-menu Excels */
+.copy-spec-banner {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  background: #ff0000;
+  color: #000000;
+  text-align: center;
+  border: 1px solid #000000;
+}
+
+.copy-spec-banner-line {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.copy-spec-banner-line + .copy-spec-banner-line {
+  margin-top: 0.35rem;
+}
+
+.copy-spec-text {
+  color: #ff0000 !important;
+  font-weight: 700;
+}
+
 .copy-regional-style {
   margin-top: 1rem;
   margin-bottom: 0;
@@ -312,6 +338,19 @@ body {
 .copy-session-pax {
   background: var(--background-alt);
   font-size: 1.0625rem;
+}
+
+/* Kitchen on-screen: yellow / orange session chrome like the Excel menus */
+.copy-session-kitchen .copy-session-date {
+  background: #b8cce4;
+}
+
+.copy-session-kitchen .copy-session-label {
+  background: #ffc000;
+}
+
+.copy-session-kitchen .copy-session-pax {
+  background: #ffff00;
 }
 
 .copy-dish-list {

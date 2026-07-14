@@ -214,10 +214,20 @@ def excel_reference_order_defs() -> list[dict]:
                 "2025-01-18": "Tamil Nadu style",
                 "2025-01-19": "Iyengar style",
             },
-            "dietary": ["Bride Allergy to Vegan No Ghee or Dairy products"],
+            "dietary": [
+                "Bride Allergy to Vegan No Ghee or Dairy products",
+                "Note: All items Onion No Garlic only",
+            ],
             "extras": [
                 _extra("e_sweet_m", "Sweet Box", "200 Box + 75 Box Groom / 400 Pax Bride", "275 Box", 80000),
                 _extra("e_thambula_m", "Thambula", "18 Jan 550pax · 19 Jan 400pax", "950 Pax", 45000),
+                _extra(
+                    "e_garlands_m",
+                    "Garlands",
+                    "Day 1 & Day 2 garlands — 21 Plates for Groom · Bridal set",
+                    "As listed",
+                    None,
+                ),
                 _extra("e_transport_m", "Transport and Cleaning", "Setting up of Kitchen, Transport, Cleaning", "1", 5000),
             ],
             "ref": "Muralidharan Daughter Wedding Menu",
