@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.data.seed_demo_data import clear_demo_rows, seed_demo_data
+from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
 from app.schemas import DevMessageRequest, DevMessageResponse
 from app.services.chat_log import log_bot_message, log_customer_message
@@ -32,6 +33,18 @@ async def seed_dashboard_demo(
     _check_seed_token(x_dev_seed_token)
     result = await seed_demo_data(db, force=True)
     logger.info("Demo data seeded via API: %s", result)
+    return result
+
+
+@router.post("/seed-excel-refs")
+async def seed_excel_reference_demo(
+    db: AsyncSession = Depends(get_db),
+    x_dev_seed_token: str | None = Header(default=None),
+) -> dict:
+    """Load 4 CONVERTED orders modeled on the Excel reference menu / invoice files."""
+    _check_seed_token(x_dev_seed_token)
+    result = await seed_excel_reference_orders(db, replace=True)
+    logger.info("Excel-reference orders seeded via API: %s", result)
     return result
 
 
