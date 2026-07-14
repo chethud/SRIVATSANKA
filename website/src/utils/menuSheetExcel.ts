@@ -284,19 +284,22 @@ export async function appendMenuSheet(
       );
       row += 1;
 
-      const amountCell = ws.getCell(row, col);
-      if (typeof session.amount === 'number' && session.amount > 0) {
-        amountCell.value = session.amount;
-        amountCell.numFmt = '#,##0';
-      } else {
-        amountCell.value = '';
+      // Amounts only on order/billing copy — kitchen sees menu + pax only
+      if (copyType !== 'kitchen') {
+        const amountCell = ws.getCell(row, col);
+        if (typeof session.amount === 'number' && session.amount > 0) {
+          amountCell.value = session.amount;
+          amountCell.numFmt = '#,##0';
+        } else {
+          amountCell.value = '';
+        }
+        amountCell.font = bold;
+        amountCell.fill = solidFill(FILL.amount);
+        amountCell.alignment = alignCenter;
+        amountCell.border = border;
+        ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 18);
+        row += 1;
       }
-      amountCell.font = bold;
-      amountCell.fill = solidFill(FILL.amount);
-      amountCell.alignment = alignCenter;
-      amountCell.border = border;
-      ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 18);
-      row += 1;
 
       for (const name of session.dishNames) {
         const dishCell = ws.getCell(row, col);
