@@ -43,7 +43,7 @@ SUPABASE_JWT_SECRET=
 GEMINI_API_KEY=your-gemini-key
 CORS_ORIGINS=https://YOUR-VERCEL-APP.vercel.app,http://localhost:5173
 OWNER_PHONE_NUMBER=917899410254
-SEED_DEMO_ON_STARTUP=true
+SEED_DEMO_ON_STARTUP=false
 ```
 
 - **SUPABASE_URL** — required for API auth (JWKS + Auth API verification).
@@ -104,7 +104,7 @@ Sign in at http://localhost:5173 with the Supabase user email/password.
 
 1. **Health:** `https://YOUR-API.onrender.com/api/health` → `{"status":"ok"}`
 2. **Sign in** on the dashboard with your Supabase user email
-3. **Supabase → Table Editor** — `Enquiry`, `Dish`, `Vendor`, etc. after demo data or real use
+3. **Supabase → Table Editor** — `Dish` catalog seeds on startup; enquiries/vendors appear from real WhatsApp/dashboard use
 4. **Authentication → Users** — your signed-in user appears there
 
 ---

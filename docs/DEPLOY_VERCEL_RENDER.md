@@ -43,20 +43,13 @@ CORS_ORIGINS=https://your-vercel-app.vercel.app,http://localhost:5173
 Replace with your real Vercel URL after step 2.  
 Vercel preview URLs (`*.vercel.app`) are also allowed automatically.
 
-### Demo data on live (Render + Vercel)
+### Data on live
 
-After deploy, dummy dashboard data can be loaded in either way:
+- **Menu dish names** are seeded automatically (kept).
+- **Demo/dummy enquiries, vendors, workers, expenses** are cleared on each API startup.
+- Leave `SEED_DEMO_ON_STARTUP=false` on Render (default in `render.yaml`).
 
-1. **Automatic (recommended):** In Render → **Environment**, set `SEED_DEMO_ON_STARTUP=true` (included in `render.yaml`). Each deploy seeds 5 demo enquiries, 2 converted orders, vendors, workers, and expenses.
-
-2. **Manual:** Open your Vercel site → **Settings** → **Load demo data**, or run:
-   ```bash
-   curl -X POST https://srivatsanka.onrender.com/dev/seed
-   ```
-
-Demo rows are tagged `[demo]` and are replaced when you seed again.
-
-**Vercel:** Set `VITE_API_URL` to `https://srivatsanka.onrender.com` (no trailing slash).
+**Vercel:** Leave `VITE_API_URL` empty (uses `/api` proxy), or set it to `https://srivatsanka.onrender.com` (no trailing slash).
 
 ### Notes
 

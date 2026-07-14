@@ -68,7 +68,8 @@ def _add_order_lines(
     return len(subset)
 
 
-async def _clear_demo_rows(session: AsyncSession) -> None:
+async def clear_demo_rows(session: AsyncSession) -> dict:
+    """Remove all rows marked as demo. Leaves dish catalog and real data intact."""
     demo_enquiries = (
         await session.execute(
             select(Enquiry.id).where(Enquiry.notes.isnot(None)).where(Enquiry.notes.contains(DEMO_MARKER))
@@ -86,17 +87,31 @@ async def _clear_demo_rows(session: AsyncSession) -> None:
     if demo_worker_ids:
         await session.execute(delete(WorkerAssignment).where(WorkerAssignment.workerId.in_(demo_worker_ids)))
 
-    await session.execute(delete(Notification).where(Notification.message.contains(DEMO_MARKER)))
-    await session.execute(delete(Vendor).where(Vendor.notes.contains(DEMO_MARKER)))
-    await session.execute(delete(Worker).where(Worker.role.contains(DEMO_MARKER)))
-    await session.execute(delete(Expense).where(Expense.description.contains(DEMO_MARKER)))
+    notif = await session.execute(delete(Notification).where(Notification.message.contains(DEMO_MARKER)))
+    vendor = await session.execute(delete(Vendor).where(Vendor.notes.contains(DEMO_MARKER)))
+    worker = await session.execute(delete(Worker).where(Worker.role.contains(DEMO_MARKER)))
+    expense = await session.execute(delete(Expense).where(Expense.description.contains(DEMO_MARKER)))
+    await session.execute(
+        delete(InvoiceUpload).where(
+            InvoiceUpload.notes.isnot(None),
+            InvoiceUpload.notes.contains(DEMO_MARKER),
+        )
+    )
     await session.commit()
+    return {
+        "enquiriesRemoved": len(demo_enquiries),
+        "notificationsRemoved": notif.rowcount or 0,
+        "vendorsRemoved": vendor.rowcount or 0,
+        "workersRemoved": worker.rowcount or 0,
+        "expensesRemoved": expense.rowcount or 0,
+        "marker": DEMO_MARKER,
+    }
 
 
 async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
     """Insert dummy enquiries, orders, vendors, workers, expenses, notifications."""
     if force:
-        await _clear_demo_rows(session)
+        await clear_demo_rows(session)
 
     dishes = await _load_all_dishes(session)
     now = datetime.now()

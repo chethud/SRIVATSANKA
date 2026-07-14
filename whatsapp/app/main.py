@@ -50,17 +50,15 @@ async def lifespan(_app: FastAPI):
     if is_supabase_auth_configured():
         warmup_jwks()
 
-    from sqlalchemy import func, select
-
-    from app.data.seed_demo_data import seed_demo_data
-    from app.models import Enquiry
+    from app.data.seed_demo_data import clear_demo_rows, seed_demo_data
 
     async with SessionLocal() as session:
-        count = await session.scalar(select(func.count()).select_from(Enquiry)) or 0
-        should_seed = settings.seed_demo_on_startup or count == 0
-        if should_seed:
-            result = await seed_demo_data(session, force=settings.seed_demo_on_startup or count == 0)
-            logging.getLogger(__name__).info("Demo data seeded on startup: %s", result)
+        # Always strip demo-marked rows; keep dish catalog (seeded in init_db).
+        cleared = await clear_demo_rows(session)
+        log.info("Demo data cleared on startup: %s", cleared)
+        if settings.seed_demo_on_startup:
+            result = await seed_demo_data(session, force=True)
+            log.info("Demo data seeded on startup (SEED_DEMO_ON_STARTUP=true): %s", result)
     start_scheduler()
     if is_gemini_configured():
         log.info("Gemini AI enabled for WhatsApp conversations (model=%s)", settings.gemini_model)

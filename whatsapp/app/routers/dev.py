@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.data.seed_demo_data import seed_demo_data
+from app.data.seed_demo_data import clear_demo_rows, seed_demo_data
 from app.database import get_db
 from app.schemas import DevMessageRequest, DevMessageResponse
 from app.services.chat_log import log_bot_message, log_customer_message
@@ -28,10 +28,22 @@ async def seed_dashboard_demo(
     db: AsyncSession = Depends(get_db),
     x_dev_seed_token: str | None = Header(default=None),
 ) -> dict:
-    """Load dummy enquiries, orders, vendors, workers, and expenses for UI testing."""
+    """Optional: load dummy data for local UI testing (disabled on production via SEED_DEMO_ON_STARTUP=false)."""
     _check_seed_token(x_dev_seed_token)
     result = await seed_demo_data(db, force=True)
     logger.info("Demo data seeded via API: %s", result)
+    return result
+
+
+@router.post("/clear-demo")
+async def clear_dashboard_demo(
+    db: AsyncSession = Depends(get_db),
+    x_dev_seed_token: str | None = Header(default=None),
+) -> dict:
+    """Remove demo-marked enquiries, vendors, workers, expenses. Keeps dishes and real data."""
+    _check_seed_token(x_dev_seed_token)
+    result = await clear_demo_rows(db)
+    logger.info("Demo data cleared via API: %s", result)
     return result
 
 
