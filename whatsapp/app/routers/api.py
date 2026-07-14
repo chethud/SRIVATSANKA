@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.data.seed_dishes import CATEGORY_LABELS
+from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
 from app.models import Dish, Enquiry, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
 from app.quantity_units import normalize_quantity, normalize_quantity_unit
@@ -257,6 +258,12 @@ async def mark_enquiry_viewed(
         await db.commit()
         await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)
+
+
+@router.post("/seed-excel-refs")
+async def seed_excel_reference_orders_api(db: AsyncSession = Depends(get_db)) -> dict:
+    """Load 4 Excel-reference CONVERTED orders (Nithin, Muralidharan, Casagrand, RA)."""
+    return await seed_excel_reference_orders(db, replace=True)
 
 
 @router.get("/notifications", response_model=list[NotificationOut])

@@ -373,6 +373,15 @@ export async function markEnquiryViewed(id: string): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}/viewed`, { method: 'POST' });
 }
 
+export async function seedExcelReferenceOrders(): Promise<{
+  removed: number;
+  created: number;
+  orders: { id: string; customerName: string; ref: string }[];
+  marker: string;
+}> {
+  return apiFetch('/api/seed-excel-refs', { method: 'POST' });
+}
+
 export async function createDish(data: { name: string; category: string; price: number; description?: string }) {
   return apiFetch<Dish>('/api/dishes', {
     method: 'POST',

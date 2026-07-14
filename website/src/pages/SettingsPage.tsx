@@ -1,19 +1,37 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PageHeader, Card } from '../components/Layout';
+import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
-import { fetchWhatsAppStatus, type WhatsAppStatus } from '../api/client';
+import { fetchWhatsAppStatus, seedExcelReferenceOrders, type WhatsAppStatus } from '../api/client';
 import { ErrorBanner } from '../components/ui';
 
 export default function SettingsPage() {
   const { connected, stats, lastSync, refresh } = useAppData();
   const [wa, setWa] = useState<WhatsAppStatus | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState('');
 
   useEffect(() => {
     if (connected) {
       fetchWhatsAppStatus().then(setWa).catch(() => setWa(null));
     }
   }, [connected, lastSync]);
+
+  async function loadExcelRefs() {
+    setSeeding(true);
+    setSeedMsg('');
+    try {
+      const result = await seedExcelReferenceOrders();
+      setSeedMsg(
+        `Loaded ${result.created} Excel-reference orders (removed ${result.removed} old). Open Orders to download Excel.`,
+      );
+      await refresh();
+    } catch (err) {
+      setSeedMsg(err instanceof Error ? err.message : 'Could not load Excel reference orders.');
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   return (
     <>
@@ -25,7 +43,9 @@ export default function SettingsPage() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-[var(--muted)]">API</dt>
-              <dd className={connected ? 'text-[var(--logo-forest)] font-medium' : 'text-[var(--danger)]'}>{connected ? 'Connected' : 'Offline'}</dd>
+              <dd className={connected ? 'text-[var(--logo-forest)] font-medium' : 'text-[var(--danger)]'}>
+                {connected ? 'Connected' : 'Offline'}
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-[var(--muted)]">New Enquiries</dt>
@@ -39,6 +59,19 @@ export default function SettingsPage() {
               Force refresh now
             </button>
           </dl>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="font-semibold mb-2">Excel reference orders</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Load 4 sample converted orders modeled on your reference Excels (Nithin wedding menu,
+            Muralidharan wedding menu, Casagrand invoice, RA Hospitalities invoice). Then open each
+            order and use Download Excel to compare.
+          </p>
+          <Button type="button" onClick={() => void loadExcelRefs()} disabled={!connected || seeding}>
+            {seeding ? 'Loading…' : 'Load 4 Excel reference orders'}
+          </Button>
+          {seedMsg && <p className="text-sm mt-3 text-[var(--foreground)]">{seedMsg}</p>}
         </Card>
 
         <Card className="p-6">
@@ -62,25 +95,45 @@ export default function SettingsPage() {
             <ul className="text-sm space-y-2 mb-4">
               <li className="flex justify-between">
                 <span>Configured</span>
-                <span className={wa.configured ? 'text-[var(--logo-forest)]' : 'text-[var(--chart-amber)]'}>{wa.configured ? 'Yes' : 'No — add tokens in whatsapp/.env'}</span>
+                <span className={wa.configured ? 'text-[var(--logo-forest)]' : 'text-[var(--chart-amber)]'}>
+                  {wa.configured ? 'Yes' : 'No — add tokens in whatsapp/.env'}
+                </span>
               </li>
-              <li className="flex justify-between"><span>Phone Number ID</span><span>{wa.phone_number_id_set ? 'Set' : 'Missing'}</span></li>
-              <li className="flex justify-between"><span>Access Token</span><span>{wa.token_set ? 'Set' : 'Missing'}</span></li>
-              <li className="flex justify-between"><span>Owner alerts to</span><span>{wa.owner_phone}</span></li>
+              <li className="flex justify-between">
+                <span>Phone Number ID</span>
+                <span>{wa.phone_number_id_set ? 'Set' : 'Missing'}</span>
+              </li>
+              <li className="flex justify-between">
+                <span>Access Token</span>
+                <span>{wa.token_set ? 'Set' : 'Missing'}</span>
+              </li>
+              <li className="flex justify-between">
+                <span>Owner alerts to</span>
+                <span>{wa.owner_phone}</span>
+              </li>
             </ul>
           ) : (
             <p className="text-sm text-[var(--muted)] mb-4">Connect API to see live WhatsApp status.</p>
           )}
-          <p className="text-sm text-[var(--muted)] mb-3">Webhook: <code>https://YOUR-DOMAIN/webhook</code></p>
-          <p className="text-sm text-[var(--muted)] mb-4">Guide: <code>docs/META_WHATSAPP_SETUP.md</code></p>
-          <Link to="/bot-tester" className="inline-block px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm hover:bg-[var(--primary-hover)] mr-3">
+          <p className="text-sm text-[var(--muted)] mb-3">
+            Webhook: <code>https://YOUR-DOMAIN/webhook</code>
+          </p>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Guide: <code>docs/META_WHATSAPP_SETUP.md</code>
+          </p>
+          <Link
+            to="/bot-tester"
+            className="inline-block px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm hover:bg-[var(--primary-hover)] mr-3"
+          >
             Open WhatsApp Chat
           </Link>
         </Card>
 
         <Card className="p-6">
           <h3 className="font-semibold mb-4">WhatsApp AI Agent</h3>
-          <p className="text-sm text-[var(--muted)]">Set <code>GEMINI_API_KEY</code> in <code>whatsapp/.env</code> for AI conversations.</p>
+          <p className="text-sm text-[var(--muted)]">
+            Set <code>GEMINI_API_KEY</code> in <code>whatsapp/.env</code> for AI conversations.
+          </p>
         </Card>
 
         <Card className="p-6">
