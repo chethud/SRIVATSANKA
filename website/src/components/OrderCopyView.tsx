@@ -145,7 +145,11 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         </div>
       )}
 
-      {copyType === 'kitchen' && <VenueMapQrPrint mapLink={extras.venueMapLink} />}
+      {copyType === 'kitchen' && (
+        <footer className="copy-venue-footer">
+          <VenueMapQrPrint mapLink={extras.venueMapLink} />
+        </footer>
+      )}
     </div>
   );
 }

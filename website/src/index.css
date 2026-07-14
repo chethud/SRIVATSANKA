@@ -285,6 +285,15 @@ body {
   font-weight: 700;
 }
 
+.copy-venue-footer {
+  margin-top: 2rem;
+  padding-top: 0.5rem;
+}
+
+.copy-venue-qr {
+  margin-top: 0;
+}
+
 .copy-regional-style {
   margin-top: 1rem;
   margin-bottom: 0;

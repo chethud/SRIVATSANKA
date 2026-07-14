@@ -98,21 +98,25 @@ export function VenueMapQrPrint({ mapLink }: { mapLink: string | null | undefine
     };
   }, [url]);
 
-  if (!url || !qrSrc) return null;
+  if (!url) return null;
 
   return (
-    <div className="mt-8 border border-[var(--border-strong)] overflow-hidden">
+    <div className="copy-venue-qr border border-[var(--border-strong)] overflow-hidden">
       <div className="copy-grid-meta font-bold text-center border-b border-[var(--border)] bg-[var(--table-header-bg)]">
         Venue — scan for directions
       </div>
       <div className="px-4 py-6 text-center">
-        <img
-          src={qrSrc}
-          alt="QR code for venue map"
-          width={220}
-          height={220}
-          className="mx-auto block"
-        />
+        {qrSrc ? (
+          <img
+            src={qrSrc}
+            alt="QR code for venue map"
+            width={220}
+            height={220}
+            className="mx-auto block"
+          />
+        ) : (
+          <p className="text-sm text-[var(--muted)]">Preparing QR…</p>
+        )}
         <p className="text-xs text-[var(--muted)] mt-4 break-all max-w-md mx-auto">{url}</p>
       </div>
     </div>

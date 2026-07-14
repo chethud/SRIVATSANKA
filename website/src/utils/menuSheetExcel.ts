@@ -13,6 +13,7 @@ import {
 } from './orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from './mealSessions';
 import { isKitchenSpecification, kitchenSpecificationNotes } from './kitchenSpecs';
+import { normalizeMapUrl, qrCodeDataUrl } from './qrCode';
 
 /** Colours from Nithin / Muralidharan wedding menu Excels */
 const FILL = {
@@ -422,6 +423,11 @@ export async function appendMenuSheet(
     maxRowUsed = row - 1;
   }
 
+  // Kitchen only: venue QR at the very bottom (after menu + extras)
+  if (copyType === 'kitchen') {
+    maxRowUsed = await appendVenueMapQr(wb, ws, extras.venueMapLink, maxRowUsed, colCount, totalCharsWide);
+  }
+
   // Light borders on empty cells so day columns align to the same height
   for (let r = cursorStart; r <= maxRowUsed; r++) {
     for (let c = 1; c <= colCount; c++) {
@@ -434,6 +440,72 @@ export async function appendMenuSheet(
   }
 
   return ws;
+}
+
+/** Place venue QR + link below everything else on the kitchen Menu sheet. */
+async function appendVenueMapQr(
+  wb: Workbook,
+  ws: Worksheet,
+  mapLink: string | null | undefined,
+  maxRowUsed: number,
+  colCount: number,
+  totalCharsWide: number,
+): Promise<number> {
+  const mapUrl = normalizeMapUrl(mapLink ?? '');
+  if (!mapUrl) return maxRowUsed;
+
+  const border = thinBorder();
+  const bold = { name: 'Calibri', size: 11, bold: true };
+  let row = maxRowUsed + 2;
+
+  paintMergedRow(ws, row, colCount, 'Venue — scan for directions', {
+    fill: FILL.header,
+    font: bold,
+    height: 22,
+  });
+  row += 1;
+
+  const dataUrl = await qrCodeDataUrl(mapUrl, 200);
+  const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+  if (!base64) return row - 1;
+
+  const imageId = wb.addImage({ base64, extension: 'png' });
+  const qrSize = 150;
+  const colWidthPx = Math.floor(34 * 7 + 5);
+  const totalWidthPx = colWidthPx * colCount;
+  const xPad = Math.max(0, (totalWidthPx - qrSize) / 2);
+  let tlCol = 0;
+  let remaining = xPad;
+  for (let i = 0; i < colCount; i += 1) {
+    if (remaining <= colWidthPx) {
+      tlCol = i + remaining / colWidthPx;
+      break;
+    }
+    remaining -= colWidthPx;
+  }
+
+  const qrRowSpan = 9;
+  ws.addImage(imageId, {
+    tl: { col: tlCol, row: row - 1 },
+    ext: { width: qrSize, height: qrSize },
+    editAs: 'oneCell',
+  });
+
+  for (let r = 0; r < qrRowSpan; r += 1) {
+    ws.getRow(row + r).height = 18;
+    for (let c = 1; c <= colCount; c += 1) {
+      ws.getCell(row + r, c).border = border;
+    }
+  }
+  row += qrRowSpan;
+
+  paintMergedRow(ws, row, colCount, mapUrl, {
+    font: { name: 'Calibri', size: 9 },
+    align: alignCenter,
+    height: wrappedRowHeight(mapUrl, totalCharsWide, 12, 18),
+  });
+
+  return row;
 }
 
 /** Standalone Menu workbook (kitchen download). */
