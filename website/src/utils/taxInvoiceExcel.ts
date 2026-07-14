@@ -107,11 +107,23 @@ function billingAddressBlock(enquiry: Enquiry): string {
   return parts.join('\n');
 }
 
-/** Fetch brand PNG and place it in the A2:A4 logo slot (Casagrand layout). */
+/** Approximate Excel column width (chars) → CSS pixels used by ExcelJS images. */
+function excelColWidthToPx(chars: number): number {
+  return Math.max(1, Math.floor(chars * 7 + 5));
+}
+
+/** Excel row height (points) → CSS pixels. */
+function excelRowHeightToPx(points: number): number {
+  return Math.round((points * 96) / 72);
+}
+
+/** Fetch brand PNG and center it in the merged A3:A4 logo slot. */
 async function embedInvoiceLogo(
   wb: import('exceljs').Workbook,
   ws: import('exceljs').Worksheet,
+  opts: { colWidthChars: number; rowHeightsPts: number[]; startRowIndex: number },
 ) {
+  const { colWidthChars, rowHeightsPts, startRowIndex } = opts;
   try {
     const base = import.meta.env.BASE_URL || '/';
     const url = new URL('brand/logo-icon.png', `${window.location.origin}${base}`).toString();
@@ -126,10 +138,30 @@ async function embedInvoiceLogo(
       base64: btoa(binary),
       extension: 'png',
     });
-    // Cover logo slot in column A (rows 2–4); ImagePosition uses tl + pixel extent
+
+    const colW = excelColWidthToPx(colWidthChars);
+    const rowPx = rowHeightsPts.map(excelRowHeightToPx);
+    const slotH = rowPx.reduce((s, h) => s + h, 0);
+    const pad = 8;
+    const size = Math.max(40, Math.min(96, colW - pad * 2, slotH - pad * 2));
+    const xPad = (colW - size) / 2;
+    let yPad = (slotH - size) / 2;
+
+    // Walk down the merged rows until the vertical padding is placed.
+    let tlRow = startRowIndex;
+    for (let i = 0; i < rowPx.length; i += 1) {
+      const h = rowPx[i]!;
+      if (yPad <= h || i === rowPx.length - 1) {
+        tlRow = startRowIndex + i + yPad / h;
+        break;
+      }
+      yPad -= h;
+    }
+
     ws.addImage(imageId, {
-      tl: { col: 0.15, row: 1.25 },
-      ext: { width: 100, height: 100 },
+      tl: { col: xPad / colW, row: tlRow },
+      ext: { width: size, height: size },
+      editAs: 'oneCell',
     });
   } catch {
     /* logo optional — invoice still downloads without it */
@@ -171,27 +203,36 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
     }
   };
 
-  // Row 2 — Original (logo sits in A2:A4 on paper invoices)
-  merge('A2:A4');
+  // Row 2 — "Original" label only (outside the bordered header)
   ws.getCell('H2').value = 'Original';
   ws.getCell('H2').alignment = { horizontal: 'right' };
   ws.getCell('H2').font = { bold: true, size: 11 };
-  await embedInvoiceLogo(wb, ws);
+
+  // Rows 3–4 — logo aligned with company name + address (not row 2)
+  const logoRowHeights = [55.5, 45.75];
+  merge('A3:A4');
+  ws.getRow(3).height = logoRowHeights[0];
+  ws.getRow(4).height = logoRowHeights[1];
+  ws.getCell('A3').alignment = center;
 
   // Row 3 — Company name
   merge('B3:H3');
-  ws.getRow(3).height = 55.5;
   ws.getCell('B3').value = INVOICE_COMPANY.legalName;
   ws.getCell('B3').font = { name: 'Calibri', size: 20, bold: true };
   ws.getCell('B3').alignment = center;
 
   // Row 4 — FSSAI / address / email
   merge('B4:H4');
-  ws.getRow(4).height = 45.75;
   ws.getCell('B4').value =
     `FSSAI  Lic No:${INVOICE_COMPANY.fssai}\n${INVOICE_COMPANY.address}\nEmail Id :${INVOICE_COMPANY.email}`;
   ws.getCell('B4').font = { size: 10, bold: true };
   ws.getCell('B4').alignment = { ...left, wrapText: true };
+
+  await embedInvoiceLogo(wb, ws, {
+    colWidthChars: 15.66,
+    rowHeightsPts: logoRowHeights,
+    startRowIndex: 2, // 0-based Excel row 3
+  });
 
   // Row 5 — TAX INVOICE
   merge('A5:H5');
