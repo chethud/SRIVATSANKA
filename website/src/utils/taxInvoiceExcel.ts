@@ -117,16 +117,19 @@ async function embedInvoiceLogo(
     const url = new URL('brand/logo-icon.png', `${window.location.origin}${base}`).toString();
     const response = await fetch(url);
     if (!response.ok) return;
-    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]!);
+    }
     const imageId = wb.addImage({
-      buffer: new Uint8Array(buffer),
+      base64: btoa(binary),
       extension: 'png',
     });
-    // Cover merged A2:A4 (ExcelJS uses 0-based col/row for anchors)
+    // Cover logo slot in column A (rows 2–4); ImagePosition uses tl + pixel extent
     ws.addImage(imageId, {
-      tl: { col: 0.08, row: 1.2 },
-      br: { col: 0.92, row: 3.85 },
-      editAs: 'oneCell',
+      tl: { col: 0.15, row: 1.25 },
+      ext: { width: 100, height: 100 },
     });
   } catch {
     /* logo optional — invoice still downloads without it */

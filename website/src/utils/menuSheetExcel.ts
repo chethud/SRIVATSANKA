@@ -3,7 +3,6 @@ import type { Enquiry } from '../api/client';
 import {
   activeOrderExtraItems,
   parseOrderNotes,
-  type MenuColumn,
 } from './orderNotes';
 import {
   dishesForColumn,
