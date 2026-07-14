@@ -119,6 +119,10 @@
   color-scheme: dark;
 }
 
+html {
+  font-size: 18px; /* +2px from browser default 16px */
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -192,11 +196,11 @@ body {
 
 .excel-menu-grid {
   font-family: Verdana, Geneva, Tahoma, sans-serif;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .order-view .excel-menu-grid {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 #order-copy-print,
@@ -207,7 +211,7 @@ body {
   margin: 0 auto;
   padding: 0;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--foreground);
   background: #ffffff;
 }
@@ -226,7 +230,7 @@ body {
 
 .copy-doc-title {
   margin-top: 1rem;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--primary);
 }
@@ -239,7 +243,7 @@ body {
 }
 
 .copy-client-line {
-  font-size: 1.0625rem;
+  font-size: 1.1875rem;
   font-weight: 700;
   line-height: 1.5;
   margin: 0;
@@ -297,17 +301,17 @@ body {
 
 .copy-session-date {
   background: var(--table-header-bg);
-  font-size: 1rem;
+  font-size: 1.125rem;
 }
 
 .copy-session-label {
-  font-size: 1rem;
+  font-size: 1.125rem;
   border-bottom-color: var(--border-strong);
 }
 
 .copy-session-pax {
   background: var(--background-alt);
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
 }
 
 .copy-dish-list {
@@ -318,7 +322,7 @@ body {
 }
 
 .copy-dish-list li {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 600;
   line-height: 1.55;
   padding: 0.3rem 0;
@@ -338,7 +342,7 @@ body {
 
 .copy-session-total-label {
   margin: 0 0 0.25rem;
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 600;
@@ -347,7 +351,7 @@ body {
 
 .copy-session-total-amount {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--foreground);
 }
@@ -363,7 +367,7 @@ body {
 
 .copy-overall-total-label {
   margin: 0 0 0.35rem;
-  font-size: 0.6875rem;
+  font-size: 0.8125rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 600;
@@ -372,7 +376,7 @@ body {
 
 .copy-overall-total-amount {
   margin: 0;
-  font-size: 1.625rem;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--primary-dark);
 }
@@ -386,7 +390,7 @@ body {
 }
 
 #order-copy-print .copy-dish-name {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 600;
   line-height: 1.55;
   padding: 0.3rem 0;
@@ -400,7 +404,7 @@ body {
 
   .copy-dish-list li,
   #order-copy-print .copy-dish-name {
-    font-size: 1.125rem;
+    font-size: 1.25rem;
   }
 
   .copy-session-block {

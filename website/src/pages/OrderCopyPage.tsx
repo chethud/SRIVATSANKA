@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Printer } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Printer } from 'lucide-react';
 import { Button, EmptyState } from '../components/Layout';
 import { OrderCopyView } from '../components/OrderCopyView';
 import { useAppData } from '../context/AppDataContext';
-import { downloadOrderCopy } from '../utils/orderCopies';
+import { downloadOrderCopyExcel, downloadOrderCopyPdf } from '../utils/orderCopies';
 
 type Props = { copyType: 'kitchen' | 'billing' };
 
@@ -13,7 +13,7 @@ export default function OrderCopyPage({ copyType }: Props) {
   const { enquiries } = useAppData();
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
   const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
-  const [downloading, setDownloading] = useState(false);
+  const [busy, setBusy] = useState<'pdf' | 'excel' | null>(null);
 
   if (!order) {
     return (
@@ -26,14 +26,21 @@ export default function OrderCopyPage({ copyType }: Props) {
     );
   }
 
-  async function handleDownload() {
-    setDownloading(true);
+  async function handleDownload(format: 'pdf' | 'excel') {
+    setBusy(format);
     try {
-      await downloadOrderCopy(order!, copyType);
+      if (format === 'pdf') await downloadOrderCopyPdf(order!, copyType);
+      else await downloadOrderCopyExcel(order!, copyType);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not download PDF. Please try again.');
+      alert(
+        err instanceof Error
+          ? err.message
+          : format === 'pdf'
+            ? 'Could not download PDF. Please try again.'
+            : 'Could not download Excel. Please try again.',
+      );
     } finally {
-      setDownloading(false);
+      setBusy(null);
     }
   }
 
@@ -46,19 +53,28 @@ export default function OrderCopyPage({ copyType }: Props) {
         >
           <ArrowLeft size={16} /> Back to order
         </Link>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => window.print()} className="flex items-center gap-2">
             <Printer size={16} />
             Print
           </Button>
           <Button
             type="button"
-            onClick={() => void handleDownload()}
-            disabled={downloading}
+            onClick={() => void handleDownload('pdf')}
+            disabled={busy !== null}
             className="flex items-center gap-2"
           >
             <Download size={16} />
-            {downloading ? 'Preparing PDF…' : 'Download PDF'}
+            {busy === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleDownload('excel')}
+            disabled={busy !== null}
+            className="flex items-center gap-2"
+          >
+            <FileSpreadsheet size={16} />
+            {busy === 'excel' ? 'Preparing Excel…' : 'Download Excel'}
           </Button>
         </div>
       </div>
