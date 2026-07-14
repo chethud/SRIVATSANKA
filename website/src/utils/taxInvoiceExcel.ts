@@ -107,6 +107,32 @@ function billingAddressBlock(enquiry: Enquiry): string {
   return parts.join('\n');
 }
 
+/** Fetch brand PNG and place it in the A2:A4 logo slot (Casagrand layout). */
+async function embedInvoiceLogo(
+  wb: import('exceljs').Workbook,
+  ws: import('exceljs').Worksheet,
+) {
+  try {
+    const base = import.meta.env.BASE_URL || '/';
+    const url = new URL('brand/logo-icon.png', `${window.location.origin}${base}`).toString();
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const buffer = await response.arrayBuffer();
+    const imageId = wb.addImage({
+      buffer: new Uint8Array(buffer),
+      extension: 'png',
+    });
+    // Cover merged A2:A4 (ExcelJS uses 0-based col/row for anchors)
+    ws.addImage(imageId, {
+      tl: { col: 0.08, row: 1.2 },
+      br: { col: 0.92, row: 3.85 },
+      editAs: 'oneCell',
+    });
+  } catch {
+    /* logo optional — invoice still downloads without it */
+  }
+}
+
 /** Build a tax-invoice Excel workbook matching the Casagrand sales-invoice layout. */
 export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const ExcelJS = (await import('exceljs')).default;
@@ -147,6 +173,7 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
   ws.getCell('H2').value = 'Original';
   ws.getCell('H2').alignment = { horizontal: 'right' };
   ws.getCell('H2').font = { bold: true, size: 11 };
+  await embedInvoiceLogo(wb, ws);
 
   // Row 3 — Company name
   merge('B3:H3');
