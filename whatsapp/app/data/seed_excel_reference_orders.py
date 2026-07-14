@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,8 @@ def _extra(eid: str, title: str, description: str, quantity: str, amount: int | 
 
 
 def excel_reference_order_defs() -> list[dict]:
-    now = datetime.now(timezone.utc)
+    # Naive UTC — Enquiry columns are TIMESTAMP WITHOUT TIME ZONE (asyncpg rejects tz-aware).
+    now = datetime.utcnow()
 
     nithin_cols = [
         _col("n_bf_25", "2024-08-25", "Breakfast Plantain Leaf", "Breakfast", 25, "08:00", "11:00", 4000),

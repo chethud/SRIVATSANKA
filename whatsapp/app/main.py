@@ -61,8 +61,11 @@ async def lifespan(_app: FastAPI):
             result = await seed_demo_data(session, force=True)
             log.info("Demo data seeded on startup (SEED_DEMO_ON_STARTUP=true): %s", result)
         if settings.seed_excel_refs_on_startup:
-            excel_refs = await ensure_excel_reference_orders(session)
-            log.info("Excel-reference orders on startup: %s", excel_refs)
+            try:
+                excel_refs = await ensure_excel_reference_orders(session)
+                log.info("Excel-reference orders on startup: %s", excel_refs)
+            except Exception as exc:
+                log.exception("Excel-reference seed failed (API will still start): %s", exc)
     start_scheduler()
     if is_gemini_configured():
         log.info("Gemini AI enabled for WhatsApp conversations (model=%s)", settings.gemini_model)
