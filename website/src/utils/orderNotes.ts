@@ -119,8 +119,10 @@ export type OrderExtras = {
   /** Optional wedding extras (paniyaram, thambula, sweet box, etc.) */
   extrasEnabled?: boolean;
   extraItems?: OrderExtraItem[];
-  /** Regional cuisine style — printed on kitchen copy before the menu */
+  /** Regional cuisine style(s) — printed on kitchen / order copy before the menu */
   regionalStyle?: string | null;
+  /** Multiple styles on one order (preferred). Falls back to regionalStyle. */
+  regionalStyles?: string[];
   /** Google Maps link — QR printed at bottom of kitchen copy only */
   venueMapLink?: string | null;
   /** @deprecated use assignedWorkerIds */
@@ -138,6 +140,18 @@ export function resolveAssignedWorkerIds(extras: OrderExtras): string[] {
     return [extras.primaryWorkerId];
   }
   return ids;
+}
+
+/** Unique cuisine styles for an order (supports multi-select + legacy single field). */
+export function resolveRegionalStyles(extras: OrderExtras): string[] {
+  const fromList = Array.isArray(extras.regionalStyles)
+    ? extras.regionalStyles.map((s) => s.trim()).filter(Boolean)
+    : [];
+  if (fromList.length > 0) {
+    return [...new Set(fromList)];
+  }
+  const legacy = extras.regionalStyle?.trim();
+  return legacy ? [legacy] : [];
 }
 
 const EMPTY: OrderExtras = {
@@ -170,6 +184,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'extrasEnabled' in parsed ||
     'extraItems' in parsed ||
     'regionalStyle' in parsed ||
+    'regionalStyles' in parsed ||
     'venueMapLink' in parsed ||
     'primaryWorkerId' in parsed ||
     'assignedWorkerIds' in parsed ||
@@ -197,6 +212,11 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         extrasEnabled: parsed.extrasEnabled ?? false,
         extraItems: Array.isArray(parsed.extraItems) ? parsed.extraItems : [],
         regionalStyle: parsed.regionalStyle ?? null,
+        regionalStyles: Array.isArray(parsed.regionalStyles)
+          ? parsed.regionalStyles.map((s) => String(s).trim()).filter(Boolean)
+          : parsed.regionalStyle?.trim()
+            ? [parsed.regionalStyle.trim()]
+            : [],
         venueMapLink: parsed.venueMapLink ?? null,
         primaryWorkerId: parsed.primaryWorkerId ?? null,
         assignedWorkerIds: Array.isArray(parsed.assignedWorkerIds)

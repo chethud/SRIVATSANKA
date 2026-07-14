@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { formatDate, type Enquiry } from '../api/client';
 import { BrandLogo } from './BrandLogo';
-import { parseOrderNotes, sumExtraItemAmounts } from '../utils/orderNotes';
+import { parseOrderNotes, sumExtraItemAmounts, resolveRegionalStyles } from '../utils/orderNotes';
 import {
   dishesForColumn,
   formatColumnAmount,
@@ -44,7 +44,7 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
           <p className="copy-client-line">{enquiry.eventLocation}</p>
         </div>
 
-        {copyType === 'kitchen' && <OrderRegionalStylePrint style={extras.regionalStyle} />}
+        <OrderRegionalStylePrint styles={resolveRegionalStyles(extras)} />
       </div>
 
       <div className="copy-menu">

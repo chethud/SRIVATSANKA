@@ -3,6 +3,7 @@ import type { Enquiry } from '../api/client';
 import {
   activeOrderExtraItems,
   parseOrderNotes,
+  resolveRegionalStyles,
 } from './orderNotes';
 import {
   dishesForColumn,
@@ -60,9 +61,11 @@ function formatMenuDate(iso: string): Date | string {
   return d;
 }
 
-function kitchenBannerNotes(regionalStyle: string | null | undefined, dietary: string[]): string[] {
+function kitchenBannerNotes(styles: string[], dietary: string[]): string[] {
   const notes: string[] = [];
-  if (regionalStyle?.trim()) notes.push(`Style: ${regionalStyle.trim()}`);
+  const cleanStyles = styles.map((s) => s.trim()).filter(Boolean);
+  if (cleanStyles.length === 1) notes.push(`Style: ${cleanStyles[0]}`);
+  else if (cleanStyles.length > 1) notes.push(`Styles: ${cleanStyles.join(' · ')}`);
   for (const item of dietary) {
     const t = item.trim();
     if (!t) continue;
@@ -224,7 +227,7 @@ export async function appendMenuSheet(
     cell.border = border;
   });
 
-  const notes = kitchenBannerNotes(extras.regionalStyle, extras.dietary);
+  const notes = kitchenBannerNotes(resolveRegionalStyles(extras), extras.dietary);
   let cursorStart = 4;
   if (notes.length > 0) {
     ws.mergeCells(4, 1, 4, colCount);
