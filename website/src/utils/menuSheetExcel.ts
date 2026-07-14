@@ -132,25 +132,7 @@ function buildDayColumns(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, sessions]) => ({ date, sessions }));
 
-  if (extras.extrasEnabled) {
-    const extraSessions: SessionBlock[] = activeOrderExtraItems(extras.extraItems).map((item) => ({
-      label: item.title,
-      paxLine: item.quantity?.trim() || '',
-      amount: typeof item.amount === 'number' ? item.amount : null,
-      dishNames: item.description ? [item.description] : [],
-      fillSession: FILL.extra,
-    }));
-    if (extraSessions.length > 0) {
-      if (dayColumns.length > 0) {
-        dayColumns[dayColumns.length - 1].sessions.push(...extraSessions);
-      } else {
-        dayColumns.push({
-          date: (enquiry.eventDate || new Date().toISOString()).slice(0, 10),
-          sessions: extraSessions,
-        });
-      }
-    }
-  }
+  // Extras are rendered below the day columns (not mixed into meal sessions).
 
   if (dayColumns.length === 0) {
     dayColumns.push({
@@ -168,6 +150,18 @@ function buildDayColumns(
   }
 
   return dayColumns;
+}
+
+function activeExtrasAsBlocks(enquiry: Enquiry): SessionBlock[] {
+  const extras = parseOrderNotes(enquiry.notes);
+  if (!extras.extrasEnabled) return [];
+  return activeOrderExtraItems(extras.extraItems).map((item) => ({
+    label: item.title,
+    paxLine: item.quantity?.trim() || '',
+    amount: typeof item.amount === 'number' ? item.amount : null,
+    dishNames: item.description ? [item.description] : [],
+    fillSession: FILL.extra,
+  }));
 }
 
 /**
@@ -314,6 +308,94 @@ export async function appendMenuSheet(
 
     maxRowUsed = Math.max(maxRowUsed, row - 1);
   });
+
+  // Extras section below all day columns (Nithin / Muralidharan footer list style)
+  const extraBlocks = activeExtrasAsBlocks(enquiry);
+  if (extraBlocks.length > 0) {
+    let row = maxRowUsed + 2;
+
+    ws.mergeCells(row, 1, row, colCount);
+    const extrasHead = ws.getCell(row, 1);
+    extrasHead.value = 'Extras';
+    extrasHead.font = bold;
+    extrasHead.fill = solidFill(FILL.extra);
+    extrasHead.alignment = alignCenter;
+    extrasHead.border = border;
+    for (let c = 1; c <= colCount; c++) {
+      ws.getCell(row, c).fill = solidFill(FILL.extra);
+      ws.getCell(row, c).border = border;
+    }
+    ws.getRow(row).height = 22;
+    row += 1;
+
+    for (const session of extraBlocks) {
+      // Title spanning full width
+      ws.mergeCells(row, 1, row, colCount);
+      const titleCell = ws.getCell(row, 1);
+      titleCell.value = session.label;
+      titleCell.font = bold;
+      titleCell.fill = solidFill(FILL.extra);
+      titleCell.alignment = alignLeftMiddle;
+      titleCell.border = border;
+      for (let c = 1; c <= colCount; c++) {
+        ws.getCell(row, c).fill = solidFill(FILL.extra);
+        ws.getCell(row, c).border = border;
+      }
+      ws.getRow(row).height = wrappedRowHeight(session.label, totalCharsWide, 14, 20);
+      row += 1;
+
+      if (session.paxLine) {
+        ws.mergeCells(row, 1, row, colCount);
+        const qtyCell = ws.getCell(row, 1);
+        qtyCell.value = session.paxLine;
+        qtyCell.font = bold;
+        qtyCell.fill = solidFill(FILL.pax);
+        qtyCell.alignment = alignLeftMiddle;
+        qtyCell.border = border;
+        for (let c = 1; c <= colCount; c++) {
+          ws.getCell(row, c).fill = solidFill(FILL.pax);
+          ws.getCell(row, c).border = border;
+        }
+        ws.getRow(row).height = 18;
+        row += 1;
+      }
+
+      if (copyType !== 'kitchen' && typeof session.amount === 'number' && session.amount > 0) {
+        ws.mergeCells(row, 1, row, colCount);
+        const amountCell = ws.getCell(row, 1);
+        amountCell.value = session.amount;
+        amountCell.numFmt = '#,##0';
+        amountCell.font = bold;
+        amountCell.fill = solidFill(FILL.amount);
+        amountCell.alignment = alignLeftMiddle;
+        amountCell.border = border;
+        for (let c = 1; c <= colCount; c++) {
+          ws.getCell(row, c).fill = solidFill(FILL.amount);
+          ws.getCell(row, c).border = border;
+        }
+        ws.getRow(row).height = 18;
+        row += 1;
+      }
+
+      for (const name of session.dishNames) {
+        ws.mergeCells(row, 1, row, colCount);
+        const dishCell = ws.getCell(row, 1);
+        dishCell.value = name;
+        dishCell.font = normal;
+        dishCell.alignment = alignLeftMiddle;
+        dishCell.border = border;
+        for (let c = 1; c <= colCount; c++) {
+          ws.getCell(row, c).border = border;
+        }
+        ws.getRow(row).height = 18;
+        row += 1;
+      }
+
+      row += 1; // spacer between extras
+    }
+
+    maxRowUsed = row - 1;
+  }
 
   // Header / note fills across merge width
   for (let c = 1; c <= colCount; c++) {

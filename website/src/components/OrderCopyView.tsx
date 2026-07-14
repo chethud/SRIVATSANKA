@@ -88,8 +88,11 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         )}
       </div>
 
-      {copyType === 'billing' && extras.extrasEnabled && (
-        <OrderExtrasTable items={extras.extraItems ?? []} />
+      {extras.extrasEnabled && (
+        <OrderExtrasTable
+          items={extras.extraItems ?? []}
+          hideAmounts={copyType === 'kitchen'}
+        />
       )}
 
       {copyType === 'billing' && grandTotal != null && (

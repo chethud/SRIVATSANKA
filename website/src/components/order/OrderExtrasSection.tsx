@@ -304,9 +304,12 @@ export function OrderExtrasSection({
 export function OrderExtrasTable({
   items,
   className = '',
+  hideAmounts = false,
 }: {
   items: OrderExtraItem[];
   className?: string;
+  /** Kitchen copy: list extras without ₹ amounts */
+  hideAmounts?: boolean;
 }) {
   const rows = activeOrderExtraItems(items);
   if (rows.length === 0) return null;
@@ -320,8 +323,10 @@ export function OrderExtrasTable({
             <tr className="bg-[var(--table-header-bg)] border-b border-[var(--border-strong)]">
               <th className="p-3 font-bold border-r border-[var(--border)] w-[22%]">Item</th>
               <th className="p-3 font-bold border-r border-[var(--border)]">Description</th>
-              <th className="p-3 font-bold border-r border-[var(--border)] w-[18%]">Quantity</th>
-              <th className="p-3 font-bold w-[16%] text-right">Amount</th>
+              <th className={`p-3 font-bold ${hideAmounts ? '' : 'border-r border-[var(--border)]'} w-[18%]`}>
+                Quantity
+              </th>
+              {!hideAmounts && <th className="p-3 font-bold w-[16%] text-right">Amount</th>}
             </tr>
           </thead>
           <tbody>
@@ -329,8 +334,14 @@ export function OrderExtrasTable({
               <tr key={row.id} className="border-b border-[var(--border)] last:border-0 align-top">
                 <td className="p-3 font-semibold border-r border-[var(--border)]">{row.title}</td>
                 <td className="p-3 border-r border-[var(--border)] whitespace-pre-wrap">{row.description}</td>
-                <td className="p-3 font-semibold border-r border-[var(--border)] text-center">{row.quantity}</td>
-                <td className="p-3 font-semibold text-right">{formatColumnAmount(row.amount) || '—'}</td>
+                <td
+                  className={`p-3 font-semibold text-center ${hideAmounts ? '' : 'border-r border-[var(--border)]'}`}
+                >
+                  {row.quantity}
+                </td>
+                {!hideAmounts && (
+                  <td className="p-3 font-semibold text-right">{formatColumnAmount(row.amount) || '—'}</td>
+                )}
               </tr>
             ))}
           </tbody>
