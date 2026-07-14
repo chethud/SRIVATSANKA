@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { formatScheduleTime } from '../utils/orderNotes';
 
 type Props = {
@@ -10,30 +11,36 @@ type Props = {
   'aria-label'?: string;
 };
 
-function parseHHmm(value: string): { hour12: number; minute: number; period: 'AM' | 'PM' } {
+function parseHHmm(value: string): { hour12: string; minute: string; period: 'AM' | 'PM' } {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (!match) return { hour12: 12, minute: 0, period: 'AM' };
+  if (!match) return { hour12: '', minute: '', period: 'AM' };
   let hour24 = Number(match[1]);
   const minute = Number(match[2]);
-  if (Number.isNaN(hour24) || Number.isNaN(minute)) return { hour12: 12, minute: 0, period: 'AM' };
+  if (Number.isNaN(hour24) || Number.isNaN(minute)) return { hour12: '', minute: '', period: 'AM' };
   hour24 = Math.min(23, Math.max(0, hour24));
   const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
   let hour12 = hour24 % 12;
   if (hour12 === 0) hour12 = 12;
-  return { hour12, minute: Math.min(59, Math.max(0, minute)), period };
+  return {
+    hour12: String(hour12),
+    minute: String(minute).padStart(2, '0'),
+    period,
+  };
 }
 
-function toHHmm(hour12: number, minute: number, period: 'AM' | 'PM'): string {
+function toHHmm(hour12Raw: string, minuteRaw: string, period: 'AM' | 'PM'): string | null {
+  const hour12 = Number(hour12Raw);
+  const minute = Number(minuteRaw);
+  if (Number.isNaN(hour12) || Number.isNaN(minute)) return null;
+  if (hour12 < 1 || hour12 > 12) return null;
+  if (minute < 0 || minute > 59) return null;
   let h = hour12 % 12;
   if (period === 'PM') h += 12;
   if (period === 'AM' && hour12 === 12) h = 0;
   return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
-const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5); // 0,5,...,55
-
-/** Time picker with explicit Hour / Minute / AM·PM (stores HH:MM 24h). */
+/** Typeable time: hour · minute · AM/PM (stores HH:MM 24h). */
 export function AmPmTimeInput({
   id,
   value,
@@ -43,13 +50,28 @@ export function AmPmTimeInput({
   className = '',
   'aria-label': ariaLabel,
 }: Props) {
-  const parts = parseHHmm(value);
-  const minuteOptions = MINUTES.includes(parts.minute)
-    ? MINUTES
-    : [...MINUTES, parts.minute].sort((a, b) => a - b);
+  const parsed = parseHHmm(value);
+  const [hour, setHour] = useState(parsed.hour12);
+  const [minute, setMinute] = useState(parsed.minute);
+  const [period, setPeriod] = useState<'AM' | 'PM'>(parsed.period);
 
-  function emit(next: { hour12: number; minute: number; period: 'AM' | 'PM' }) {
-    onChange(toHHmm(next.hour12, next.minute, next.period));
+  useEffect(() => {
+    const next = parseHHmm(value);
+    setHour(next.hour12);
+    setMinute(next.minute);
+    setPeriod(next.period);
+  }, [value]);
+
+  function commit(nextHour: string, nextMinute: string, nextPeriod: 'AM' | 'PM') {
+    const hhmm = toHHmm(nextHour, nextMinute, nextPeriod);
+    if (hhmm) onChange(hhmm);
+  }
+
+  function handleBlur() {
+    const normalizedMinute = minute.trim() === '' ? minute : minute.padStart(2, '0');
+    if (normalizedMinute !== minute) setMinute(normalizedMinute);
+    commit(hour, normalizedMinute, period);
+    onBlur?.();
   }
 
   return (
@@ -58,49 +80,65 @@ export function AmPmTimeInput({
       role="group"
       aria-label={ariaLabel || (value ? formatScheduleTime(value) : 'Time')}
     >
-      <select
+      <input
         id={id}
-        value={parts.hour12}
+        type="text"
+        inputMode="numeric"
         disabled={disabled}
-        onChange={(e) => emit({ ...parts, hour12: Number(e.target.value) })}
-        onBlur={onBlur}
-        className="form-input ampm-time-select"
+        value={hour}
+        placeholder="hh"
+        maxLength={2}
+        onChange={(e) => {
+          const next = e.target.value.replace(/\D/g, '').slice(0, 2);
+          setHour(next);
+          if (next && minute) commit(next, minute, period);
+        }}
+        onBlur={handleBlur}
+        className="form-input ampm-time-input"
         aria-label="Hour"
-      >
-        {HOURS.map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
-        ))}
-      </select>
+      />
       <span className="ampm-time-sep" aria-hidden>
         :
       </span>
-      <select
-        value={parts.minute}
+      <input
+        type="text"
+        inputMode="numeric"
         disabled={disabled}
-        onChange={(e) => emit({ ...parts, minute: Number(e.target.value) })}
-        onBlur={onBlur}
-        className="form-input ampm-time-select"
+        value={minute}
+        placeholder="mm"
+        maxLength={2}
+        onChange={(e) => {
+          const next = e.target.value.replace(/\D/g, '').slice(0, 2);
+          setMinute(next);
+          if (hour && next.length === 2) commit(hour, next, period);
+        }}
+        onBlur={handleBlur}
+        className="form-input ampm-time-input"
         aria-label="Minute"
-      >
-        {minuteOptions.map((m) => (
-          <option key={m} value={m}>
-            {String(m).padStart(2, '0')}
-          </option>
-        ))}
-      </select>
-      <select
-        value={parts.period}
+      />
+      <input
+        type="text"
         disabled={disabled}
-        onChange={(e) => emit({ ...parts, period: e.target.value as 'AM' | 'PM' })}
-        onBlur={onBlur}
-        className="form-input ampm-time-select ampm-time-period"
+        value={period}
+        placeholder="AM"
+        maxLength={2}
+        onChange={(e) => {
+          const raw = e.target.value.toUpperCase().replace(/[^APM]/g, '').slice(0, 2);
+          if (raw === 'A' || raw === 'AM') {
+            setPeriod('AM');
+            if (hour && minute) commit(hour, minute, 'AM');
+          } else if (raw === 'P' || raw === 'PM') {
+            setPeriod('PM');
+            if (hour && minute) commit(hour, minute, 'PM');
+          } else if (raw === '') {
+            setPeriod('AM');
+          }
+        }}
+        onBlur={handleBlur}
+        className="form-input ampm-time-input ampm-time-period"
         aria-label="AM or PM"
-      >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
-      </select>
+        title="Type AM or PM"
+      />
     </div>
   );
 }
