@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.data.seed_dishes import CATEGORY_LABELS
 from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
+from app.datetime_util import as_naive_utc
 from app.models import Dish, Enquiry, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
 from app.quantity_units import normalize_quantity, normalize_quantity_unit
 from app.schemas import (
@@ -139,14 +140,21 @@ async def create_enquiry(
     db: AsyncSession = Depends(get_db),
 ) -> EnquiryOut:
     """Owner-created enquiry (walk-in, phone, email — not from WhatsApp)."""
+    name = payload.customerName.strip()
+    phone = payload.phoneNumber.strip()
+    event_type = payload.eventType.strip()
+    location = payload.eventLocation.strip()
+    if not name or not phone or not event_type or not location:
+        raise HTTPException(status_code=400, detail="Name, phone, event type, and location are required")
+
     enquiry = Enquiry(
-        customerName=payload.customerName.strip(),
-        phoneNumber=payload.phoneNumber.strip(),
-        eventType=payload.eventType.strip(),
-        eventDate=payload.eventDate,
-        eventLocation=payload.eventLocation.strip(),
+        customerName=name,
+        phoneNumber=phone,
+        eventType=event_type,
+        eventDate=as_naive_utc(payload.eventDate),
+        eventLocation=location,
         guestCount=max(0, payload.guestCount),
-        preferredCallbackAt=payload.preferredCallbackAt,
+        preferredCallbackAt=as_naive_utc(payload.preferredCallbackAt),
         status=EnquiryStatus.NEW,
         notes=payload.notes or "Created manually by owner",
     )

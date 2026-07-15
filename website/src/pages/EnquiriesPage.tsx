@@ -115,22 +115,28 @@ export default function EnquiriesPage() {
     setSaving(true);
     setFormError('');
     try {
+      const eventDate = new Date(`${form.eventDate}T12:00:00`);
+      const preferredCallbackAt = new Date(form.preferredCallbackAt);
+      if (Number.isNaN(eventDate.getTime()) || Number.isNaN(preferredCallbackAt.getTime())) {
+        setFormError('Enter a valid event date and preferred callback time.');
+        return;
+      }
       const created = await createEnquiry({
-        customerName: form.customerName,
-        phoneNumber: form.phoneNumber,
+        customerName: form.customerName.trim(),
+        phoneNumber: form.phoneNumber.trim(),
         eventType: form.eventType,
-        eventDate: new Date(`${form.eventDate}T12:00:00`).toISOString(),
-        eventLocation: form.eventLocation,
+        eventDate: eventDate.toISOString(),
+        eventLocation: form.eventLocation.trim(),
         guestCount: 0,
-        preferredCallbackAt: new Date(form.preferredCallbackAt).toISOString(),
+        preferredCallbackAt: preferredCallbackAt.toISOString(),
         notes: 'Created manually by owner',
       });
       setForm(emptyForm());
       setShowForm(false);
       setSelected(created.id);
       await refresh();
-    } catch {
-      setFormError('Could not save enquiry. Check API connection.');
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not save enquiry. Check API connection.');
     } finally {
       setSaving(false);
     }
