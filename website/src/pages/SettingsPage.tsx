@@ -36,7 +36,7 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" description="Live connection status and integrations" />
-      <ErrorBanner message={!connected ? 'API offline — start FastAPI on port 8000' : ''} />
+      <ErrorBanner message={!connected ? 'API offline — start FastAPI on port 8001' : ''} />
       <div className="space-y-6 max-w-2xl">
         <Card className="p-6">
           <h3 className="font-semibold mb-4">System Status</h3>

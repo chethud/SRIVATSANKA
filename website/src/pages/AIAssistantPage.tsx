@@ -53,7 +53,7 @@ export default function AIAssistantPage() {
         ...prev,
         {
           role: 'assistant',
-          text: 'Could not reach the API. Make sure FastAPI is running on port 8000.',
+          text: 'Could not reach the API. Make sure FastAPI is running on port 8001.',
         },
       ]);
     } finally {

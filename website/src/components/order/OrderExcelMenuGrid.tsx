@@ -1,58 +1,84 @@
 import { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import type { Enquiry, EnquiryDish } from '../../api/client';
-import { deleteOrderDish, formatCurrency, formatDate, updateEnquiry } from '../../api/client';
-import { serializeOrderNotes, type OrderExtras } from '../../utils/orderNotes';
+import type { Dish, Enquiry, EnquiryDish } from '../../api/client';
 import {
+  addOrderDish,
+  deleteOrderDish,
+  formatCurrency,
+  formatDate,
+  updateEnquiry,
+} from '../../api/client';
+import { DishSearchSelect } from '../DishSearchSelect';
+import { AmPmTimeInput } from '../AmPmTimeInput';
+import { Button } from '../Layout';
+import { serializeOrderNotes, toDateInputValue, type OrderExtras } from '../../utils/orderNotes';
+import { DEFAULT_MEAL_TIMES } from '../../utils/mealSessions';
+import {
+  assignDishColumn,
   dishesForColumn,
+  findOrCreateColumn,
   removeMenuColumn,
   resolveMenuColumns,
+  sessionLabelOptions,
+  stripMenuColumnsForSave,
   updateColumnAmount,
   updateColumnPax,
   updateColumnTime,
   type MenuColumn,
 } from '../../utils/orderMenuGrid';
 import { OrderMenuItem } from './OrderMenuItem';
-import { AmPmTimeInput } from '../AmPmTimeInput';
 
 export function OrderExcelMenuGrid({
   order,
   extras,
   menuItems,
+  activeSession,
+  dishes,
   onOrderUpdated,
+  onDishesCatalogUpdated,
 }: {
   order: Enquiry;
   extras: OrderExtras;
   menuItems: EnquiryDish[];
+  activeSession: string;
+  dishes: Dish[];
   onOrderUpdated: (order: Enquiry) => void;
+  onDishesCatalogUpdated?: () => Promise<void>;
 }) {
   const columns = resolveMenuColumns(extras, order, menuItems);
-
-  if (columns.length === 0) {
-    return (
-      <p className="text-center text-[var(--muted)] py-10 text-sm">
-        No menu items yet. Choose a session, set date and time, then add dishes.
-      </p>
-    );
-  }
+  const sessionColumns = columns.filter((c) => c.baseSession === activeSession);
 
   return (
     <div className="excel-menu-grid">
-      <div className="excel-menu-stack">
-        {columns.map((col) => (
-          <SessionBlock
-            key={col.id}
-            column={col}
-            columns={columns}
-            extras={extras}
-            menuItems={menuItems}
-            orderId={order.id}
-            onOrderUpdated={onOrderUpdated}
-          />
-        ))}
-      </div>
+      {sessionColumns.length > 0 ? (
+        <div className="excel-menu-stack">
+          {sessionColumns.map((col) => (
+            <SessionBlock
+              key={col.id}
+              column={col}
+              columns={columns}
+              extras={extras}
+              menuItems={menuItems}
+              order={order}
+              dishes={dishes}
+              onOrderUpdated={onOrderUpdated}
+              onDishesCatalogUpdated={onDishesCatalogUpdated}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptySessionCard
+          order={order}
+          extras={extras}
+          columns={columns}
+          activeSession={activeSession}
+          dishes={dishes}
+          onOrderUpdated={onOrderUpdated}
+          onDishesCatalogUpdated={onDishesCatalogUpdated}
+        />
+      )}
       <p className="excel-menu-hint">
-        Each meal session stacks below the previous one. Enter the session total after all dishes are added.
+        Add dishes above each session list. Enter pax, time, and session total on the card.
       </p>
     </div>
   );
@@ -63,15 +89,19 @@ function SessionBlock({
   columns,
   extras,
   menuItems,
-  orderId,
+  order,
+  dishes,
   onOrderUpdated,
+  onDishesCatalogUpdated,
 }: {
   column: MenuColumn;
   columns: MenuColumn[];
   extras: OrderExtras;
   menuItems: EnquiryDish[];
-  orderId: string;
+  order: Enquiry;
+  dishes: Dish[];
   onOrderUpdated: (order: Enquiry) => void;
+  onDishesCatalogUpdated?: () => Promise<void>;
 }) {
   const items = dishesForColumn(column, menuItems, extras);
   const [deleting, setDeleting] = useState(false);
@@ -89,10 +119,10 @@ function SessionBlock({
     setDeleting(true);
     try {
       if (items.length > 0) {
-        await Promise.all(items.map((dish) => deleteOrderDish(orderId, dish.id)));
+        await Promise.all(items.map((dish) => deleteOrderDish(order.id, dish.id)));
       }
       const merged = removeMenuColumn(extras, columns, column.id);
-      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      const updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
       onOrderUpdated(updated);
     } catch {
       setRemoved(false);
@@ -126,42 +156,322 @@ function SessionBlock({
           column={column}
           columns={columns}
           extras={extras}
-          orderId={orderId}
+          orderId={order.id}
           onOrderUpdated={onOrderUpdated}
         />
         <SessionTimeField
           column={column}
           columns={columns}
           extras={extras}
-          orderId={orderId}
+          orderId={order.id}
           onOrderUpdated={onOrderUpdated}
         />
       </div>
 
+      <SessionAddDishForm
+        order={order}
+        extras={extras}
+        columns={columns}
+        column={column}
+        dishes={dishes}
+        onOrderUpdated={onOrderUpdated}
+        onDishesCatalogUpdated={onDishesCatalogUpdated}
+      />
+
       <div className="excel-session-dishes">
         {items.length === 0 ? (
-          <p className="excel-session-empty">No dishes yet for this session</p>
+          <p className="excel-session-empty">No dishes yet — search above and press Enter to add</p>
         ) : (
           <ul className="excel-dish-list">
             {items.map((d) => (
-              <OrderMenuItem key={d.id} orderId={orderId} dish={d} onUpdated={onOrderUpdated} />
+              <OrderMenuItem key={d.id} orderId={order.id} dish={d} onUpdated={onOrderUpdated} />
             ))}
           </ul>
         )}
       </div>
 
-      {items.length > 0 && (
-        <footer className="excel-session-total">
-          <SessionAmountField
-            column={column}
-            columns={columns}
-            extras={extras}
-            orderId={orderId}
-            onOrderUpdated={onOrderUpdated}
-          />
-        </footer>
-      )}
+      <footer className="excel-session-total">
+        <SessionAmountField
+          column={column}
+          columns={columns}
+          extras={extras}
+          orderId={order.id}
+          onOrderUpdated={onOrderUpdated}
+        />
+      </footer>
     </article>
+  );
+}
+
+function EmptySessionCard({
+  order,
+  extras,
+  columns,
+  activeSession,
+  dishes,
+  onOrderUpdated,
+  onDishesCatalogUpdated,
+}: {
+  order: Enquiry;
+  extras: OrderExtras;
+  columns: MenuColumn[];
+  activeSession: string;
+  dishes: Dish[];
+  onOrderUpdated: (order: Enquiry) => void;
+  onDishesCatalogUpdated?: () => Promise<void>;
+}) {
+  const defaultDate = extras.scheduleDateFrom ?? toDateInputValue(order.eventDate);
+  const defaultTimes = extras.mealSchedules?.[activeSession] ?? DEFAULT_MEAL_TIMES[activeSession] ?? {
+    timeFrom: '',
+    timeTo: '',
+  };
+  const [columnDate, setColumnDate] = useState(defaultDate);
+  const [columnPax, setColumnPax] = useState('');
+  const [sessionTimeFrom, setSessionTimeFrom] = useState(defaultTimes.timeFrom ?? '');
+  const [sessionTimeTo, setSessionTimeTo] = useState(defaultTimes.timeTo ?? '');
+
+  useEffect(() => {
+    setColumnDate(extras.scheduleDateFrom ?? toDateInputValue(order.eventDate));
+    const times = extras.mealSchedules?.[activeSession] ?? DEFAULT_MEAL_TIMES[activeSession] ?? {
+      timeFrom: '',
+      timeTo: '',
+    };
+    setSessionTimeFrom(times.timeFrom ?? '');
+    setSessionTimeTo(times.timeTo ?? '');
+    setColumnPax('');
+  }, [activeSession, extras, order.eventDate]);
+
+  const draftColumn: MenuColumn = {
+    id: '__draft__',
+    date: columnDate,
+    sessionLabel: sessionLabelOptions(activeSession),
+    baseSession: activeSession,
+    pax: columnPax.trim() ? Number(columnPax) : null,
+    timeFrom: sessionTimeFrom || null,
+    timeTo: sessionTimeTo || null,
+    amount: null,
+  };
+
+  return (
+    <article className="excel-session-block">
+      <header className="excel-session-head">
+        <p className="excel-session-date">{columnDate ? formatDate(columnDate) : 'Set date below'}</p>
+        <h3 className="excel-session-title">{sessionLabelOptions(activeSession)}</h3>
+      </header>
+
+      <div className="excel-session-meta excel-session-meta--draft">
+        <div className="excel-meta-field">
+          <label className="excel-meta-label" htmlFor={`draft-date-${activeSession}`}>
+            Date
+          </label>
+          <input
+            id={`draft-date-${activeSession}`}
+            type="date"
+            value={columnDate}
+            onChange={(e) => setColumnDate(e.target.value)}
+            className="excel-meta-input excel-meta-input--date"
+          />
+        </div>
+        <div className="excel-meta-field">
+          <label className="excel-meta-label" htmlFor={`draft-pax-${activeSession}`}>
+            Pax
+          </label>
+          <input
+            id={`draft-pax-${activeSession}`}
+            type="number"
+            min={1}
+            value={columnPax}
+            onChange={(e) => setColumnPax(e.target.value)}
+            placeholder="e.g. 60"
+            className="excel-meta-input"
+          />
+        </div>
+        <div className="excel-meta-field excel-meta-field--time">
+          <span className="excel-meta-label">Time</span>
+          <div className="excel-meta-time-row">
+            <AmPmTimeInput
+              value={sessionTimeFrom}
+              onChange={setSessionTimeFrom}
+              className="excel-meta-ampm"
+              aria-label={`${activeSession} from`}
+            />
+            <span className="excel-meta-time-sep" aria-hidden>
+              –
+            </span>
+            <AmPmTimeInput
+              value={sessionTimeTo}
+              onChange={setSessionTimeTo}
+              className="excel-meta-ampm"
+              aria-label={`${activeSession} to`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <SessionAddDishForm
+        order={order}
+        extras={extras}
+        columns={columns}
+        column={draftColumn}
+        dishes={dishes}
+        draftPax={columnPax}
+        onOrderUpdated={onOrderUpdated}
+        onDishesCatalogUpdated={onDishesCatalogUpdated}
+      />
+
+      <div className="excel-session-dishes">
+        <p className="excel-session-empty">No dishes yet — set pax and time, then add items above</p>
+      </div>
+    </article>
+  );
+}
+
+function SessionAddDishForm({
+  order,
+  extras,
+  columns,
+  column,
+  dishes,
+  draftPax,
+  onOrderUpdated,
+  onDishesCatalogUpdated,
+}: {
+  order: Enquiry;
+  extras: OrderExtras;
+  columns: MenuColumn[];
+  column: MenuColumn;
+  dishes: Dish[];
+  draftPax?: string;
+  onOrderUpdated: (order: Enquiry) => void;
+  onDishesCatalogUpdated?: () => Promise<void>;
+}) {
+  const [dishId, setDishId] = useState('');
+  const [customDishName, setCustomDishName] = useState('');
+  const [saveToCatalog, setSaveToCatalog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleAdd(opts?: { dishIdOverride?: string; dishNameOverride?: string }) {
+    setError('');
+    const resolvedDishId = opts?.dishIdOverride ?? dishId;
+    const customName = (opts?.dishNameOverride ?? customDishName).trim();
+    if (!resolvedDishId && !customName) {
+      setError('Select a menu item or type a dish name.');
+      return;
+    }
+    if (!column.date) {
+      setError('Pick the service date for this session.');
+      return;
+    }
+
+    const paxRaw = draftPax ?? (column.pax != null ? String(column.pax) : '');
+    let paxNum: number | null = column.pax;
+    if (paxRaw.trim()) {
+      paxNum = Number(paxRaw);
+      if (Number.isNaN(paxNum) || paxNum < 1) {
+        setError('Enter a valid pax count for this session.');
+        return;
+      }
+    } else if (paxNum == null || paxNum < 1) {
+      setError('Enter pax for this session (e.g. 60).');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const label = column.sessionLabel.trim() || sessionLabelOptions(column.baseSession);
+      const { columns: nextColumns, columnId } = findOrCreateColumn(columns, {
+        date: column.date,
+        baseSession: column.baseSession,
+        sessionLabel: label,
+        pax: paxNum,
+        timeFrom: column.timeFrom ?? '',
+        timeTo: column.timeTo ?? '',
+      });
+
+      let merged: OrderExtras = {
+        ...extras,
+        menuColumns: stripMenuColumnsForSave(nextColumns),
+        mealSchedules: {
+          ...(extras.mealSchedules ?? {}),
+          [column.baseSession]: {
+            timeFrom: column.timeFrom || null,
+            timeTo: column.timeTo || null,
+          },
+        },
+      };
+
+      const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
+      let updated = await addOrderDish(order.id, {
+        ...(resolvedDishId
+          ? { dishId: resolvedDishId }
+          : { dishName: customName, saveToCatalog }),
+        category: column.baseSession,
+      });
+      const newDish = updated.dishes.find(
+        (d) =>
+          !prevIds.has(d.id) &&
+          (resolvedDishId
+            ? d.dishId === resolvedDishId
+            : d.dishName.toLowerCase() === customName.toLowerCase()),
+      );
+      if (newDish) {
+        merged = assignDishColumn(merged, newDish.id, columnId);
+      }
+      updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
+
+      if (customName && saveToCatalog) {
+        await onDishesCatalogUpdated?.();
+      }
+
+      setDishId('');
+      setCustomDishName('');
+      onOrderUpdated(updated);
+    } catch {
+      setError('Could not add item.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="excel-session-add">
+      <DishSearchSelect
+        dishes={dishes}
+        value={dishId}
+        customName={customDishName}
+        onChange={setDishId}
+        onCustomNameChange={setCustomDishName}
+        onConfirmCustom={(name) => {
+          void handleAdd({ dishNameOverride: name });
+        }}
+        onConfirmDish={(d) => {
+          void handleAdd({ dishIdOverride: d.id });
+        }}
+      />
+      <div className="excel-session-add-actions">
+        <Button
+          type="button"
+          onClick={() => void handleAdd()}
+          disabled={saving || (!dishId && !customDishName.trim())}
+          className="!py-2 !px-4 text-sm"
+        >
+          {saving ? 'Adding…' : 'Add dish'}
+        </Button>
+      </div>
+      {!!customDishName.trim() && !dishId && (
+        <label className="excel-session-add-catalog flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={saveToCatalog}
+            onChange={(e) => setSaveToCatalog(e.target.checked)}
+            className="rounded border-[var(--border)]"
+          />
+          Also save this dish to the menu catalog
+        </label>
+      )}
+      {error && <p className="excel-session-add-error">{error}</p>}
+    </div>
   );
 }
 

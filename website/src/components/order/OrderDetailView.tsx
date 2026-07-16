@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, ChefHat, Clock, MapPin, Phone, Plus, Pencil, FileText, UtensilsCrossed, Calendar,
+  ArrowLeft, ChefHat, Clock, MapPin, Phone, Pencil, FileText, UtensilsCrossed, Calendar,
 } from 'lucide-react';
 import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
-  addOrderDish,
   formatDate,
   formatDateTime,
   updateEnquiry,
 } from '../../api/client';
-import { DishSearchSelect } from '../DishSearchSelect';
 import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
 import { OrderDispatchSection } from './OrderDispatchSection';
@@ -30,13 +28,7 @@ import {
   type OrderExtras,
 } from '../../utils/orderNotes';
 import { MEAL_SESSIONS, PREFERENCE_CATEGORIES } from '../../utils/mealSessions';
-import {
-  assignDishColumn,
-  findOrCreateColumn,
-  resolveMenuColumns,
-  sessionLabelOptions,
-  stripMenuColumnsForSave,
-} from '../../utils/orderMenuGrid';
+import { resolveMenuColumns } from '../../utils/orderMenuGrid';
 
 function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
   return {
@@ -54,13 +46,6 @@ function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
   };
 }
 
-function sessionTimesFromExtras(extras: OrderExtras, session: string) {
-  return {
-    timeFrom: extras.mealSchedules?.[session]?.timeFrom ?? '',
-    timeTo: extras.mealSchedules?.[session]?.timeTo ?? '',
-  };
-}
-
 export function OrderDetailView({
   order,
   dishes,
@@ -74,13 +59,9 @@ export function OrderDetailView({
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
 }) {
-  const [showAddForm, setShowAddForm] = useState(false);
   const [editingExtras, setEditingExtras] = useState(false);
-  const [dishId, setDishId] = useState('');
-  const [customDishName, setCustomDishName] = useState('');
-  const [mealSession, setMealSession] = useState('Breakfast');
+  const [activeSession, setActiveSession] = useState('Breakfast');
   const [saving, setSaving] = useState(false);
-  const [addError, setAddError] = useState('');
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
@@ -88,12 +69,6 @@ export function OrderDetailView({
   const [draftExtras, setDraftExtras] = useState<OrderExtras>(extras);
   const defaultEventDate = toDateInputValue(order.eventDate);
   const [draftSchedule, setDraftSchedule] = useState(() => buildScheduleDraft(extras, defaultEventDate));
-  const [sessionTimeFrom, setSessionTimeFrom] = useState(() => sessionTimesFromExtras(extras, 'Breakfast').timeFrom);
-  const [sessionTimeTo, setSessionTimeTo] = useState(() => sessionTimesFromExtras(extras, 'Breakfast').timeTo);
-  const [columnDate, setColumnDate] = useState(() => extras.scheduleDateFrom ?? defaultEventDate);
-  const [columnPax, setColumnPax] = useState('');
-  const [sessionLabel, setSessionLabel] = useState('');
-  const [saveToCatalog, setSaveToCatalog] = useState(false);
 
   const menuItems = useMemo(
     () => (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category)),
@@ -132,113 +107,6 @@ export function OrderDetailView({
     if (withPax.length === 0) return 'Set per session when adding menu';
     return withPax.map((c) => `${c.sessionLabel} ${c.pax}`).join(' · ');
   }, [extras, order, menuItems]);
-
-  function pickMealSession(session: string) {
-    setMealSession(session);
-    const times = sessionTimesFromExtras(extras, session);
-    setSessionTimeFrom(times.timeFrom);
-    setSessionTimeTo(times.timeTo);
-    setSessionLabel('');
-    const cols = resolveMenuColumns(extras, order, menuItems);
-    const existing = cols.find((c) => c.date === columnDate && c.baseSession === session);
-    setColumnPax(existing?.pax != null ? String(existing.pax) : '');
-  }
-
-  async function handleAdd(opts?: { dishIdOverride?: string; dishNameOverride?: string }) {
-    setAddError('');
-    const resolvedDishId = opts?.dishIdOverride ?? dishId;
-    const customName = (opts?.dishNameOverride ?? customDishName).trim();
-    if (!resolvedDishId && !customName) {
-      setAddError('Select a menu item or type a dish name.');
-      return;
-    }
-    if (!mealSession) {
-      setAddError('Choose a meal session (breakfast, lunch, etc.).');
-      return;
-    }
-    if (!columnDate) {
-      setAddError('Pick the service date for this column (like Excel row 3).');
-      return;
-    }
-
-    const currentColumns = resolveMenuColumns(extras, order, menuItems);
-    const label = sessionLabel.trim() || sessionLabelOptions(mealSession);
-    const existingCol = currentColumns.find(
-      (c) =>
-        c.date === columnDate &&
-        c.baseSession === mealSession &&
-        c.sessionLabel === label,
-    );
-
-    let paxNum: number | null = null;
-    if (columnPax.trim()) {
-      paxNum = Number(columnPax);
-      if (Number.isNaN(paxNum) || paxNum < 1) {
-        setAddError('Enter a valid pax count for this session.');
-        return;
-      }
-    } else if (existingCol?.pax != null && existingCol.pax > 0) {
-      paxNum = existingCol.pax;
-    } else {
-      setAddError('Enter pax for this session (e.g. 60 for breakfast, 100 for lunch).');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { columns, columnId } = findOrCreateColumn(currentColumns, {
-        date: columnDate,
-        baseSession: mealSession,
-        sessionLabel: label,
-        pax: paxNum,
-        timeFrom: sessionTimeFrom,
-        timeTo: sessionTimeTo,
-      });
-
-      let merged: OrderExtras = {
-        ...extras,
-        menuColumns: stripMenuColumnsForSave(columns),
-        mealSchedules: {
-          ...(extras.mealSchedules ?? {}),
-          [mealSession]: {
-            timeFrom: sessionTimeFrom || null,
-            timeTo: sessionTimeTo || null,
-          },
-        },
-      };
-
-      const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
-      let updated = await addOrderDish(order.id, {
-        ...(resolvedDishId
-          ? { dishId: resolvedDishId }
-          : { dishName: customName, saveToCatalog }),
-        category: mealSession,
-      });
-      const newDish = updated.dishes.find(
-        (d) =>
-          !prevIds.has(d.id) &&
-          (resolvedDishId
-            ? d.dishId === resolvedDishId
-            : d.dishName.toLowerCase() === customName.toLowerCase()),
-      );
-      if (newDish) {
-        merged = assignDishColumn(merged, newDish.id, columnId);
-      }
-      updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
-
-      if (customName && saveToCatalog) {
-        await onDishesCatalogUpdated?.();
-      }
-
-      setDishId('');
-      setCustomDishName('');
-      onOrderUpdated(updated);
-    } catch {
-      setAddError('Could not add item.');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function saveExtras() {
     setSaving(true);
@@ -279,11 +147,6 @@ export function OrderDetailView({
     setDraftExtras(parseOrderNotes(order.notes));
     setEditingExtras(true);
   }
-
-  const menuColumns = useMemo(
-    () => resolveMenuColumns(extras, order, menuItems),
-    [extras, order, menuItems],
-  );
 
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
@@ -474,146 +337,31 @@ export function OrderDetailView({
             </span>
             Menu breakdown
           </div>
-          <button
-            type="button"
-            onClick={() => setShowAddForm((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)]"
-          >
-            <Plus size={18} />
-            Add menu item
-          </button>
         </div>
 
-        {showAddForm && (
-          <div className="order-add-panel">
-            <p className="text-sm text-[var(--muted)] mb-4">
-              Pick session + date once, then keep adding dish names with Enter. Pax is remembered for the session.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {MEAL_SESSIONS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => pickMealSession(s.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    mealSession === s.id
-                      ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
-                      : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-              <div>
-                <label className="text-xs text-[var(--muted)]">Service date</label>
-                <input
-                  type="date"
-                  value={columnDate}
-                  onChange={(e) => setColumnDate(e.target.value)}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-[var(--muted)]">Session label (Excel row 4)</label>
-                <input
-                  type="text"
-                  value={sessionLabel}
-                  onChange={(e) => setSessionLabel(e.target.value)}
-                  placeholder={sessionLabelOptions(mealSession)}
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-[var(--muted)]">Pax for {mealSession} *</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={columnPax}
-                  onChange={(e) => setColumnPax(e.target.value)}
-                  placeholder="e.g. 60 or 100"
-                  className="form-input w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-[var(--muted)]">Time from ({mealSession})</label>
-                <div className="mt-1">
-                  <AmPmTimeInput
-                    value={sessionTimeFrom}
-                    onChange={setSessionTimeFrom}
-                    aria-label={`${mealSession} from`}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-[var(--muted)]">Time to ({mealSession})</label>
-                <div className="mt-1">
-                  <AmPmTimeInput
-                    value={sessionTimeTo}
-                    onChange={setSessionTimeTo}
-                    aria-label={`${mealSession} to`}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
-              <div className="lg:col-span-10">
-                <DishSearchSelect
-                  dishes={dishes}
-                  value={dishId}
-                  customName={customDishName}
-                  onChange={setDishId}
-                  onCustomNameChange={setCustomDishName}
-                  onConfirmCustom={(name) => {
-                    void handleAdd({ dishNameOverride: name });
-                  }}
-                  onConfirmDish={(d) => {
-                    void handleAdd({ dishIdOverride: d.id });
-                  }}
-                />
-              </div>
-              <div className="lg:col-span-2">
-                <Button
-                  type="button"
-                  onClick={() => void handleAdd()}
-                  disabled={saving || (!dishId && !customDishName.trim())}
-                  className="w-full !py-2"
-                >
-                  {saving ? 'Adding…' : 'Add'}
-                </Button>
-              </div>
-            </div>
-            {!!customDishName.trim() && !dishId && (
-              <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={saveToCatalog}
-                  onChange={(e) => setSaveToCatalog(e.target.checked)}
-                  className="rounded border-[var(--border)]"
-                />
-                Also save this dish to the menu catalog
-              </label>
-            )}
-            {addError && <p className="text-sm text-red-600 mt-2">{addError}</p>}
-          </div>
-        )}
+        <div className="order-session-tabs">
+          {MEAL_SESSIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setActiveSession(s.id)}
+              className={`order-session-tab ${activeSession === s.id ? 'order-session-tab--active' : ''}`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
 
-        {menuColumns.length > 0 || menuItems.length > 0 ? (
-          <>
-            <OrderExcelHeader order={order} />
-            <OrderExcelMenuGrid
-              order={order}
-              extras={extras}
-              menuItems={menuItems}
-              onOrderUpdated={onOrderUpdated}
-            />
-          </>
-        ) : (
-          <p className="text-center text-[var(--muted)] py-10 text-sm">
-            No menu items yet. Choose a session, set date, pax, and time, then add dishes — columns appear like the Excel menu sheet.
-          </p>
-        )}
+        <OrderExcelHeader order={order} />
+        <OrderExcelMenuGrid
+          order={order}
+          extras={extras}
+          menuItems={menuItems}
+          activeSession={activeSession}
+          dishes={dishes}
+          onOrderUpdated={onOrderUpdated}
+          onDishesCatalogUpdated={onDishesCatalogUpdated}
+        />
 
         {mealPrefs.length > 0 && (
           <div className="mt-8 pt-6 border-t border-[var(--border)]">

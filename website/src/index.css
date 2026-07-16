@@ -905,6 +905,64 @@ body {
   background: var(--card);
 }
 
+.excel-session-add {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+
+.excel-session-add-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.excel-session-add-catalog {
+  margin-top: 0.625rem;
+}
+
+.excel-session-add-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.excel-meta-input--date {
+  min-width: 9.5rem;
+}
+
+.excel-session-meta--draft {
+  flex-wrap: wrap;
+}
+
+.order-session-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.order-session-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.order-session-tab:hover {
+  border-color: var(--primary);
+}
+
+.order-session-tab--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 .excel-session-empty {
   margin: 0;
   padding: 2rem 1.5rem;
