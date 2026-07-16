@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Moon, Plus, Search, Sun } from 'lucide-react';
+import { Bell, Moon, Plus, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
 import { useTheme } from '../context/ThemeContext';
@@ -12,7 +12,6 @@ export function TopNav() {
   const { theme, toggleTheme } = useTheme();
   const { triggerCreate } = useCreateAction();
   const location = useLocation();
-  const [search, setSearch] = useState('');
   const [notifOpen, setNotifOpen] = useState(false);
 
   const unread = getUnreadNotifications(notifications);
@@ -31,18 +30,7 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-30 mb-6 -mx-1 px-1">
       <div className="flex flex-wrap items-center gap-3 py-3 px-4 rounded-[var(--radius-xl)] bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-sm)]">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search enquiries, orders, dishes…"
-            className="form-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto w-full justify-end">
           {pageAction && (
             <button
               type="button"
