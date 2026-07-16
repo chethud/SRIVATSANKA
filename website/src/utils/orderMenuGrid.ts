@@ -1,4 +1,5 @@
 import type { Enquiry, EnquiryDish } from '../api/client';
+import { normalizeDateOnly } from './dateOnly';
 import { formatScheduleTime, type MenuColumn, type OrderExtras } from './orderNotes';
 import { MEAL_SESSIONS, MEAL_SESSION_ORDER, PREFERENCE_CATEGORIES } from './mealSessions';
 
@@ -36,7 +37,7 @@ export function sortMenuColumns(columns: MenuColumn[]): MenuColumn[] {
 }
 
 function defaultDate(extras: OrderExtras, order: Enquiry): string {
-  return extras.scheduleDateFrom ?? order.eventDate.slice(0, 10);
+  return normalizeDateOnly(extras.scheduleDateFrom ?? order.eventDate);
 }
 
 function menuItemsOnly(dishes: EnquiryDish[]): EnquiryDish[] {

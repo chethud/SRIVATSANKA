@@ -1,4 +1,5 @@
 import type { Enquiry } from '../api/client';
+import { todayDateOnlyLocal } from './dateOnly';
 import {
   INVOICE_COMPANY,
   formatInvoiceDate,
@@ -258,7 +259,7 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
   merge('E8:H8');
   ws.getCell('E8').value = `GSTIN NO : ${INVOICE_COMPANY.gstin}`;
 
-  ws.getCell('A9').value = `DATE : ${formatInvoiceDate(enquiry.eventDate || new Date().toISOString())}`;
+  ws.getCell('A9').value = `DATE : ${formatInvoiceDate(enquiry.eventDate || todayDateOnlyLocal())}`;
   merge('E9:H9');
   ws.getCell('E9').value = `CIN No : ${INVOICE_COMPANY.cin}`;
 

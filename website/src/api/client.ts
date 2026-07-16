@@ -1,4 +1,5 @@
 import { isSupabaseAuth, supabase } from '../lib/supabase';
+import { formatDateOnlyDisplay } from '../utils/dateOnly';
 
 /** Fallback when not using Vercel /api proxy (set VITE_API_URL instead). */
 const DEFAULT_LIVE_API = 'https://srivatsanka.onrender.com';
@@ -620,7 +621,7 @@ export async function askDashboardAssistant(query: string): Promise<{ reply: str
 }
 
 export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return formatDateOnlyDisplay(iso);
 }
 
 export function formatDateTime(iso: string) {

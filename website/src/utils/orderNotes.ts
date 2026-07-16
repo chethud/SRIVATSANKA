@@ -21,7 +21,7 @@ export type OrderExtraItem = {
   isCustom?: boolean;
 };
 
-/** Preset extras from wedding Excel sheets — each has its own checkbox on the order. */
+import { normalizeDateOnly, parseDateOnlyLocal, todayDateOnlyLocal } from './dateOnly';
 export const DEFAULT_ORDER_EXTRA_PRESETS = [
   'Tat Paniyaram',
   'Vratha Paniyaram Box',
@@ -178,27 +178,30 @@ export function eventDatesForStyles(
   eventDate: string | null | undefined,
 ): string[] {
   const dates = new Set<string>();
-  const from = extras.scheduleDateFrom?.slice(0, 10);
-  const to = (extras.scheduleDateTo ?? extras.scheduleDateFrom)?.slice(0, 10);
+  const from = normalizeDateOnly(extras.scheduleDateFrom);
+  const to = normalizeDateOnly(extras.scheduleDateTo ?? extras.scheduleDateFrom);
   if (from && to) {
-    const cursor = new Date(`${from}T00:00:00`);
-    const end = new Date(`${to}T00:00:00`);
-    if (!Number.isNaN(cursor.getTime()) && !Number.isNaN(end.getTime())) {
-      while (cursor <= end) {
-        dates.add(cursor.toISOString().slice(0, 10));
-        cursor.setDate(cursor.getDate() + 1);
+    const cursor = parseDateOnlyLocal(from);
+    const end = parseDateOnlyLocal(to);
+    if (cursor && end) {
+      const walk = new Date(cursor);
+      while (walk <= end) {
+        dates.add(normalizeDateOnly(
+          `${walk.getFullYear()}-${String(walk.getMonth() + 1).padStart(2, '0')}-${String(walk.getDate()).padStart(2, '0')}`,
+        ));
+        walk.setDate(walk.getDate() + 1);
       }
     }
   }
   for (const col of extras.menuColumns ?? []) {
-    if (col.date) dates.add(col.date.slice(0, 10));
+    if (col.date) dates.add(normalizeDateOnly(col.date));
   }
   for (const key of Object.keys(extras.regionalStylesByDate ?? {})) {
-    if (key) dates.add(key.slice(0, 10));
+    if (key) dates.add(normalizeDateOnly(key));
   }
-  if (eventDate) dates.add(eventDate.slice(0, 10));
+  if (eventDate) dates.add(normalizeDateOnly(eventDate));
   if (dates.size === 0) {
-    dates.add(new Date().toISOString().slice(0, 10));
+    dates.add(todayDateOnlyLocal());
   }
   return [...dates].sort();
 }

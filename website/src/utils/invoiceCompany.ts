@@ -56,14 +56,7 @@ export function numberToIndianWords(amount: number): string {
   return `${parts.join(' ').replace(/\s+/g, ' ').trim()} Rupees only`;
 }
 
-export function formatInvoiceDate(isoOrDate: string): string {
-  const d = new Date(isoOrDate);
-  if (Number.isNaN(d.getTime())) return isoOrDate;
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
+export { formatInvoiceDateOnly as formatInvoiceDate } from './dateOnly';
 
 export function shortInvoiceNo(enquiryId: string): string {
   const suffix = enquiryId.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase() || '0001';

@@ -1,3 +1,9 @@
+import {
+  formatEventDateRangeLabel,
+  formatMenuExcelDateText,
+  normalizeDateOnly,
+  todayDateOnlyLocal,
+} from './dateOnly';
 import type { Workbook, Worksheet } from 'exceljs';
 import type { Enquiry } from '../api/client';
 import {
@@ -60,20 +66,12 @@ function wrappedRowHeight(text: string, charsPerLine: number, linePx = 15, min =
   return Math.max(min, lines * linePx + 6);
 }
 
-function formatMenuDate(iso: string): Date | string {
-  const d = new Date(iso.includes('T') ? iso : `${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d;
-}
-
-function clientTitle(enquiry: Enquiry): string {
-  const datePart = enquiry.eventDate
-    ? (() => {
-        const d = new Date(enquiry.eventDate);
-        if (Number.isNaN(d.getTime())) return '';
-        return ` ${d.toLocaleString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-      })()
-    : '';
+function clientTitle(enquiry: Enquiry, dayDates: string[]): string {
+  const datePart = dayDates.length > 0
+    ? ` ${formatEventDateRangeLabel(dayDates)}`
+    : enquiry.eventDate
+      ? ` ${formatEventDateRangeLabel([enquiry.eventDate])}`
+      : '';
   const event = enquiry.eventType ? ` ${enquiry.eventType}` : '';
   return `Client : ${enquiry.customerName}${event}${datePart}`;
 }
@@ -113,7 +111,7 @@ function buildDayColumns(
   const byDate = new Map<string, SessionBlock[]>();
 
   for (const column of columns) {
-    const date = (column.date || enquiry.eventDate || '').slice(0, 10);
+    const date = normalizeDateOnly(column.date || enquiry.eventDate);
     if (!date) continue;
     const list = byDate.get(date) ?? [];
     const label = column.sessionLabel;
@@ -136,7 +134,7 @@ function buildDayColumns(
 
   if (dayColumns.length === 0) {
     dayColumns.push({
-      date: (enquiry.eventDate || new Date().toISOString()).slice(0, 10),
+      date: normalizeDateOnly(enquiry.eventDate) || todayDateOnlyLocal(),
       sessions: [
         {
           label: enquiry.eventType || 'Event',
@@ -223,10 +221,11 @@ export async function appendMenuSheet(
   }
 
   // Row 1 — Client (light blue)
-  paintMergedRow(ws, 1, colCount, clientTitle(enquiry), {
+  const title = clientTitle(enquiry, dayColumns.map((d) => d.date));
+  paintMergedRow(ws, 1, colCount, title, {
     fill: FILL.header,
     font: bold,
-    height: wrappedRowHeight(clientTitle(enquiry), totalCharsWide, 16, 24),
+    height: wrappedRowHeight(title, totalCharsWide, 16, 24),
   });
 
   // Row 2 — Venue (light blue)
@@ -241,8 +240,7 @@ export async function appendMenuSheet(
   ws.getRow(3).height = 22;
   dayColumns.forEach((day, i) => {
     const cell = ws.getCell(3, i + 1);
-    cell.value = formatMenuDate(day.date);
-    if (cell.value instanceof Date) cell.numFmt = 'dd-mmm-yy';
+    cell.value = formatMenuExcelDateText(day.date);
     cell.font = bold;
     cell.alignment = alignCenter;
     cell.border = border;
