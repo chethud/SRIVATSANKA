@@ -172,17 +172,12 @@ async def _migrate_sqlite_columns() -> None:
                         )
 
             if "Dish" in tables:
-                from app.data.meal_sessions import ENUM_VALUE_TO_LABEL, OLD_DISH_ENUM_MAP
+                from app.data.meal_sessions import OLD_DISH_ENUM_MAP
 
                 for old_val, new_val in OLD_DISH_ENUM_MAP.items():
                     connection.execute(
                         sa.text("UPDATE Dish SET category = :new WHERE category = :old"),
                         {"old": old_val, "new": new_val},
-                    )
-                for enum_val, label in ENUM_VALUE_TO_LABEL.items():
-                    connection.execute(
-                        sa.text("UPDATE Dish SET category = :label WHERE category = :enum"),
-                        {"enum": enum_val, "label": label},
                     )
             if "EnquiryDish" in tables:
                 from app.data.meal_sessions import OLD_ENQUIRY_CATEGORY_MAP
@@ -197,33 +192,60 @@ async def _migrate_sqlite_columns() -> None:
 
 
 async def _migrate_dish_category_to_labels() -> None:
-    """Store meal sessions as display labels (Breakfast, High Tea, …) on Dish.category."""
+    """Convert Dish.category from Postgres enum → VARCHAR, then rewrite labels.
+
+    Must alter the column type BEFORE writing display labels like \"Breakfast\",
+    otherwise Postgres rejects them as invalid dishcategory enum values.
+    """
     import sqlalchemy as sa
 
-    from app.data.meal_sessions import ENUM_VALUE_TO_LABEL
+    from app.data.meal_sessions import ENUM_VALUE_TO_LABEL, OLD_DISH_ENUM_MAP
 
     async with engine.begin() as conn:
         def run(connection) -> None:
             inspector = sa.inspect(connection)
             if "Dish" not in inspector.get_table_names():
                 return
-            for enum_val, label in ENUM_VALUE_TO_LABEL.items():
-                connection.execute(
-                    sa.text('UPDATE "Dish" SET category = :label WHERE category = :enum'),
-                    {"enum": enum_val, "label": label},
-                )
-            # Postgres: enum → varchar so custom sessions can be stored
+
             if connection.dialect.name == "postgresql":
-                try:
+                # Detect current column type — skip ALTER if already varchar/text
+                row = connection.execute(
+                    sa.text(
+                        """
+                        SELECT data_type, udt_name
+                        FROM information_schema.columns
+                        WHERE table_schema = current_schema()
+                          AND table_name = 'Dish'
+                          AND column_name = 'category'
+                        """
+                    )
+                ).fetchone()
+                data_type = (row[0] if row else "") or ""
+                udt_name = (row[1] if row else "") or ""
+                needs_alter = data_type == "USER-DEFINED" or "enum" in udt_name.lower() or udt_name == "dishcategory"
+                if needs_alter:
                     connection.execute(
                         sa.text(
                             'ALTER TABLE "Dish" ALTER COLUMN category TYPE VARCHAR '
                             "USING category::text"
                         )
                     )
-                except Exception:
-                    # Already varchar, or insufficient privileges — ignore
-                    pass
+
+            # Legacy cuisine enum tokens → meal session enum tokens (string form)
+            for old_val, new_val in OLD_DISH_ENUM_MAP.items():
+                connection.execute(
+                    sa.text('UPDATE "Dish" SET category = :new WHERE category = :old'),
+                    {"old": old_val, "new": new_val},
+                )
+
+            # Enum tokens (BREAKFAST) → display labels (Breakfast)
+            for enum_val, label in ENUM_VALUE_TO_LABEL.items():
+                if enum_val == label:
+                    continue
+                connection.execute(
+                    sa.text('UPDATE "Dish" SET category = :label WHERE category = :enum'),
+                    {"enum": enum_val, "label": label},
+                )
 
         await conn.run_sync(run)
 
