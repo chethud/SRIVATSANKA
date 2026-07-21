@@ -594,9 +594,27 @@ body {
   transform: translateY(-1px);
 }
 
+.order-copy-btn--active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
 .order-copy-btn svg {
   color: var(--primary);
   opacity: 0.85;
+}
+
+.order-inline-copy {
+  margin-bottom: 1.5rem;
+}
+
+.order-inline-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .order-section {
@@ -935,6 +953,14 @@ body {
   flex-wrap: wrap;
 }
 
+.excel-session-save {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0 1.25rem 1.25rem;
+}
+
 .order-session-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -961,6 +987,31 @@ body {
   background: var(--primary);
   color: #fff;
   border-color: var(--primary);
+}
+
+.order-session-tab--add {
+  border-style: dashed;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.order-session-add-form {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.order-session-add-input {
+  min-width: 8rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  font-size: 0.8125rem;
+  background: var(--card);
+  color: var(--foreground);
 }
 
 .excel-session-empty {
@@ -1242,6 +1293,164 @@ select:focus {
 
 .form-input::placeholder {
   color: var(--input-placeholder);
+}
+
+/* WhatsApp chats — full-height split pane */
+.wa-chats {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.wa-chats__header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.wa-chats__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.25;
+}
+
+.wa-chats__offline {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+}
+
+.wa-chats__banner {
+  flex-shrink: 0;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8125rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+}
+
+.wa-chats__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  width: 100%;
+}
+
+.wa-chats__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  background: var(--card);
+}
+
+.wa-chats__list-toolbar {
+  flex-shrink: 0;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.wa-chats__list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.wa-chats__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.wa-chats__row:hover {
+  background: var(--sidebar-hover);
+}
+
+.wa-chats__row--active {
+  background: var(--primary-light);
+}
+
+.wa-chats__thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--background);
+}
+
+.wa-chats__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--muted);
+}
+
+.wa-chats__thread-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.wa-chats__messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wa-chats__composer {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+@media (max-width: 1023px) {
+  .wa-chats__body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 40%) minmax(0, 1fr);
+  }
+
+  .wa-chats__list {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wa-chats__offline {
+    display: none;
+  }
 }
 
 @media print {

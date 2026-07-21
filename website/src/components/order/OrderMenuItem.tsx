@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { updateOrderDish, deleteOrderDish, type Enquiry, type EnquiryDish } from '../../api/client';
-import { MEAL_SESSIONS } from '../../utils/mealSessions';
+import { resolveSessionTabs } from '../../utils/mealSessions';
 
 export function OrderMenuItem({
   orderId,
   dish,
+  sessionOptions,
   onUpdated,
 }: {
   orderId: string;
   dish: EnquiryDish;
+  sessionOptions?: { id: string; label: string }[];
   onUpdated: (order: Enquiry) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [session, setSession] = useState(dish.category);
   const [saving, setSaving] = useState(false);
+  const options = sessionOptions ?? resolveSessionTabs([], [dish.category]);
 
   function startEdit() {
     setSession(dish.category);
@@ -57,11 +60,14 @@ export function OrderMenuItem({
               onChange={(e) => setSession(e.target.value)}
               className="form-select excel-meta-input excel-meta-input--wide"
             >
-              {MEAL_SESSIONS.map((s) => (
+              {options.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
               ))}
+              {!options.some((s) => s.id === dish.category) && (
+                <option value={dish.category}>{dish.category}</option>
+              )}
             </select>
           </div>
           <div className="order-menu-item-actions">

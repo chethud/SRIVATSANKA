@@ -1,35 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Loader2, Send, Sparkles, X } from 'lucide-react';
+import { Bot, Loader2, Sparkles, X } from 'lucide-react';
 import { askDashboardAssistant } from '../api/client';
-
-const exampleQueries = [
-  'Show all upcoming events',
-  'Show wedding enquiries',
-  'Business summary',
-];
-
-function renderMarkdownish(text: string) {
-  return text.split('\n').map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|_[^_]+_)/g).map((part, j) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={j}>{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith('_') && part.endsWith('_')) {
-        return <em key={j}>{part.slice(1, -1)}</em>;
-      }
-      return part;
-    });
-    return (
-      <span key={i} className="block whitespace-pre-wrap">
-        {parts}
-      </span>
-    );
-  });
-}
+import { AI_ASSISTANT_RULES, renderMarkdownish } from '../utils/aiAssistantRules';
 
 export function AIChatWidget() {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -38,17 +13,14 @@ export function AIChatWidget() {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = query.trim();
-    if (!text || loading) return;
+  async function runRule(query: string) {
+    if (loading) return;
 
-    setQuery('');
-    setMessages((prev) => [...prev, { role: 'user', text }]);
+    setMessages((prev) => [...prev, { role: 'user', text: query }]);
     setLoading(true);
 
     try {
-      const { reply } = await askDashboardAssistant(text);
+      const { reply } = await askDashboardAssistant(query);
       setMessages((prev) => [...prev, { role: 'assistant', text: reply }]);
     } catch {
       setMessages((prev) => [
@@ -77,7 +49,7 @@ export function AIChatWidget() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-sm">SRIVATSANKA EVENTS AI</p>
-              <p className="text-xs text-white/80">Ask about enquiries, orders & stats</p>
+              <p className="text-xs text-white/80">Choose a question below</p>
             </div>
             <button
               type="button"
@@ -95,22 +67,10 @@ export function AIChatWidget() {
                 <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[var(--primary-light)] flex items-center justify-center">
                   <Bot size={28} className="text-[var(--primary)]" />
                 </div>
-                <p className="text-sm font-medium text-[var(--foreground)]">Hi! How can I help?</p>
-                <p className="text-xs text-[var(--muted)] mt-1 mb-4">
-                  Ask about upcoming events, enquiries, or business stats.
+                <p className="text-sm font-medium text-[var(--foreground)]">Hi! Pick a question</p>
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  Tap one of the options below to see live enquiry data.
                 </p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {exampleQueries.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => setQuery(q)}
-                      className="px-3 py-1.5 text-xs rounded-full border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] transition-colors"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
               </div>
             ) : (
               messages.map((msg, i) => (
@@ -143,24 +103,24 @@ export function AIChatWidget() {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="border-t border-[var(--border)] p-3 flex gap-2 bg-[var(--card)] shrink-0">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask anything…"
-              disabled={loading}
-              className="form-input flex-1 px-3 py-2.5 rounded-full text-sm"
-            />
-            <button
-              type="submit"
-              disabled={loading || !query.trim()}
-              className="w-10 h-10 rounded-full bg-[var(--primary)] text-white flex items-center justify-center hover:bg-[var(--primary-hover)] disabled:opacity-50 shrink-0"
-              aria-label="Send"
-            >
-              <Send size={16} />
-            </button>
-          </form>
+          <div className="border-t border-[var(--border)] p-3 bg-[var(--card)] shrink-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-2 px-1">
+              Quick questions
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {AI_ASSISTANT_RULES.map((rule) => (
+                <button
+                  key={rule.id}
+                  type="button"
+                  onClick={() => void runRule(rule.query)}
+                  disabled={loading}
+                  className="px-3 py-1.5 text-xs rounded-full border border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)] hover:bg-[var(--primary-light)] transition-colors disabled:opacity-50"
+                >
+                  {rule.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

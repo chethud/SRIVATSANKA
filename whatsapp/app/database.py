@@ -172,12 +172,17 @@ async def _migrate_sqlite_columns() -> None:
                         )
 
             if "Dish" in tables:
-                from app.data.meal_sessions import OLD_DISH_ENUM_MAP, OLD_ENQUIRY_CATEGORY_MAP
+                from app.data.meal_sessions import ENUM_VALUE_TO_LABEL, OLD_DISH_ENUM_MAP
 
                 for old_val, new_val in OLD_DISH_ENUM_MAP.items():
                     connection.execute(
                         sa.text("UPDATE Dish SET category = :new WHERE category = :old"),
                         {"old": old_val, "new": new_val},
+                    )
+                for enum_val, label in ENUM_VALUE_TO_LABEL.items():
+                    connection.execute(
+                        sa.text("UPDATE Dish SET category = :label WHERE category = :enum"),
+                        {"enum": enum_val, "label": label},
                     )
             if "EnquiryDish" in tables:
                 from app.data.meal_sessions import OLD_ENQUIRY_CATEGORY_MAP
@@ -191,6 +196,38 @@ async def _migrate_sqlite_columns() -> None:
         await conn.run_sync(run)
 
 
+async def _migrate_dish_category_to_labels() -> None:
+    """Store meal sessions as display labels (Breakfast, High Tea, …) on Dish.category."""
+    import sqlalchemy as sa
+
+    from app.data.meal_sessions import ENUM_VALUE_TO_LABEL
+
+    async with engine.begin() as conn:
+        def run(connection) -> None:
+            inspector = sa.inspect(connection)
+            if "Dish" not in inspector.get_table_names():
+                return
+            for enum_val, label in ENUM_VALUE_TO_LABEL.items():
+                connection.execute(
+                    sa.text('UPDATE "Dish" SET category = :label WHERE category = :enum'),
+                    {"enum": enum_val, "label": label},
+                )
+            # Postgres: enum → varchar so custom sessions can be stored
+            if connection.dialect.name == "postgresql":
+                try:
+                    connection.execute(
+                        sa.text(
+                            'ALTER TABLE "Dish" ALTER COLUMN category TYPE VARCHAR '
+                            "USING category::text"
+                        )
+                    )
+                except Exception:
+                    # Already varchar, or insufficient privileges — ignore
+                    pass
+
+        await conn.run_sync(run)
+
+
 async def init_db() -> None:
     import app.models  # noqa: F401 — register every table before create_all
 
@@ -198,6 +235,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     await _migrate_sqlite_columns() if is_sqlite_database(settings.database_url) else None
+    await _migrate_dish_category_to_labels()
 
     from app.data.seed_dishes import seed_dishes
 

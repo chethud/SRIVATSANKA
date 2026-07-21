@@ -1,19 +1,23 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, FileSpreadsheet, Printer } from 'lucide-react';
-import { Button, EmptyState } from '../components/Layout';
-import { OrderCopyView } from '../components/OrderCopyView';
+import { useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { EmptyState } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
-import { downloadOrderCopyExcel } from '../utils/orderCopies';
 
 type Props = { copyType: 'kitchen' | 'billing' };
 
+/** Legacy routes — send users back to the order page (copies open in-place there). */
 export default function OrderCopyPage({ copyType }: Props) {
   const { orderId } = useParams<{ orderId: string }>();
   const { enquiries } = useAppData();
+  const navigate = useNavigate();
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
-  const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
-  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (order) {
+      navigate(`/orders/${order.id}`, { replace: true, state: { openCopy: copyType } });
+    }
+  }, [order, copyType, navigate]);
 
   if (!order) {
     return (
@@ -26,48 +30,7 @@ export default function OrderCopyPage({ copyType }: Props) {
     );
   }
 
-  async function handleDownloadExcel() {
-    setBusy(true);
-    try {
-      await downloadOrderCopyExcel(order!, copyType);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not download Excel. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 print:hidden">
-        <Link
-          to={`/orders/${order.id}`}
-          className="text-sm text-[var(--primary)] hover:underline inline-flex items-center gap-1"
-        >
-          <ArrowLeft size={16} /> Back to order
-        </Link>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={() => window.print()} className="flex items-center gap-2">
-            <Printer size={16} />
-            Print
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleDownloadExcel()}
-            disabled={busy}
-            className="flex items-center gap-2"
-          >
-            <FileSpreadsheet size={16} />
-            {busy ? 'Preparing Excel…' : 'Download Excel'}
-          </Button>
-        </div>
-      </div>
-
-      <div className="print:border-0 print:shadow-none print:p-0 bg-white">
-        <OrderCopyView enquiry={order} copyType={copyType} />
-      </div>
-
-      <p className="text-center text-sm text-[var(--muted)] mt-6 print:hidden">{title} for {order.customerName}</p>
-    </>
+    <p className="text-sm text-[var(--muted)]">Opening {copyType === 'kitchen' ? 'kitchen' : 'order'} copy…</p>
   );
 }

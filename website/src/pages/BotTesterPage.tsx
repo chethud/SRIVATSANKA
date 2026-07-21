@@ -160,21 +160,22 @@ export default function BotTesterPage() {
   const active = conversations.find((c) => c.phoneNumber === selectedPhone);
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <header className="shrink-0 flex items-center gap-2.5 px-4 py-3 border-b border-[var(--border)] bg-[var(--card)]">
-        <MessageCircle size={22} className="text-[var(--primary)]" />
-        <h1 className="text-lg font-semibold text-[var(--foreground)]">WhatsApp Chats</h1>
+    <div className="wa-chats">
+      <header className="wa-chats__header">
+        <MessageCircle size={22} className="text-[var(--primary)] shrink-0" />
+        <h1 className="wa-chats__title">WhatsApp Chats</h1>
+        {!connected && (
+          <p className="wa-chats__offline">API offline — sign in again after the backend is running.</p>
+        )}
       </header>
 
-      {!connected && (
-        <p className="text-xs text-amber-800 bg-amber-50 border-b border-amber-200 px-4 py-2 shrink-0">
-          API offline — sign in again after the backend is running.
-        </p>
+      {error && !selectedPhone && (
+        <p className="wa-chats__banner">{error}</p>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] flex-1 min-h-0">
-        <aside className="flex flex-col overflow-hidden min-h-0 h-full border-r border-[var(--border)] bg-[var(--card)]">
-          <div className="p-3 border-b border-[var(--border)]">
+      <div className="wa-chats__body">
+        <aside className="wa-chats__list">
+          <div className="wa-chats__list-toolbar">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-[var(--muted)]">
                 {conversations.length} chat{conversations.length === 1 ? '' : 's'}
@@ -194,12 +195,12 @@ export default function BotTesterPage() {
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
                 placeholder="917899410254"
-                className="form-input flex-1 px-3 py-2 rounded-lg text-sm"
+                className="form-input flex-1 min-w-0 px-3 py-2 rounded-lg text-sm"
               />
               <button
                 type="button"
                 onClick={startNewChat}
-                className="px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]"
+                className="px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shrink-0"
                 title="Open chat by phone"
               >
                 <Plus size={18} />
@@ -207,11 +208,11 @@ export default function BotTesterPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="wa-chats__list-scroll">
             {loadingList && conversations.length === 0 ? (
               <p className="text-sm text-[var(--muted)] p-4">Loading conversations…</p>
             ) : conversations.length === 0 ? (
-              <p className="text-sm text-[var(--muted)] p-4">No chats yet.</p>
+              <p className="text-sm text-[var(--muted)] p-4">No chats yet. Enter a phone number above to start.</p>
             ) : (
               conversations.map((c) => {
                 const activeRow = c.phoneNumber === selectedPhone;
@@ -220,27 +221,23 @@ export default function BotTesterPage() {
                     key={c.phoneNumber}
                     type="button"
                     onClick={() => selectConversation(c.phoneNumber, 'owner')}
-                    className={`w-full text-left px-4 py-3 border-b border-[var(--border)] transition-colors ${
-                      activeRow ? 'bg-[var(--primary-light)]' : 'hover:bg-[var(--sidebar-hover)]'
-                    }`}
+                    className={`wa-chats__row ${activeRow ? 'wa-chats__row--active' : ''}`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[var(--background)] border border-[var(--border)] flex items-center justify-center shrink-0">
-                        <User size={16} className="text-[var(--muted)]" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm truncate">{formatPhoneDisplay(c.phoneNumber)}</p>
-                        {c.customerName && (
-                          <p className="text-xs text-[var(--foreground)] truncate">{c.customerName}</p>
-                        )}
-                        <p className="text-xs text-[var(--muted)] mt-1 truncate">
-                          {roleLabel(c.lastRole)}: {c.lastMessage}
-                        </p>
-                        <p className="text-[10px] text-[var(--muted)] mt-0.5">
-                          {formatDateTime(c.lastAt)} · {c.messageCount} msgs
-                          {c.botPaused ? ' · You are replying' : ''}
-                        </p>
-                      </div>
+                    <div className="w-9 h-9 rounded-full bg-[var(--background)] border border-[var(--border)] flex items-center justify-center shrink-0">
+                      <User size={16} className="text-[var(--muted)]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm truncate">{formatPhoneDisplay(c.phoneNumber)}</p>
+                      {c.customerName && (
+                        <p className="text-xs text-[var(--foreground)] truncate">{c.customerName}</p>
+                      )}
+                      <p className="text-xs text-[var(--muted)] mt-1 truncate">
+                        {roleLabel(c.lastRole)}: {c.lastMessage}
+                      </p>
+                      <p className="text-[10px] text-[var(--muted)] mt-0.5">
+                        {formatDateTime(c.lastAt)} · {c.messageCount} msgs
+                        {c.botPaused ? ' · You are replying' : ''}
+                      </p>
                     </div>
                   </button>
                 );
@@ -249,18 +246,19 @@ export default function BotTesterPage() {
           </div>
         </aside>
 
-        <section className="flex flex-col overflow-hidden min-h-0 h-full bg-[var(--background)]">
+        <section className="wa-chats__thread">
           {!selectedPhone ? (
-            <div className="flex-1 flex items-center justify-center text-[var(--muted)]">
-              <MessageCircle size={48} className="opacity-25" />
+            <div className="wa-chats__empty">
+              <MessageCircle size={48} className="opacity-25 mb-3" />
+              <p className="text-sm text-[var(--muted)]">Select a chat or open a number to start</p>
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between gap-3 shrink-0">
-                <div>
-                  <p className="font-semibold">{formatPhoneDisplay(selectedPhone)}</p>
+              <div className="wa-chats__thread-head">
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{formatPhoneDisplay(selectedPhone)}</p>
                   {active?.customerName && (
-                    <p className="text-xs text-[var(--muted)]">{active.customerName}</p>
+                    <p className="text-xs text-[var(--muted)] truncate">{active.customerName}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -276,7 +274,7 @@ export default function BotTesterPage() {
                 </div>
               </div>
 
-              <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+              <div ref={threadRef} className="wa-chats__messages">
                 {loadingThread && messages.length === 0 ? (
                   <p className="text-sm text-[var(--muted)] text-center mt-10">Loading messages…</p>
                 ) : messages.length === 0 ? (
@@ -299,7 +297,7 @@ export default function BotTesterPage() {
                               ? 'bg-[#dcf8c6] text-[#111]'
                               : isOwner
                                 ? 'bg-[var(--primary-light)] border border-[var(--primary)]/20 text-[var(--foreground)]'
-                                : 'bg-[var(--background)] border border-[var(--border)]'
+                                : 'bg-[var(--card)] border border-[var(--border)]'
                           }`}
                         >
                           {msg.body}
@@ -326,7 +324,8 @@ export default function BotTesterPage() {
                 )}
               </div>
 
-              <div className="border-t border-[var(--border)] p-3 bg-[var(--card)] shrink-0">
+              <div className="wa-chats__composer">
+                {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
                 <div className="flex gap-2 mb-2">
                   <button
                     type="button"
@@ -364,17 +363,16 @@ export default function BotTesterPage() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={sendMode === 'owner' ? 'Type a message…' : 'Simulate customer…'}
                     disabled={sending}
-                    className="form-input flex-1 px-4 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] disabled:opacity-50"
+                    className="form-input flex-1 min-w-0 px-4 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] disabled:opacity-50"
                   />
                   <button
                     type="submit"
                     disabled={sending || !input.trim()}
-                    className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-hover)] disabled:opacity-50"
+                    className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-hover)] disabled:opacity-50 shrink-0"
                   >
                     <Send size={18} />
                   </button>
                 </form>
-                {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
             </>
           )}

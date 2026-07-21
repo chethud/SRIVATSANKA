@@ -10,13 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.data.meal_sessions import (
-    LABEL_TO_DISH_CATEGORY,
     MEAL_SESSION_LABELS,
-    OLD_DISH_ENUM_MAP,
-    OLD_ENQUIRY_CATEGORY_MAP,
+    dish_category_label,
     normalize_meal_session_label,
 )
-from app.data.seed_dishes import CATEGORY_LABELS
 from app.database import get_db
 from app.models import Dish, DishCategory, Enquiry, EnquiryDish, EnquiryStatus, InvoiceUpload
 from app.schemas import (
@@ -37,8 +34,6 @@ router = APIRouter(prefix="/api", tags=["orders"])
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-LABEL_TO_CATEGORY: dict[str, DishCategory] = dict(LABEL_TO_DISH_CATEGORY)
 
 
 def _dish_out(d: EnquiryDish) -> EnquiryDishOut:
@@ -78,16 +73,13 @@ async def _get_converted_enquiry(enquiry_id: str, db: AsyncSession) -> Enquiry:
 
 @router.post("/dishes", response_model=DishOut)
 async def create_dish(payload: DishIn, db: AsyncSession = Depends(get_db)) -> DishOut:
-    cat = LABEL_TO_CATEGORY.get(payload.category)
-    if not cat:
-        try:
-            cat = DishCategory(payload.category.upper().replace(" ", "_"))
-        except ValueError as exc:
-            raise HTTPException(400, "Invalid category") from exc
+    label = normalize_meal_session_label(payload.category)
+    if not label:
+        raise HTTPException(400, "Invalid meal session — use Breakfast, Lunch, or a custom name")
 
     dish = Dish(
         name=payload.name.strip(),
-        category=cat,
+        category=label,
         price=payload.price,
         description=payload.description,
         isActive=True,
@@ -98,7 +90,7 @@ async def create_dish(payload: DishIn, db: AsyncSession = Depends(get_db)) -> Di
     return DishOut(
         id=dish.id,
         name=dish.name,
-        category=CATEGORY_LABELS.get(dish.category, str(dish.category)),
+        category=dish_category_label(dish.category),
         price=dish.price,
         description=dish.description,
     )
@@ -124,7 +116,7 @@ async def add_order_dish(
         if not menu or not menu.isActive:
             raise HTTPException(404, "Dish not found in menu")
         if not payload.category:
-            session_label = CATEGORY_LABELS.get(menu.category, MEAL_SESSION_LABELS[DishCategory.LUNCH])
+            session_label = dish_category_label(menu.category)
         item = EnquiryDish(
             enquiryId=enquiry.id,
             dishId=menu.id,
@@ -161,10 +153,9 @@ async def add_order_dish(
             )
             menu = result.scalar_one_or_none()
             if not menu:
-                cat = LABEL_TO_CATEGORY.get(session_label, DishCategory.LUNCH)
                 menu = Dish(
                     name=name,
-                    category=cat,
+                    category=session_label,
                     price=0.0,
                     description="Added from order menu",
                     isActive=True,

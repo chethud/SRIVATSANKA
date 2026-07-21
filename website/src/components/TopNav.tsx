@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Moon, Plus, Sun } from 'lucide-react';
+import { Bell, Layers, Moon, Plus, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
 import { useTheme } from '../context/ThemeContext';
-import { getCreateActionForPath, getCreateButtonLabel } from '../utils/createAction';
+import {
+  getCreateActionForPath,
+  getCreateButtonLabel,
+  getSecondaryCreateActionForPath,
+  getSecondaryCreateButtonLabel,
+} from '../utils/createAction';
 import { getUnreadNotifications } from '../utils/dashboardData';
 
 export function TopNav() {
@@ -16,14 +21,17 @@ export function TopNav() {
 
   const unread = getUnreadNotifications(notifications);
   const pageAction = getCreateActionForPath(location.pathname);
+  const secondaryAction = getSecondaryCreateActionForPath(location.pathname);
   const createLabel = getCreateButtonLabel(location.pathname);
+  const secondaryLabel = getSecondaryCreateButtonLabel(secondaryAction);
 
-  function handleCreate() {
+  function handleCreate(action: typeof pageAction | typeof secondaryAction) {
     setNotifOpen(false);
-    if (!pageAction) return;
-    triggerCreate(pageAction);
+    if (!action) return;
+    triggerCreate(action);
     requestAnimationFrame(() => {
-      document.getElementById('page-create-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const id = action === 'session' ? 'page-add-session' : 'page-create-form';
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -31,10 +39,20 @@ export function TopNav() {
     <header className="sticky top-0 z-30 mb-6 -mx-1 px-1">
       <div className="flex flex-wrap items-center gap-3 py-3 px-4 rounded-[var(--radius-xl)] bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-sm)]">
         <div className="flex items-center gap-2 ml-auto w-full justify-end">
+          {secondaryAction && (
+            <button
+              type="button"
+              onClick={() => handleCreate(secondaryAction)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] text-sm font-semibold hover:border-[var(--primary)] hover:bg-[var(--primary-light)] hover:text-[var(--primary)] transition-colors shadow-sm"
+            >
+              <Layers size={18} />
+              <span className="hidden sm:inline">{secondaryLabel}</span>
+            </button>
+          )}
           {pageAction && (
             <button
               type="button"
-              onClick={handleCreate}
+              onClick={() => handleCreate(pageAction)}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm"
             >
               <Plus size={18} />

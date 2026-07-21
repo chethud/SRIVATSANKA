@@ -64,7 +64,7 @@ class Dish(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=cuid)
     name: Mapped[str] = mapped_column(String)
-    category: Mapped[DishCategory] = mapped_column(Enum(DishCategory))
+    category: Mapped[str] = mapped_column(String)  # display label: Breakfast, High Tea, …
     price: Mapped[float] = mapped_column(Float, default=0)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     isActive: Mapped[bool] = mapped_column(Boolean, default=True)

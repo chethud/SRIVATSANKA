@@ -1,9 +1,11 @@
 """Default menu items seeded on first run."""
 
+from sqlalchemy import select
+
 from app.data.meal_sessions import MEAL_SESSION_LABELS
 from app.models import Dish, DishCategory
 
-# Re-export for existing imports
+# Re-export for existing imports (enum → label)
 CATEGORY_LABELS = MEAL_SESSION_LABELS
 
 DEFAULT_DISHES: list[tuple[str, DishCategory, float]] = [
@@ -92,5 +94,12 @@ async def seed_dishes(session) -> None:
         return
 
     for name, category, price in DEFAULT_DISHES:
-        session.add(Dish(name=name, category=category, price=price, isActive=True))
+        session.add(
+            Dish(
+                name=name,
+                category=MEAL_SESSION_LABELS[category],
+                price=price,
+                isActive=True,
+            )
+        )
     await session.commit()

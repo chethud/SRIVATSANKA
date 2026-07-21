@@ -1,18 +1,24 @@
-import { useCallback, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import type { Enquiry } from '../api/client';
 import { EmptyState } from '../components/Layout';
-import { OrderDetailView } from '../components/order/OrderDetailView';
+import { OrderDetailView, type OrderPageView } from '../components/order/OrderDetailView';
 import { useAppData } from '../context/AppDataContext';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
+  const location = useLocation();
   const { enquiries, dishes, workers, patchEnquiry, refreshDishes, markEnquiryViewed } = useAppData();
   const onOrderUpdated = useCallback((updated: Enquiry) => {
     patchEnquiry(updated);
   }, [patchEnquiry]);
   const order = enquiries.find((e) => e.id === orderId && e.status === 'CONVERTED');
+
+  const openCopy = (location.state as { openCopy?: OrderPageView } | null)?.openCopy;
+  const [initialView] = useState<OrderPageView>(() =>
+    openCopy === 'kitchen' || openCopy === 'billing' ? openCopy : 'details',
+  );
 
   useEffect(() => {
     if (order && !order.ownerViewedAt) {
@@ -38,6 +44,7 @@ export default function OrderDetailPage() {
       workers={workers}
       onOrderUpdated={onOrderUpdated}
       onDishesCatalogUpdated={refreshDishes}
+      initialView={initialView}
     />
   );
 }

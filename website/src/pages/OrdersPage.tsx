@@ -56,7 +56,7 @@ export default function OrdersPage() {
         description={
           attentionOnly
             ? `${orders.length} new ${orders.length === 1 ? 'order needs' : 'orders need'} your attention`
-            : 'Converted clients — upcoming orders show a countdown; past event dates are marked completed'
+            : undefined
         }
       />
       <div className="flex flex-col gap-3 mb-6">

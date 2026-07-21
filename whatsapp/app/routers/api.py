@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.data.seed_dishes import CATEGORY_LABELS
+from app.data.meal_sessions import dish_category_label
 from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
 from app.datetime_util import as_naive_utc
@@ -126,7 +126,7 @@ async def list_dishes(db: AsyncSession = Depends(get_db)) -> list[DishOut]:
         DishOut(
             id=d.id,
             name=d.name,
-            category=CATEGORY_LABELS.get(d.category, str(d.category)),
+            category=dish_category_label(d.category),
             price=d.price,
             description=d.description,
         )

@@ -1,4 +1,5 @@
 import { DEFAULT_MEAL_TIMES, MEAL_SESSION_ORDER, PREFERENCE_CATEGORIES } from './mealSessions';
+import { normalizeDateOnly, parseDateOnlyLocal, todayDateOnlyLocal } from './dateOnly';
 
 export type DispatchItemStatus = 'pending' | 'packed' | 'dispatched' | 'served';
 export type DispatchPhase = 'planned' | 'preparing' | 'out_for_delivery' | 'completed';
@@ -12,16 +13,15 @@ export type OrderExtraItem = {
   id: string;
   title: string;
   description: string;
-  quantity: string;
   /** Price for this extra line — included in order copy overall total */
   amount?: number | null;
   /** Client selected this extra — checkbox on order page */
   enabled?: boolean;
   /** User-added row (not from preset list) */
   isCustom?: boolean;
+  quantity: string;
 };
 
-import { normalizeDateOnly, parseDateOnlyLocal, todayDateOnlyLocal } from './dateOnly';
 export const DEFAULT_ORDER_EXTRA_PRESETS = [
   'Tat Paniyaram',
   'Vratha Paniyaram Box',
@@ -119,6 +119,8 @@ export type OrderExtras = {
   /** Optional wedding extras (paniyaram, thambula, sweet box, etc.) */
   extrasEnabled?: boolean;
   extraItems?: OrderExtraItem[];
+  /** Extra meal sessions beyond Breakfast…Dessert (e.g. High Tea, Midnight Snacks) */
+  customSessions?: string[];
   /** Regional cuisine style(s) — printed on kitchen / order copy before the menu */
   regionalStyle?: string | null;
   /** Multiple styles on one order (legacy multi-select). Prefer regionalStylesByDate. */
@@ -235,6 +237,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'dishColumns' in parsed ||
     'extrasEnabled' in parsed ||
     'extraItems' in parsed ||
+    'customSessions' in parsed ||
     'regionalStyle' in parsed ||
     'regionalStyles' in parsed ||
     'regionalStylesByDate' in parsed ||
@@ -264,6 +267,9 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
         dishColumns: parsed.dishColumns ?? {},
         extrasEnabled: parsed.extrasEnabled ?? false,
         extraItems: Array.isArray(parsed.extraItems) ? parsed.extraItems : [],
+        customSessions: Array.isArray(parsed.customSessions)
+          ? parsed.customSessions.map((s) => String(s).trim()).filter(Boolean)
+          : [],
         regionalStyle: parsed.regionalStyle ?? null,
         regionalStyles: Array.isArray(parsed.regionalStyles)
           ? parsed.regionalStyles.map((s) => String(s).trim()).filter(Boolean)

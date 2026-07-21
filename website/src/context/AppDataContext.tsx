@@ -21,6 +21,44 @@ import {
 
 const POLL_MS = 8000;
 
+function enquiryFingerprint(e: Enquiry): string {
+  return [
+    e.id,
+    e.status,
+    e.notes ?? '',
+    e.ownerViewedAt ?? '',
+    e.eventDate,
+    e.guestCount ?? '',
+    e.eventLocation ?? '',
+    e.customerName,
+    e.phoneNumber,
+    ...(e.dishes ?? []).map((d) => `${d.id}:${d.served}:${d.dishName}:${d.category}:${d.customizations ?? ''}`),
+  ].join('|');
+}
+
+function mergeEnquiries(prev: Enquiry[], next: Enquiry[]): Enquiry[] {
+  if (prev.length === 0) return next;
+  const prevById = new Map(prev.map((e) => [e.id, e]));
+  let changed = prev.length !== next.length;
+  const merged = next.map((incoming) => {
+    const existing = prevById.get(incoming.id);
+    if (existing && enquiryFingerprint(existing) === enquiryFingerprint(incoming)) {
+      return existing;
+    }
+    changed = true;
+    return incoming;
+  });
+  if (!changed) {
+    for (const e of prev) {
+      if (!next.some((n) => n.id === e.id)) {
+        changed = true;
+        break;
+      }
+    }
+  }
+  return changed ? merged : prev;
+}
+
 interface AppData {
   connected: boolean;
   loading: boolean;
@@ -119,7 +157,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       ]);
       startTransition(() => {
         setStats(s);
-        setEnquiries(e);
+        setEnquiries((prev) => mergeEnquiries(prev, e));
         setDishes(d);
         setNotifications(n);
         setVendors(v);

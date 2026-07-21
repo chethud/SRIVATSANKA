@@ -10,6 +10,11 @@ export function getCreateActionForPath(pathname: string): CreateActionType | nul
   return null;
 }
 
+export function getSecondaryCreateActionForPath(pathname: string): CreateActionType | null {
+  if (pathname.startsWith('/dishes')) return 'session';
+  return null;
+}
+
 export function getCreateButtonLabel(pathname: string): string {
   const action = getCreateActionForPath(pathname);
   switch (action) {
@@ -24,4 +29,9 @@ export function getCreateButtonLabel(pathname: string): string {
     default:
       return 'Create';
   }
+}
+
+export function getSecondaryCreateButtonLabel(action: CreateActionType | null): string {
+  if (action === 'session') return 'Add session';
+  return 'Create';
 }

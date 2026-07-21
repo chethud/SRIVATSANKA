@@ -24,12 +24,9 @@ DEMO_MARKER = "[demo]"
 
 
 def _dish_category_label(dish: Dish) -> str:
-    cat = dish.category
-    if cat in CATEGORY_LABELS:
-        return CATEGORY_LABELS[cat]
-    if hasattr(cat, "value"):
-        return str(cat.value).replace("_", " ").title()
-    return str(cat)
+    from app.data.meal_sessions import dish_category_label
+
+    return dish_category_label(dish.category)
 
 
 async def _load_all_dishes(session: AsyncSession) -> list[Dish]:

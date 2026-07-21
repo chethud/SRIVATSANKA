@@ -28,6 +28,8 @@ MEAL_SESSION_ORDER: list[str] = [
     "Cuisine Preference",
 ]
 
+PREFERENCE_SESSION_LABELS = frozenset({"Meal Preference", "Cuisine Preference"})
+
 LABEL_TO_DISH_CATEGORY: dict[str, DishCategory] = {v: k for k, v in MEAL_SESSION_LABELS.items()}
 LABEL_TO_DISH_CATEGORY.update(
     {
@@ -56,15 +58,47 @@ OLD_ENQUIRY_CATEGORY_MAP: dict[str, str] = {
     "Multi Cuisine": "Lunch",
 }
 
+# Enum DB values → display labels (after Dish.category became free-text)
+ENUM_VALUE_TO_LABEL: dict[str, str] = {
+    **{c.value: label for c, label in MEAL_SESSION_LABELS.items()},
+    **{c.name: label for c, label in MEAL_SESSION_LABELS.items()},
+}
+
+
+def custom_session_label(label: str) -> str | None:
+    """Allow a free-form session name (High Tea, Midnight Snacks, …)."""
+    trimmed = " ".join(label.split())
+    if not trimmed or len(trimmed) > 40:
+        return None
+    if trimmed.lower() in {p.lower() for p in PREFERENCE_SESSION_LABELS}:
+        return None
+    return trimmed
+
 
 def normalize_meal_session_label(label: str) -> str | None:
     trimmed = label.strip()
+    if not trimmed:
+        return None
     if trimmed in MEAL_SESSION_LABELS.values():
         return trimmed
     key = trimmed.lower()
-    for cat, lbl in MEAL_SESSION_LABELS.items():
+    for _cat, lbl in MEAL_SESSION_LABELS.items():
         if lbl.lower() == key:
             return lbl
     if key in LABEL_TO_DISH_CATEGORY:
         return MEAL_SESSION_LABELS[LABEL_TO_DISH_CATEGORY[key]]
-    return None
+    enum_hit = ENUM_VALUE_TO_LABEL.get(trimmed) or ENUM_VALUE_TO_LABEL.get(trimmed.upper())
+    if enum_hit:
+        return enum_hit
+    return custom_session_label(trimmed)
+
+
+def dish_category_label(category: DishCategory | str) -> str:
+    if isinstance(category, DishCategory):
+        return MEAL_SESSION_LABELS[category]
+    mapped = ENUM_VALUE_TO_LABEL.get(str(category)) or ENUM_VALUE_TO_LABEL.get(str(category).upper())
+    if mapped:
+        return mapped
+    if str(category) in MEAL_SESSION_LABELS.values():
+        return str(category)
+    return str(category)

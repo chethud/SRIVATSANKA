@@ -40,3 +40,35 @@ export function allMealSessionIds(): string[] {
 export function isMenuSessionCategory(category: string): boolean {
   return !PREFERENCE_CATEGORIES.has(category);
 }
+
+export function isPresetMealSession(id: string): boolean {
+  return MEAL_SESSIONS.some((s) => s.id === id);
+}
+
+/** Preset sessions + custom ones (order notes / catalog). */
+export function resolveSessionTabs(
+  customSessions: string[] | null | undefined,
+  extraCategories: string[] = [],
+): { id: string; label: string }[] {
+  const seen = new Set<string>();
+  const tabs: { id: string; label: string }[] = [];
+
+  for (const s of MEAL_SESSIONS) {
+    seen.add(s.id.toLowerCase());
+    tabs.push({ id: s.id, label: s.label });
+  }
+
+  const addCustom = (raw: string) => {
+    const name = raw.trim();
+    if (!name || PREFERENCE_CATEGORIES.has(name)) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    tabs.push({ id: name, label: name });
+  };
+
+  for (const s of customSessions ?? []) addCustom(s);
+  for (const c of extraCategories) addCustom(c);
+
+  return tabs;
+}

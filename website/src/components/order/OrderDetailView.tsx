@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, ChefHat, Clock, MapPin, Phone, Pencil, FileText, UtensilsCrossed, Calendar,
+  FileSpreadsheet, Printer, Plus,
 } from 'lucide-react';
 import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../../api/client';
 import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
+import { OrderCopyView } from '../OrderCopyView';
 import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderExtrasSection } from './OrderExtrasSection';
 import { OrderRegionalStyleSection } from './OrderRegionalStyleSection';
@@ -27,8 +29,11 @@ import {
   toDateInputValue,
   type OrderExtras,
 } from '../../utils/orderNotes';
-import { MEAL_SESSIONS, PREFERENCE_CATEGORIES } from '../../utils/mealSessions';
+import { MEAL_SESSIONS, PREFERENCE_CATEGORIES, resolveSessionTabs } from '../../utils/mealSessions';
 import { resolveMenuColumns } from '../../utils/orderMenuGrid';
+import { downloadOrderCopyExcel } from '../../utils/orderCopies';
+
+export type OrderPageView = 'details' | 'kitchen' | 'billing';
 
 function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
   return {
@@ -52,18 +57,63 @@ export function OrderDetailView({
   workers,
   onOrderUpdated,
   onDishesCatalogUpdated,
+  initialView = 'details',
 }: {
   order: Enquiry;
   dishes: Dish[];
   workers: Worker[];
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
+  initialView?: OrderPageView;
 }) {
+  const [pageView, setPageView] = useState<OrderPageView>(initialView);
+  const [excelBusy, setExcelBusy] = useState(false);
   const [editingExtras, setEditingExtras] = useState(false);
   const [activeSession, setActiveSession] = useState('Breakfast');
+  const [addingSession, setAddingSession] = useState(false);
+  const [newSessionName, setNewSessionName] = useState('');
+  const [sessionSaving, setSessionSaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+
+  async function handleDownloadExcel(copyType: 'kitchen' | 'billing') {
+    setExcelBusy(true);
+    try {
+      await downloadOrderCopyExcel(order, copyType);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not download Excel. Please try again.');
+    } finally {
+      setExcelBusy(false);
+    }
+  }
+
+  async function handleAddCustomSession() {
+    const name = newSessionName.trim();
+    if (!name) return;
+    const exists = sessionTabs.some((s) => s.id.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      setActiveSession(sessionTabs.find((s) => s.id.toLowerCase() === name.toLowerCase())!.id);
+      setAddingSession(false);
+      setNewSessionName('');
+      return;
+    }
+    setSessionSaving(true);
+    try {
+      const customSessions = [...(extras.customSessions ?? []), name];
+      const updated = await updateEnquiry(order.id, {
+        notes: serializeOrderNotes({ ...extras, customSessions }),
+      });
+      onOrderUpdated(updated);
+      setActiveSession(name);
+      setAddingSession(false);
+      setNewSessionName('');
+    } catch {
+      alert('Could not add session. Please try again.');
+    } finally {
+      setSessionSaving(false);
+    }
+  }
 
   const extras = useMemo(() => parseOrderNotes(order.notes), [order.notes]);
   const [draftExtras, setDraftExtras] = useState<OrderExtras>(extras);
@@ -73,6 +123,19 @@ export function OrderDetailView({
   const menuItems = useMemo(
     () => (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category)),
     [order.dishes],
+  );
+
+  const sessionTabs = useMemo(
+    () =>
+      resolveSessionTabs(
+        extras.customSessions,
+        [
+          ...menuItems.map((d) => d.category),
+          ...(extras.menuColumns ?? []).map((c) => c.baseSession),
+          ...dishes.map((d) => d.category),
+        ],
+      ),
+    [extras.customSessions, extras.menuColumns, menuItems, dishes],
   );
   const mealPrefs = useMemo(
     () => (order.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
@@ -191,14 +254,52 @@ export function OrderDetailView({
       </div>
 
       <div className="order-copy-bar">
-        <Link to={`/orders/${order.id}/kitchen`} className="order-copy-btn">
+        <button
+          type="button"
+          className={`order-copy-btn ${pageView === 'details' ? 'order-copy-btn--active' : ''}`}
+          onClick={() => setPageView('details')}
+        >
+          <Pencil size={18} /> Order details
+        </button>
+        <button
+          type="button"
+          className={`order-copy-btn ${pageView === 'kitchen' ? 'order-copy-btn--active' : ''}`}
+          onClick={() => setPageView('kitchen')}
+        >
           <FileText size={18} /> Kitchen copy
-        </Link>
-        <Link to={`/orders/${order.id}/billing`} className="order-copy-btn">
+        </button>
+        <button
+          type="button"
+          className={`order-copy-btn ${pageView === 'billing' ? 'order-copy-btn--active' : ''}`}
+          onClick={() => setPageView('billing')}
+        >
           <FileText size={18} /> Order copy
-        </Link>
+        </button>
       </div>
 
+      {pageView !== 'details' ? (
+        <div className="order-inline-copy">
+          <div className="order-inline-copy-actions print:hidden">
+            <Button type="button" onClick={() => window.print()} className="flex items-center gap-2">
+              <Printer size={16} />
+              Print
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleDownloadExcel(pageView)}
+              disabled={excelBusy}
+              className="flex items-center gap-2"
+            >
+              <FileSpreadsheet size={16} />
+              {excelBusy ? 'Preparing Excel…' : 'Download Excel'}
+            </Button>
+          </div>
+          <div className="print:border-0 print:shadow-none print:p-0 bg-white">
+            <OrderCopyView enquiry={order} copyType={pageView} />
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="order-section">
         <div className="order-section-head">
           <div className="order-section-title">
@@ -340,7 +441,7 @@ export function OrderDetailView({
         </div>
 
         <div className="order-session-tabs">
-          {MEAL_SESSIONS.map((s) => (
+          {sessionTabs.map((s) => (
             <button
               key={s.id}
               type="button"
@@ -350,6 +451,51 @@ export function OrderDetailView({
               {s.label}
             </button>
           ))}
+          {!addingSession ? (
+            <button
+              type="button"
+              onClick={() => setAddingSession(true)}
+              className="order-session-tab order-session-tab--add"
+            >
+              <Plus size={14} /> Add session
+            </button>
+          ) : (
+            <div className="order-session-add-form">
+              <input
+                autoFocus
+                value={newSessionName}
+                onChange={(e) => setNewSessionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleAddCustomSession();
+                  if (e.key === 'Escape') {
+                    setAddingSession(false);
+                    setNewSessionName('');
+                  }
+                }}
+                placeholder="e.g. High Tea"
+                className="order-session-add-input"
+                maxLength={40}
+              />
+              <button
+                type="button"
+                onClick={() => void handleAddCustomSession()}
+                disabled={sessionSaving || !newSessionName.trim()}
+                className="order-session-tab order-session-tab--active"
+              >
+                {sessionSaving ? '…' : 'Add'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingSession(false);
+                  setNewSessionName('');
+                }}
+                className="order-session-tab"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         <OrderExcelHeader order={order} />
@@ -501,6 +647,8 @@ export function OrderDetailView({
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

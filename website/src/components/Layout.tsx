@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
   HardHat, FileText, BarChart3, Settings, MessageCircle,
@@ -143,30 +143,29 @@ function DashboardLayoutInner() {
       </motion.aside>
 
       <motion.main
-        layout
-        className={`flex-1 flex flex-col ${
-          isWhatsAppChat ? 'p-0 h-screen overflow-hidden' : 'min-h-screen px-4 py-4 md:px-6 lg:px-8'
+        layout={!isWhatsAppChat}
+        className={`flex-1 flex flex-col min-w-0 ${
+          isWhatsAppChat
+            ? 'h-dvh max-h-dvh p-0 overflow-hidden'
+            : 'min-h-screen px-4 py-4 md:px-6 lg:px-8'
         }`}
         style={{ marginLeft: sidebarWidth }}
-        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        transition={isWhatsAppChat ? undefined : { type: 'spring', stiffness: 380, damping: 32 }}
       >
         {!isWhatsAppChat && (
           <div className="topnav-root">
             <TopNav />
           </div>
         )}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={isWhatsAppChat ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : undefined}
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <div
+          className={
+            isWhatsAppChat
+              ? 'flex-1 min-h-0 h-full flex flex-col overflow-hidden'
+              : undefined
+          }
+        >
+          <Outlet />
+        </div>
         {!isWhatsAppChat && <AIChatWidget />}
       </motion.main>
     </div>
