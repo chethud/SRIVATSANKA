@@ -1,4 +1,4 @@
-"""Gallery photos from https://kannansharangapani.com/ for WhatsApp replies."""
+"""Gallery photos from https://srivatsanka.com/ for WhatsApp replies."""
 
 import logging
 

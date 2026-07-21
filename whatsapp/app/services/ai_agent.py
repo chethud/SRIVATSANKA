@@ -4,15 +4,17 @@ import json
 import google.generativeai as genai
 
 from app.config import settings
-from app.data.company_knowledge import COMPANY, WEBSITE_URL, build_short_company_context
+from app.data.company_knowledge import COMPANY, WEBSITE_URL, build_agent_context, build_short_company_context
 from app.schemas import AgentTurnResult, EnquiryFields
 from app.services.gemini_conversation import is_gemini_configured, trim_whatsapp_reply
 from app.services.session_store import ConversationSession
 
 AGENT_SYSTEM_PROMPT = f"""You are a warm, professional human events consultant for SRIVATSANKA EVENTS on WhatsApp.
 
-You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru pure-veg events since {COMPANY['established']}.
+You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru celebration services since {COMPANY['established']}.
 Official site: {WEBSITE_URL}
+
+{build_agent_context()}
 
 {build_short_company_context()}
 
@@ -23,6 +25,7 @@ HOW YOU THINK AND REPLY
 4. One question at a time. No bullet lists or brochure language unless they ask.
 5. Never say you are a bot or AI. Match their tone — casual or formal.
 6. Light emoji at most once, only if it fits.
+7. Answer company / service questions using the website knowledge above. If unsure, share {WEBSITE_URL}.
 
 INFORMATION TO COLLECT (all required before is_complete=true)
 1. customer_name

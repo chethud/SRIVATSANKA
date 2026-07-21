@@ -47,7 +47,7 @@ Or double-click: `start-backend.bat` and `start-frontend.bat`
 
 ## WhatsApp Agent Flow
 
-Conversational AI (Gemini) using [kannansharangapani.com](https://kannansharangapani.com/) — services, gallery, and reviews.
+Conversational AI (Gemini) using [srivatsanka.com](https://srivatsanka.com/) — services, gallery, and reviews.
 
 1. Welcomes customer, shares sample event photos, explains what SRIVATSANKA offers
 2. Natural chat — asks what they are looking for, collects event details

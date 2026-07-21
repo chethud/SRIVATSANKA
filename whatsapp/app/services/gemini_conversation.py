@@ -7,7 +7,7 @@ import re
 import google.generativeai as genai
 
 from app.config import settings
-from app.data.company_knowledge import COMPANY, build_short_company_context
+from app.data.company_knowledge import COMPANY, build_agent_context, build_short_company_context
 from app.services.session_store import ConversationSession
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
 def _showcase_system(session: ConversationSession, *, sharing_photos: bool = False) -> str:
     name = session.fields.customer_name or "the customer"
     event = session.fields.event_type or "their celebration"
-    context = build_short_company_context()
+    context = build_agent_context()
     photo_note = (
         "\nThe customer asked for photos — our system is sending gallery images now. "
         "Briefly acknowledge that you're sharing them."
@@ -107,6 +107,7 @@ Chatting with *{name}* about their *{event}*.
 
 RIGHT NOW
 - Answer what they asked — pricing, menu, experience, photos, etc. — before anything else.
+- Use the website knowledge above for company / service answers.
 - Do NOT ask for date, venue, or callback unless they ask what you need next.
 - If they seem ready to move on, you can gently mention you'll note date & location next.{photo_note}"""
 
@@ -129,7 +130,7 @@ Still need from them: {pending}
 
 RIGHT NOW
 - If they gave the detail we asked for, acknowledge it naturally.
-- If they asked something else, answer that first — then gently ask for: {pending}
+- If they asked something else, answer that first using company website knowledge — then gently ask for: {pending}
 - Do NOT invent dates, locations, or callback times they didn't say."""
 
 
