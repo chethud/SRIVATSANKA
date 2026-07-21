@@ -171,7 +171,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('sign in') || msg.includes('Session expired')) {
         setError(
-          'API rejected your sign-in token. On Render set SUPABASE_URL and SUPABASE_ANON_KEY (publishable key), then redeploy.',
+          'API rejected your sign-in token. Set SUPABASE_URL and SUPABASE_ANON_KEY on the API (.env locally, or Render env), then restart/redeploy.',
         );
       } else if (msg.includes('rejected the token')) {
         setError(msg);

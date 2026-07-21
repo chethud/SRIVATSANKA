@@ -43,47 +43,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function bootstrap() {
-      if (isSupabaseAuth && supabase) {
-        const { data } = await supabase.auth.getSession();
-        if (cancelled) return;
-        if (data.session) {
-          applySupabaseSession(data.session, setToken, setUsername, setAuthenticated);
-          void verifySession()
-            .then((me) => {
-              if (!cancelled) setUsername(me.username);
-            })
-            .catch(() => {
-              /* Supabase session stays valid even if API is temporarily unreachable */
-            });
-        } else {
-          applySupabaseSession(null, setToken, setUsername, setAuthenticated);
-        }
-        setLoading(false);
-        return;
-      }
-
-      const t = getAuthToken();
-      if (!t) {
-        setLoading(false);
-        return;
-      }
-      setToken(t);
-      setAuthenticated(true);
-      verifySession()
-        .then((me) => {
-          if (!cancelled) setUsername(me.username);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setAuthToken(null);
-            setToken(null);
-            setUsername(null);
-            setAuthenticated(false);
+      try {
+        if (isSupabaseAuth && supabase) {
+          const { data } = await supabase.auth.getSession();
+          if (cancelled) return;
+          if (data.session) {
+            applySupabaseSession(data.session, setToken, setUsername, setAuthenticated);
+            void verifySession()
+              .then((me) => {
+                if (!cancelled) setUsername(me.username);
+              })
+              .catch(async (err) => {
+                const msg = err instanceof Error ? err.message : '';
+                if (!cancelled && supabase && msg.includes('Session expired')) {
+                  await supabase.auth.signOut();
+                  applySupabaseSession(null, setToken, setUsername, setAuthenticated);
+                }
+              });
+          } else {
+            applySupabaseSession(null, setToken, setUsername, setAuthenticated);
           }
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
+          return;
+        }
+
+        const t = getAuthToken();
+        if (!t) return;
+        setToken(t);
+        setAuthenticated(true);
+        verifySession()
+          .then((me) => {
+            if (!cancelled) setUsername(me.username);
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setAuthToken(null);
+              setToken(null);
+              setUsername(null);
+              setAuthenticated(false);
+            }
+          });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
     bootstrap();

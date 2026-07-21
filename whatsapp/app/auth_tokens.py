@@ -27,7 +27,14 @@ def _decode_legacy_access_token(token: str) -> str:
 
 
 def decode_access_token(token: str) -> str:
-    """Accept Supabase Auth tokens (production) or legacy dashboard JWT (local dev)."""
+    """Accept Supabase Auth tokens, with legacy dashboard JWT as fallback."""
     if is_supabase_auth_configured():
-        return decode_supabase_access_token(token)
+        try:
+            return decode_supabase_access_token(token)
+        except HTTPException:
+            # Local/dev: allow Admin JWT if Supabase verification fails
+            try:
+                return _decode_legacy_access_token(token)
+            except HTTPException:
+                raise
     return _decode_legacy_access_token(token)

@@ -45,27 +45,11 @@ export function OrderExcelMenuGrid({
   onDishesCatalogUpdated?: () => Promise<void>;
 }) {
   const columns = resolveMenuColumns(extras, order, menuItems);
-  const sessionColumns = columns.filter((c) => c.baseSession === activeSession);
+  const activeHasSaved = columns.some((c) => c.baseSession === activeSession);
 
   return (
     <div className="excel-menu-grid">
-      {sessionColumns.length > 0 ? (
-        <div className="excel-menu-stack">
-          {sessionColumns.map((col) => (
-            <SessionBlock
-              key={col.id}
-              column={col}
-              columns={columns}
-              extras={extras}
-              menuItems={menuItems}
-              order={order}
-              dishes={dishes}
-              onOrderUpdated={onOrderUpdated}
-              onDishesCatalogUpdated={onDishesCatalogUpdated}
-            />
-          ))}
-        </div>
-      ) : (
+      {!activeHasSaved && (
         <EmptySessionCard
           order={order}
           extras={extras}
@@ -74,8 +58,33 @@ export function OrderExcelMenuGrid({
           onOrderUpdated={onOrderUpdated}
         />
       )}
+
+      {columns.length > 0 && (
+        <div className="excel-saved-sessions">
+          <h4 className="excel-saved-sessions-title">
+            Saved sessions ({columns.length})
+          </h4>
+          <div className="excel-menu-stack">
+            {columns.map((col) => (
+              <SessionBlock
+                key={col.id}
+                column={col}
+                columns={columns}
+                extras={extras}
+                menuItems={menuItems}
+                order={order}
+                dishes={dishes}
+                highlighted={col.baseSession === activeSession}
+                onOrderUpdated={onOrderUpdated}
+                onDishesCatalogUpdated={onDishesCatalogUpdated}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="excel-menu-hint">
-        Save the session first (date, pax, time), then add dishes to that session.
+        Every session you save appears in the list below. Use the tabs above to add Breakfast, Lunch, Dinner, and more.
       </p>
     </div>
   );
@@ -88,6 +97,7 @@ function SessionBlock({
   menuItems,
   order,
   dishes,
+  highlighted,
   onOrderUpdated,
   onDishesCatalogUpdated,
 }: {
@@ -97,12 +107,19 @@ function SessionBlock({
   menuItems: EnquiryDish[];
   order: Enquiry;
   dishes: Dish[];
+  highlighted?: boolean;
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
 }) {
   const items = dishesForColumn(column, menuItems, extras);
   const [deleting, setDeleting] = useState(false);
   const [removed, setRemoved] = useState(false);
+
+  useEffect(() => {
+    if (!highlighted) return;
+    const el = document.getElementById(`session-block-${column.id}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [highlighted, column.id]);
 
   async function removeSession() {
     const sessionLabel = `${column.sessionLabel} · ${formatDate(column.date)}`;
@@ -132,7 +149,10 @@ function SessionBlock({
   if (removed) return null;
 
   return (
-    <article className="excel-session-block">
+    <article
+      id={`session-block-${column.id}`}
+      className={`excel-session-block${highlighted ? ' excel-session-block--active' : ''}`}
+    >
       <header className="excel-session-head">
         <button
           type="button"
@@ -420,6 +440,7 @@ function SessionAddDishForm({
         dishes={dishes}
         value={dishId}
         customName={customDishName}
+        sessionCategory={column.baseSession}
         onChange={setDishId}
         onCustomNameChange={setCustomDishName}
         onConfirmCustom={(name) => {

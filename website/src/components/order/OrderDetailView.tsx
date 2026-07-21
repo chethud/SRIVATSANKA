@@ -137,6 +137,10 @@ export function OrderDetailView({
       ),
     [extras.customSessions, extras.menuColumns, menuItems, dishes],
   );
+  const savedSessionIds = useMemo(
+    () => new Set((extras.menuColumns ?? []).map((c) => c.baseSession)),
+    [extras.menuColumns],
+  );
   const mealPrefs = useMemo(
     () => (order.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
     [order.dishes],
@@ -446,7 +450,7 @@ export function OrderDetailView({
               key={s.id}
               type="button"
               onClick={() => setActiveSession(s.id)}
-              className={`order-session-tab ${activeSession === s.id ? 'order-session-tab--active' : ''}`}
+              className={`order-session-tab ${activeSession === s.id ? 'order-session-tab--active' : ''} ${savedSessionIds.has(s.id) ? 'order-session-tab--saved' : ''}`}
             >
               {s.label}
             </button>

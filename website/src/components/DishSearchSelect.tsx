@@ -6,6 +6,7 @@ export function DishSearchSelect({
   dishes,
   value,
   customName = '',
+  sessionCategory,
   onChange,
   onCustomNameChange,
   onSelectDish,
@@ -15,6 +16,8 @@ export function DishSearchSelect({
   dishes: Dish[];
   value: string;
   customName?: string;
+  /** Prefer dishes from this meal session (e.g. Lunch) in suggestions */
+  sessionCategory?: string;
   onChange: (dishId: string) => void;
   onCustomNameChange?: (name: string) => void;
   onSelectDish?: (dish: Dish | null) => void;
@@ -29,18 +32,30 @@ export function DishSearchSelect({
   const selected = dishes.find((d) => d.id === value);
   const trimmedQuery = query.trim();
   const hasCustom = Boolean(customName.trim()) && !value;
+  const sessionKey = (sessionCategory ?? '').trim().toLowerCase();
 
   const filtered = useMemo(() => {
     const q = trimmedQuery.toLowerCase();
-    if (!q) return dishes.slice(0, 12);
-    return dishes
-      .filter(
-        (d) =>
-          d.name.toLowerCase().includes(q) ||
-          d.category.toLowerCase().includes(q),
-      )
-      .slice(0, 12);
-  }, [dishes, trimmedQuery]);
+    const matchesQuery = (d: Dish) =>
+      !q ||
+      d.name.toLowerCase().includes(q) ||
+      d.category.toLowerCase().includes(q);
+
+    const inSession = (d: Dish) =>
+      !sessionKey || d.category.trim().toLowerCase() === sessionKey;
+
+    const sessionDishes = dishes.filter((d) => inSession(d) && matchesQuery(d));
+    const otherDishes = sessionKey
+      ? dishes.filter((d) => !inSession(d) && matchesQuery(d))
+      : [];
+
+    // Empty search: only this session's dishes (don't flood Lunch with Breakfast items).
+    // With a query: session matches first, then other categories so you can still pick any dish.
+    if (!q) {
+      return sessionDishes.slice(0, 12);
+    }
+    return [...sessionDishes, ...otherDishes].slice(0, 12);
+  }, [dishes, trimmedQuery, sessionKey]);
 
   function clearSelection() {
     onChange('');
@@ -117,7 +132,11 @@ export function DishSearchSelect({
               setOpen(false);
             }
           }}
-          placeholder="Search menu or type any dish name…"
+          placeholder={
+            sessionCategory
+              ? `Search ${sessionCategory} menu or type any dish…`
+              : 'Search menu or type any dish name…'
+          }
           className={`form-input w-full pl-9 py-2.5 rounded-lg text-sm ${
             selected || hasCustom ? 'pr-16' : 'pr-3'
           }`}
@@ -142,20 +161,30 @@ export function DishSearchSelect({
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
           <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-sm text-[var(--foreground)]">
             {filtered.length === 0 && !trimmedQuery ? (
-              <li className="px-3 py-2 text-[var(--muted)]">Type a dish name</li>
+              <li className="px-3 py-2 text-[var(--muted)]">
+                {sessionCategory
+                  ? `No ${sessionCategory} dishes in catalog — type a name to add`
+                  : 'Type a dish name'}
+              </li>
             ) : (
-              filtered.map((d) => (
-                <li key={d.id}>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2 text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
-                    onClick={() => pick(d)}
-                  >
-                    <span className="font-medium">{d.name}</span>
-                    <span className="text-[var(--muted)] ml-2">{d.category}</span>
-                  </button>
-                </li>
-              ))
+              filtered.map((d) => {
+                const sameSession =
+                  sessionKey && d.category.trim().toLowerCase() === sessionKey;
+                return (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
+                      onClick={() => pick(d)}
+                    >
+                      <span className="font-medium">{d.name}</span>
+                      {!sameSession && (
+                        <span className="text-[var(--muted)] ml-2">{d.category}</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })
             )}
             {trimmedQuery && filtered.every((d) => d.name.toLowerCase() !== trimmedQuery.toLowerCase()) && (
               <li className="border-t border-[var(--border)]">
