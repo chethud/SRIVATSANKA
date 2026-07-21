@@ -84,7 +84,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="text-sm text-[var(--muted)]">Owner Phone (WhatsApp alerts)</label>
-              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 78994 10254'} className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
+              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 99459 27101'} className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
             </div>
           </div>
         </Card>

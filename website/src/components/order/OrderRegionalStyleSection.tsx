@@ -39,17 +39,9 @@ export function OrderRegionalStyleSection({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const next: Record<string, string> = { ...(extras.regionalStylesByDate ?? {}) };
-    // Seed from legacy single/global styles if no per-day values yet
-    if (Object.keys(next).length === 0) {
-      const legacy =
-        extras.regionalStyles?.[0]?.trim() || extras.regionalStyle?.trim() || '';
-      if (legacy) {
-        for (const day of days) next[day] = legacy;
-      }
-    }
-    setByDate(next);
-  }, [extras, days]);
+    // Only show styles the user saved per day — never seed every day from a global style
+    setByDate({ ...(extras.regionalStylesByDate ?? {}) });
+  }, [extras.regionalStylesByDate]);
 
   function setDayStyle(date: string, style: string) {
     setByDate((prev) => {
@@ -73,8 +65,9 @@ export function OrderRegionalStyleSection({
       const merged: OrderExtras = {
         ...extras,
         regionalStylesByDate: cleaned,
+        // Clear legacy globals so style is not implied for every day
         regionalStyles: unique,
-        regionalStyle: unique[0] ?? null,
+        regionalStyle: null,
       };
       const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
       onOrderUpdated(updated);
@@ -94,21 +87,41 @@ export function OrderRegionalStyleSection({
         </div>
       </div>
       <p className="order-section-sub">
-        Set a style for each event day — e.g. Day 1 Kerala, Day 2 Tamil Nadu. Printed on kitchen and
-        order copies under that day.
+        Optional — add a style only for the days you want (e.g. Day 1 Kerala). Leave other days blank.
+        Printed on kitchen and order copies under that day only.
       </p>
 
-      <div className="space-y-5">
+      <div className="space-y-4">
         {days.map((date, index) => {
           const value = byDate[date] ?? '';
           return (
             <div
               key={date}
-              className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4"
+              className={`order-style-day ${value ? 'order-style-day--set' : ''}`}
             >
-              <p className="text-sm font-bold text-[var(--foreground)] mb-3">
-                Day {index + 1} · {formatDate(date)}
-              </p>
+              <div className="order-style-day-head">
+                <p className="order-style-day-title">
+                  Day {index + 1} · {formatDate(date)}
+                </p>
+                {value ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDayStyle(date, '');
+                      setCustomByDate((prev) => {
+                        const next = { ...prev };
+                        delete next[date];
+                        return next;
+                      });
+                    }}
+                    className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--danger)]"
+                  >
+                    Clear
+                  </button>
+                ) : (
+                  <span className="text-xs text-[var(--muted)]">No style</span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 mb-3">
                 {REGIONAL_STYLE_PRESETS.map((preset) => (
                   <button
@@ -125,7 +138,7 @@ export function OrderRegionalStyleSection({
                 )}
               </div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-1.5">
-                Custom style for this day
+                Custom style for this day (optional)
               </label>
               <input
                 type="text"
@@ -135,7 +148,7 @@ export function OrderRegionalStyleSection({
                   setCustomByDate((prev) => ({ ...prev, [date]: next }));
                   setDayStyle(date, next);
                 }}
-                placeholder="e.g. Iyengar style…"
+                placeholder="Leave blank, or e.g. Iyengar style…"
                 className="form-input w-full px-3 py-2 rounded-lg text-sm font-semibold"
               />
             </div>
@@ -144,7 +157,7 @@ export function OrderRegionalStyleSection({
       </div>
 
       <p className="text-xs text-[var(--muted)] mt-3 mb-4">
-        Days come from the event schedule date range. Edit Event schedule if you need more days.
+        Days come from the event schedule date range. You do not need a style on every day.
       </p>
 
       <Button type="button" onClick={() => void save()} disabled={saving} className="!py-2 !px-4 text-sm">

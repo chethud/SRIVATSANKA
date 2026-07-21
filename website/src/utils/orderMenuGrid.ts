@@ -20,11 +20,24 @@ export function formatPaxTimeLine(column: MenuColumn): string {
   return parts.join('  ');
 }
 
-/** Stack sessions top-to-bottom: date, then breakfast → lunch → dinner order. */
+function timeSortMinutes(value: string | null | undefined): number {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const [hRaw, mRaw] = value.split(':');
+  const h = Number(hRaw);
+  const m = Number(mRaw ?? 0);
+  if (Number.isNaN(h) || Number.isNaN(m)) return Number.POSITIVE_INFINITY;
+  return h * 60 + m;
+}
+
+/** Stack sessions top-to-bottom: date, then start time, then meal type / label. */
 export function sortMenuColumns(columns: MenuColumn[]): MenuColumn[] {
   return [...columns].sort((a, b) => {
     const dateCmp = a.date.localeCompare(b.date);
     if (dateCmp !== 0) return dateCmp;
+
+    const timeCmp = timeSortMinutes(a.timeFrom) - timeSortMinutes(b.timeFrom);
+    if (timeCmp !== 0) return timeCmp;
+
     const ia = MEAL_SESSION_ORDER.indexOf(a.baseSession);
     const ib = MEAL_SESSION_ORDER.indexOf(b.baseSession);
     if (ia !== ib) {

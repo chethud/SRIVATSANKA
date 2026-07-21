@@ -11,8 +11,6 @@ type Props = {
   'aria-label'?: string;
 };
 
-const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
-
 function parseHHmm(value: string): { hour12: string; minute: string; period: 'AM' | 'PM' } {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
   if (!match) return { hour12: '', minute: '', period: 'AM' };
@@ -43,7 +41,7 @@ function toHHmm(hour12Raw: string, minuteRaw: string, period: 'AM' | 'PM'): stri
   return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-/** Typeable time: hour · minute · AM/PM (stores HH:MM 24h). */
+/** Typeable time: hour · minute · AM/PM (stores HH:MM 24h). Minutes start blank. */
 export function AmPmTimeInput({
   id,
   value,
@@ -79,11 +77,6 @@ export function AmPmTimeInput({
     onBlur?.();
   }
 
-  const minuteChoices =
-    minute && !MINUTE_OPTIONS.includes(minute)
-      ? [...MINUTE_OPTIONS, minute].sort((a, b) => Number(a) - Number(b))
-      : MINUTE_OPTIONS;
-
   return (
     <div
       className={`ampm-time ${className}`.trim()}
@@ -110,40 +103,48 @@ export function AmPmTimeInput({
       <span className="ampm-time-sep" aria-hidden>
         :
       </span>
-      <select
+      <input
+        type="text"
+        inputMode="numeric"
         disabled={disabled}
         value={minute}
+        placeholder="mm"
+        maxLength={2}
         onChange={(e) => {
-          const next = e.target.value;
+          const next = e.target.value.replace(/\D/g, '').slice(0, 2);
           setMinute(next);
-          if (hour.trim() && next !== '') commit(hour, next, period);
+          if (hour.trim() && next.length === 2) commit(hour, next, period);
         }}
         onBlur={handleBlur}
-        className="form-select ampm-time-input ampm-time-minute"
+        className="form-input ampm-time-input ampm-time-minute"
         aria-label="Minute"
-      >
-        <option value="">mm</option>
-        {minuteChoices.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-      <select
-        disabled={disabled}
-        value={period}
-        onChange={(e) => {
-          const next = e.target.value === 'PM' ? 'PM' : 'AM';
-          setPeriod(next);
-          if (hour.trim() && minute.trim() !== '') commit(hour, minute, next);
-        }}
-        onBlur={handleBlur}
-        className="form-select ampm-time-input ampm-time-period"
-        aria-label="AM or PM"
-      >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
-      </select>
+      />
+      <div className="ampm-time-period" role="group" aria-label="AM or PM">
+        <button
+          type="button"
+          disabled={disabled}
+          aria-pressed={period === 'AM'}
+          className={`ampm-time-period-btn${period === 'AM' ? ' ampm-time-period-btn--active' : ''}`}
+          onClick={() => {
+            setPeriod('AM');
+            if (hour.trim() && minute.trim() !== '') commit(hour, minute, 'AM');
+          }}
+        >
+          AM
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-pressed={period === 'PM'}
+          className={`ampm-time-period-btn${period === 'PM' ? ' ampm-time-period-btn--active' : ''}`}
+          onClick={() => {
+            setPeriod('PM');
+            if (hour.trim() && minute.trim() !== '') commit(hour, minute, 'PM');
+          }}
+        >
+          PM
+        </button>
+      </div>
     </div>
   );
 }

@@ -163,15 +163,10 @@ export function resolveRegionalStyles(extras: OrderExtras): string[] {
   return legacy ? [legacy] : [];
 }
 
-/** Style for a specific service day (YYYY-MM-DD). */
+/** Style for a specific service day (YYYY-MM-DD). Only explicit per-day values — never auto-fill all days. */
 export function resolveStyleForDate(extras: OrderExtras, date: string): string | null {
   const key = date.slice(0, 10);
-  const fromMap = extras.regionalStylesByDate?.[key]?.trim();
-  if (fromMap) return fromMap;
-  // Single global style applies to every day when no per-day map
-  const byDateEntries = Object.entries(extras.regionalStylesByDate ?? {}).filter(([, v]) => v?.trim());
-  if (byDateEntries.length > 0) return null;
-  return resolveRegionalStyles(extras)[0] ?? null;
+  return extras.regionalStylesByDate?.[key]?.trim() || null;
 }
 
 /** Event days to assign styles for (schedule range ∪ menu columns ∪ event date). */

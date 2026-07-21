@@ -3,12 +3,11 @@ import { motion } from 'framer-motion';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
   HardHat, FileText, BarChart3, Settings, MessageCircle,
-  PanelLeftClose, PanelLeft, Moon, Sun, LogOut,
+  PanelLeftClose, PanelLeft, LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { CreateActionProvider } from '../context/CreateActionContext';
 import { LayoutProvider, useLayout } from '../context/LayoutContext';
 import { BrandLogo } from './BrandLogo';
@@ -37,7 +36,6 @@ const navItems: {
 
 function DashboardLayoutInner() {
   const data = useAppData();
-  const { theme, toggleTheme } = useTheme();
   const { sidebarCollapsed, toggleSidebar, sidebarWidth } = useLayout();
   const location = useLocation();
   const navigate = useNavigate();
@@ -117,17 +115,6 @@ function DashboardLayoutInner() {
           >
             <LogOut size={18} />
             {!sidebarCollapsed && <span>Sign out</span>}
-          </button>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] transition-colors ${
-              sidebarCollapsed ? 'justify-center' : ''
-            }`}
-            title={theme === 'light' ? 'Dark mode' : 'Light mode'}
-          >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            {!sidebarCollapsed && <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>}
           </button>
           <button
             type="button"

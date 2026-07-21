@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useLayout } from '../context/LayoutContext';
 
 type BrandLogoProps = {
@@ -10,9 +11,11 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
   const { sidebarCollapsed } = useLayout();
 
   return (
-    <div
+    <Link
+      to="/"
       className={`flex items-center justify-center w-full h-[72px] min-h-[72px] max-h-[72px] ${className}`}
-      title="SRIVATSANKA EVENTS"
+      title="SRIVATSANKA EVENTS — Dashboard"
+      aria-label="Go to dashboard"
     >
       <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>
         <img
@@ -30,7 +33,7 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 

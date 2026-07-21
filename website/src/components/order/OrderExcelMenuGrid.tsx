@@ -169,14 +169,14 @@ function SessionBlock({
       </header>
 
       <div className="excel-session-meta">
-        <SessionPaxField
+        <SessionTimeField
           column={column}
           columns={columns}
           extras={extras}
           orderId={order.id}
           onOrderUpdated={onOrderUpdated}
         />
-        <SessionTimeField
+        <SessionPaxField
           column={column}
           columns={columns}
           extras={extras}
@@ -328,20 +328,6 @@ function EmptySessionCard({
             className="excel-meta-input excel-meta-input--date"
           />
         </div>
-        <div className="excel-meta-field">
-          <label className="excel-meta-label" htmlFor={`draft-pax-${activeSession}`}>
-            Pax
-          </label>
-          <input
-            id={`draft-pax-${activeSession}`}
-            type="number"
-            min={1}
-            value={columnPax}
-            onChange={(e) => setColumnPax(e.target.value)}
-            placeholder="e.g. 100"
-            className="excel-meta-input"
-          />
-        </div>
         <div className="excel-meta-field excel-meta-field--time">
           <span className="excel-meta-label">Time</span>
           <div className="excel-meta-time-row">
@@ -361,6 +347,20 @@ function EmptySessionCard({
               aria-label={`${activeSession} to`}
             />
           </div>
+        </div>
+        <div className="excel-meta-field">
+          <label className="excel-meta-label" htmlFor={`draft-pax-${activeSession}`}>
+            Pax
+          </label>
+          <input
+            id={`draft-pax-${activeSession}`}
+            type="number"
+            min={1}
+            value={columnPax}
+            onChange={(e) => setColumnPax(e.target.value)}
+            placeholder="e.g. 100"
+            className="excel-meta-input"
+          />
         </div>
       </div>
 
@@ -471,30 +471,32 @@ function SessionAddDishForm({
 
   return (
     <div className="excel-session-add">
-      <DishSearchSelect
-        dishes={availableDishes}
-        value={dishId}
-        customName={customDishName}
-        sessionCategory={column.baseSession}
-        blockedNames={[...usedNames]}
-        onChange={setDishId}
-        onCustomNameChange={setCustomDishName}
-        onConfirmCustom={(name) => {
-          void handleAdd({ dishNameOverride: name });
-        }}
-        onConfirmDish={(d) => {
-          void handleAdd({ dishIdOverride: d.id });
-        }}
-      />
-      <div className="excel-session-add-actions">
-        <Button
-          type="button"
-          onClick={() => void handleAdd()}
-          disabled={saving || (!dishId && !customDishName.trim())}
-          className="!py-2 !px-4 text-sm"
-        >
-          {saving ? 'Adding…' : 'Add dish'}
-        </Button>
+      <div className="excel-session-add-row">
+        <DishSearchSelect
+          dishes={availableDishes}
+          value={dishId}
+          customName={customDishName}
+          sessionCategory={column.baseSession}
+          blockedNames={[...usedNames]}
+          onChange={setDishId}
+          onCustomNameChange={setCustomDishName}
+          onConfirmCustom={(name) => {
+            void handleAdd({ dishNameOverride: name });
+          }}
+          onConfirmDish={(d) => {
+            void handleAdd({ dishIdOverride: d.id });
+          }}
+        />
+        <div className="excel-session-add-actions">
+          <Button
+            type="button"
+            onClick={() => void handleAdd()}
+            disabled={saving || (!dishId && !customDishName.trim())}
+            className="!py-2 !px-4 text-sm"
+          >
+            {saving ? 'Adding…' : 'Add dish'}
+          </Button>
+        </div>
       </div>
       {!!customDishName.trim() && !dishId && (
         <label className="excel-session-add-catalog flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
@@ -621,7 +623,10 @@ function SessionTimeField({
         <AmPmTimeInput
           id={`time-from-${column.id}`}
           value={timeFrom}
-          onChange={setTimeFrom}
+          onChange={(next) => {
+            setTimeFrom(next);
+            void saveTime(next, timeTo);
+          }}
           onBlur={handleBlur}
           disabled={saving}
           className="excel-meta-ampm"
@@ -633,7 +638,10 @@ function SessionTimeField({
         <AmPmTimeInput
           id={`time-to-${column.id}`}
           value={timeTo}
-          onChange={setTimeTo}
+          onChange={(next) => {
+            setTimeTo(next);
+            void saveTime(timeFrom, next);
+          }}
           onBlur={handleBlur}
           disabled={saving}
           className="excel-meta-ampm"
@@ -735,10 +743,10 @@ export function OrderExcelHeader({ order }: { order: Enquiry }) {
   return (
     <div className="order-client-header">
       <p>
-        Client : {order.customerName}
+        Client: {order.customerName}
         {order.eventType ? ` · ${order.eventType}` : ''}
       </p>
-      <p>{order.eventLocation}</p>
+      {order.eventLocation ? <p>{order.eventLocation}</p> : null}
     </div>
   );
 }

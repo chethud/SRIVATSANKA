@@ -217,10 +217,7 @@ export function OrderDetailView({
 
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
-      <Link
-        to="/orders"
-        className="inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--primary)] mb-6"
-      >
+      <Link to="/orders" className="order-view-back">
         <ArrowLeft size={18} />
         Back to orders
       </Link>
@@ -230,10 +227,8 @@ export function OrderDetailView({
           <h1 className="order-view-title text-3xl md:text-4xl text-[var(--foreground)] tracking-tight">
             {order.customerName}
           </h1>
-          <p className="text-sm text-[var(--muted)] mt-1.5 font-mono tracking-wide">{formatOrderId(order.id)}</p>
-          {order.eventType && (
-            <p className="text-sm text-[var(--order-accent)] font-medium mt-2">{order.eventType}</p>
-          )}
+          <p className="order-hero-meta">{formatOrderId(order.id)}</p>
+          {order.eventType && <p className="order-hero-event">{order.eventType}</p>}
         </div>
         <span className="order-status-badge">{statusLabel(order.status)}</span>
       </div>
@@ -514,11 +509,11 @@ export function OrderDetailView({
         />
 
         {mealPrefs.length > 0 && (
-          <div className="mt-8 pt-6 border-t border-[var(--border)]">
-            <h4 className="text-sm font-semibold text-[var(--order-accent)] mb-2">Meal services (from enquiry)</h4>
-            <ul className="text-sm space-y-1">
+          <div className="order-meal-prefs">
+            <h4 className="order-meal-prefs-title">Meal services (from enquiry)</h4>
+            <ul className="order-meal-prefs-list">
               {mealPrefs.map((d) => (
-                <li key={d.id} className="flex justify-between gap-4">
+                <li key={d.id} className="order-meal-prefs-item">
                   <span>{d.dishName}</span>
                 </li>
               ))}

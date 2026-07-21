@@ -37,7 +37,7 @@ WHATSAPP_TOKEN=EAAxxxxx...
 WHATSAPP_PHONE_NUMBER_ID=123456789012345
 WHATSAPP_VERIFY_TOKEN=kannans-verify-token
 META_APP_SECRET=your-app-secret
-OWNER_PHONE_NUMBER=917899102165
+OWNER_PHONE_NUMBER=919945927101
 GEMINI_API_KEY=your-gemini-key
 ```
 
@@ -95,7 +95,7 @@ If verification fails, check:
 1. In Meta **API Setup**, add your phone as a **test recipient**  
 2. Send a WhatsApp message to the business test number  
 3. The AI bot should reply and collect enquiry details  
-4. Owner alert goes to **917899102165**
+4. Owner alert goes to **919945927101**
 
 Check connection status:
 
@@ -123,7 +123,7 @@ GET http://localhost:8000/api/whatsapp/status
 | Bot receives but doesn't reply | Check `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` |
 | Send failed 401 | Token expired – generate new permanent token |
 | Send failed 131030 | Recipient not in test list (dev mode) |
-| No owner alert | `OWNER_PHONE_NUMBER=917899102165` must be a registered test number in dev |
+| No owner alert | `OWNER_PHONE_NUMBER=919945927101` must be a registered test number in dev |
 
 ---
 
