@@ -1,3 +1,4 @@
+import json
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -176,6 +177,23 @@ async def add_order_dish(
             )
 
     db.add(item)
+    await db.flush()
+
+    column_id = (payload.menuColumnId or "").strip()
+    if column_id:
+        try:
+            notes_data = json.loads(enquiry.notes) if enquiry.notes else {}
+        except Exception:
+            notes_data = {}
+        if not isinstance(notes_data, dict):
+            notes_data = {}
+        dish_columns = notes_data.get("dishColumns")
+        if not isinstance(dish_columns, dict):
+            dish_columns = {}
+        dish_columns[item.id] = column_id
+        notes_data["dishColumns"] = dish_columns
+        enquiry.notes = json.dumps(notes_data)
+
     await db.commit()
     await db.refresh(enquiry, ["dish_items"])
     return _enquiry_out(enquiry)

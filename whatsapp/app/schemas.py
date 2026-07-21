@@ -60,6 +60,8 @@ class OrderDishIn(BaseModel):
     unitPrice: float | None = None
     # When False with dishName, add to this order only (do not create Dish catalog).
     saveToCatalog: bool = True
+    # Optional menu session column id — assign dish in the same request (avoids 2nd PATCH).
+    menuColumnId: str | None = None
 
     @model_validator(mode="after")
     def require_dish_reference(self) -> "OrderDishIn":

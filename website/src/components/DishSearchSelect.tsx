@@ -91,7 +91,7 @@ export function DishSearchSelect({
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
         <input
-          type="search"
+          type="text"
           value={displayValue}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -113,15 +113,25 @@ export function DishSearchSelect({
               e.preventDefault();
               commitTypedName();
             }
+            if (e.key === 'Escape') {
+              setOpen(false);
+            }
           }}
           placeholder="Search menu or type any dish name…"
-          className="form-input w-full pl-9 pr-8 py-2.5 rounded-lg text-sm"
+          className={`form-input w-full pl-9 py-2.5 rounded-lg text-sm ${
+            selected || hasCustom ? 'pr-16' : 'pr-3'
+          }`}
+          autoComplete="off"
         />
-        {(selected || hasCustom) && !open && (
+        {(selected || hasCustom) && (
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--muted)] hover:text-[var(--primary)]"
-            onClick={clearSelection}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-[var(--muted)] hover:text-[var(--primary)]"
+            onClick={(e) => {
+              e.preventDefault();
+              clearSelection();
+              setOpen(false);
+            }}
           >
             Clear
           </button>

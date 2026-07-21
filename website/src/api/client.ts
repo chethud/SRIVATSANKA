@@ -404,6 +404,8 @@ export async function addOrderDish(
     unitPrice?: number;
     /** When false with dishName, order-only (not added to Dish catalog). */
     saveToCatalog?: boolean;
+    /** Assign this dish to a menu session column in the same request. */
+    menuColumnId?: string;
   },
 ) {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/dishes`, {

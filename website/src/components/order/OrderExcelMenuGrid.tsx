@@ -15,7 +15,6 @@ import { serializeOrderNotes, toDateInputValue, type OrderExtras } from '../../u
 import { DEFAULT_MEAL_TIMES } from '../../utils/mealSessions';
 import { resolveSessionTabs } from '../../utils/mealSessions';
 import {
-  assignDishColumn,
   dishesForColumn,
   findOrCreateColumn,
   removeMenuColumn,
@@ -169,7 +168,6 @@ function SessionBlock({
 
       <SessionAddDishForm
         order={order}
-        extras={extras}
         column={column}
         dishes={dishes}
         onOrderUpdated={onOrderUpdated}
@@ -373,14 +371,12 @@ function EmptySessionCard({
 
 function SessionAddDishForm({
   order,
-  extras,
   column,
   dishes,
   onOrderUpdated,
   onDishesCatalogUpdated,
 }: {
   order: Enquiry;
-  extras: OrderExtras;
   column: MenuColumn;
   dishes: Dish[];
   onOrderUpdated: (order: Enquiry) => void;
@@ -403,33 +399,22 @@ function SessionAddDishForm({
 
     setSaving(true);
     try {
-      let merged: OrderExtras = { ...extras };
-      const prevIds = new Set((order.dishes ?? []).map((d) => d.id));
-      let updated = await addOrderDish(order.id, {
+      const updated = await addOrderDish(order.id, {
         ...(resolvedDishId
           ? { dishId: resolvedDishId }
           : { dishName: customName, saveToCatalog }),
         category: column.baseSession,
+        menuColumnId: column.id,
       });
-      const newDish = updated.dishes.find(
-        (d) =>
-          !prevIds.has(d.id) &&
-          (resolvedDishId
-            ? d.dishId === resolvedDishId
-            : d.dishName.toLowerCase() === customName.toLowerCase()),
-      );
-      if (newDish) {
-        merged = assignDishColumn(merged, newDish.id, column.id);
-        updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
-      }
-
-      if (customName && saveToCatalog) {
-        await onDishesCatalogUpdated?.();
-      }
 
       setDishId('');
       setCustomDishName('');
       onOrderUpdated(updated);
+
+      // Catalog refresh can wait — don't block the UI
+      if (customName && saveToCatalog) {
+        void onDishesCatalogUpdated?.();
+      }
     } catch {
       setError('Could not add item.');
     } finally {
