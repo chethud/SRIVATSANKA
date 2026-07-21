@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Layers, Moon, Plus, Sun } from 'lucide-react';
+import { Bell, Layers, Moon, Plus, Search, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
+import { usePageSearchSlot } from '../context/PageSearchContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   getCreateActionForPath,
@@ -11,19 +12,35 @@ import {
   getSecondaryCreateButtonLabel,
 } from '../utils/createAction';
 import { getUnreadNotifications } from '../utils/dashboardData';
+import { getTopNavTitle } from '../utils/topNavTitle';
 
 export function TopNav() {
   const { notifications, stats } = useAppData();
   const { theme, toggleTheme } = useTheme();
   const { triggerCreate } = useCreateAction();
+  const { config: pageSearch } = usePageSearchSlot();
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const unread = getUnreadNotifications(notifications);
   const pageAction = getCreateActionForPath(location.pathname);
   const secondaryAction = getSecondaryCreateActionForPath(location.pathname);
   const createLabel = getCreateButtonLabel(location.pathname);
   const secondaryLabel = getSecondaryCreateButtonLabel(secondaryAction);
+  const unreadCount = stats?.unread_notifications ?? 0;
+  const pageTitle = !pageSearch ? getTopNavTitle(location.pathname) : null;
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [notifOpen]);
 
   function handleCreate(action: typeof pageAction | typeof secondaryAction) {
     setNotifOpen(false);
@@ -36,61 +53,84 @@ export function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-30 mb-6 -mx-1 px-1">
-      <div className="flex flex-wrap items-center gap-3 py-3 px-4 rounded-[var(--radius-xl)] bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-sm)]">
-        <div className="flex items-center gap-2 ml-auto w-full justify-end">
+    <header className="topnav sticky top-0 z-30 mb-5">
+      <div className="topnav__bar">
+        {pageSearch ? (
+          <div className="topnav__search">
+            <Search size={16} className="topnav__search-icon" aria-hidden />
+            <input
+              type="search"
+              value={pageSearch.value}
+              onChange={(e) => pageSearch.onChange(e.target.value)}
+              placeholder={pageSearch.placeholder}
+              className="topnav__search-input"
+              aria-label={pageSearch.placeholder}
+            />
+          </div>
+        ) : (
+          <div className="topnav__title-wrap">
+            {pageTitle ? <p className="topnav__title">{pageTitle}</p> : <span />}
+          </div>
+        )}
+
+        <div className="topnav__actions">
           {secondaryAction && (
             <button
               type="button"
               onClick={() => handleCreate(secondaryAction)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] text-sm font-semibold hover:border-[var(--primary)] hover:bg-[var(--primary-light)] hover:text-[var(--primary)] transition-colors shadow-sm"
+              className="topnav__btn topnav__btn--ghost"
             >
-              <Layers size={18} />
-              <span className="hidden sm:inline">{secondaryLabel}</span>
+              <Layers size={16} />
+              <span className="topnav__btn-label">{secondaryLabel}</span>
             </button>
           )}
           {pageAction && (
             <button
               type="button"
               onClick={() => handleCreate(pageAction)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm"
+              className="topnav__btn topnav__btn--primary"
             >
-              <Plus size={18} />
-              <span className="hidden sm:inline">{createLabel}</span>
+              <Plus size={16} />
+              <span className="topnav__btn-label">{createLabel}</span>
             </button>
           )}
+
+          {(pageAction || secondaryAction) && <span className="topnav__divider" aria-hidden />}
 
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-[var(--foreground)]"
-            aria-label="Toggle theme"
+            className="topnav__icon-btn"
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            title={theme === 'light' ? 'Dark mode' : 'Light mode'}
           >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
 
-          <div className="relative">
+          <div className="relative" ref={notifRef}>
             <button
               type="button"
               onClick={() => setNotifOpen((o) => !o)}
-              className="relative p-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-[var(--foreground)]"
+              className={`topnav__icon-btn ${notifOpen ? 'topnav__icon-btn--active' : ''}`}
+              aria-label="Notifications"
+              aria-expanded={notifOpen}
             >
-              <Bell size={18} />
-              {(stats?.unread_notifications ?? 0) > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[10px] font-bold rounded-full bg-[var(--accent)] text-[var(--sidebar-badge-text)] flex items-center justify-center">
-                  {stats!.unread_notifications! > 9 ? '9+' : stats!.unread_notifications}
+              <Bell size={16} />
+              {unreadCount > 0 && (
+                <span className="topnav__badge">
+                  {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
             {notifOpen && (
-              <div className="absolute right-0 mt-2 w-80 max-h-72 overflow-y-auto rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-md)] z-50">
-                <p className="px-4 py-3 text-xs font-semibold text-[var(--muted)] border-b border-[var(--border)]">Notifications</p>
+              <div className="topnav__panel">
+                <p className="topnav__panel-title">Notifications</p>
                 {unread.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-[var(--muted)]">No new notifications</p>
+                  <p className="topnav__panel-empty">No new notifications</p>
                 ) : (
                   unread.map((n) => (
-                    <div key={n.id} className="px-4 py-3 border-b border-[var(--border)] last:border-0 text-sm text-[var(--foreground)]">
-                      <p className="font-medium">{n.title}</p>
+                    <div key={n.id} className="topnav__panel-item">
+                      <p className="font-medium text-[var(--foreground)]">{n.title}</p>
                       <p className="text-xs text-[var(--muted)] mt-0.5 line-clamp-2">{n.message}</p>
                     </div>
                   ))

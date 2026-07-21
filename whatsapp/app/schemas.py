@@ -341,6 +341,7 @@ class ChatMessageOut(BaseModel):
 class ChatConversationOut(BaseModel):
     phoneNumber: str
     customerName: str | None = None
+    enquiryId: str | None = None
     lastMessage: str
     lastRole: str
     lastAt: datetime
@@ -354,6 +355,7 @@ class OwnerChatMessageIn(BaseModel):
 
 class AIAssistantRequest(BaseModel):
     query: str
+    ruleId: str | None = None
 
 
 class AIAssistantResponse(BaseModel):

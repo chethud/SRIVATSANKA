@@ -8,14 +8,14 @@ export default function AIAssistantPage() {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
 
-  async function runRule(query: string) {
+  async function runRule(rule: (typeof AI_ASSISTANT_RULES)[number]) {
     if (loading) return;
 
-    setMessages((prev) => [...prev, { role: 'user', text: query }]);
+    setMessages((prev) => [...prev, { role: 'user', text: rule.query }]);
     setLoading(true);
 
     try {
-      const { reply } = await askDashboardAssistant(query);
+      const { reply } = await askDashboardAssistant(rule.query, rule.id);
       setMessages((prev) => [...prev, { role: 'assistant', text: reply }]);
     } catch {
       setMessages((prev) => [
@@ -70,7 +70,7 @@ export default function AIAssistantPage() {
               <button
                 key={rule.id}
                 type="button"
-                onClick={() => void runRule(rule.query)}
+                onClick={() => void runRule(rule)}
                 disabled={loading}
                 className="px-3 py-1.5 text-sm bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-full hover:border-[var(--primary)] transition-colors disabled:opacity-50"
               >

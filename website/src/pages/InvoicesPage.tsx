@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BarChart3, CheckCircle2, FileText, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, FileText, Upload, XCircle } from 'lucide-react';
 import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import {
@@ -244,14 +243,6 @@ export default function InvoicesPage() {
           <p>{savedMsg}</p>
         </div>
       )}
-
-      <Link
-        to="/analytics"
-        className="inline-flex items-center gap-2 mt-8 text-sm font-medium text-[var(--primary)] hover:underline"
-      >
-        <BarChart3 size={18} />
-        View expenses & profit in Analytics →
-      </Link>
     </>
   );
 }

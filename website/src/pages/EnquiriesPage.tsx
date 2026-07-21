@@ -4,8 +4,9 @@ import { MessageCircle } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { useAppData } from '../context/AppDataContext';
-import { ErrorBanner, SearchInput, FilterChips, LoadingScreen } from '../components/ui';
+import { ErrorBanner, FilterChips, LoadingScreen } from '../components/ui';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
+import { usePageSearch } from '../context/PageSearchContext';
 import { createEnquiry, updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
 import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention';
 import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../utils/enquiryStatus';
@@ -38,6 +39,10 @@ function callbackDisplay(enquiry: { preferredCallbackAt: string; notes?: string 
   return requested ? `${when} (${requested})` : when;
 }
 
+function normalizePhoneDigits(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
 const emptyForm = () => ({
   customerName: '',
   phoneNumber: '',
@@ -51,6 +56,8 @@ export default function EnquiriesPage() {
   const { loading, error, enquiries, refresh, markEnquiryViewed } = useAppData();
   const [searchParams] = useSearchParams();
   const attentionOnly = searchParams.get('attention') === '1';
+  const deepLinkId = searchParams.get('id');
+  const deepLinkPhone = normalizePhoneDigits(searchParams.get('phone') || '');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [monthFilter, setMonthFilter] = useState('ALL');
@@ -62,6 +69,7 @@ export default function EnquiriesPage() {
   const [formError, setFormError] = useState('');
 
   useCreateActionListener('enquiry', () => setShowForm(true));
+  usePageSearch('Search name, event, phone...', search, setSearch);
 
   const unviewedEnquiries = useMemo(
     () => sortEnquiriesForAttention(enquiries.filter(isUnviewedEnquiry)),
@@ -69,6 +77,20 @@ export default function EnquiriesPage() {
   );
 
   const serialNumbers = useMemo(() => buildSerialNumberMap(enquiries), [enquiries]);
+
+  useEffect(() => {
+    if (deepLinkId && enquiries.some((e) => e.id === deepLinkId)) {
+      setSelected(deepLinkId);
+      return;
+    }
+    if (deepLinkPhone) {
+      const match = enquiries.find((e) => normalizePhoneDigits(e.phoneNumber) === deepLinkPhone);
+      if (match) {
+        setSelected(match.id);
+        setSearch(deepLinkPhone.slice(-10));
+      }
+    }
+  }, [deepLinkId, deepLinkPhone, enquiries]);
 
   const filtered = useMemo(() => {
     let list = enquiries.filter((e) => {
@@ -95,9 +117,10 @@ export default function EnquiriesPage() {
   const detail = enquiries.find((e) => e.id === selected);
 
   useEffect(() => {
+    if (deepLinkId || deepLinkPhone) return;
     if (selected || unviewedEnquiries.length === 0) return;
     setSelected(unviewedEnquiries[0].id);
-  }, [unviewedEnquiries, selected]);
+  }, [unviewedEnquiries, selected, deepLinkId, deepLinkPhone]);
 
   function handleRowHover(enquiry: (typeof enquiries)[0]) {
     if (!isUnviewedEnquiry(enquiry) || markedSeenRef.current.has(enquiry.id)) return;
@@ -220,7 +243,6 @@ export default function EnquiriesPage() {
         </Card>
       )}
       <div className="flex flex-col gap-3 mb-6">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search name, event, phone..." />
         <FilterChips options={MONTH_FILTERS} selected={monthFilter} onSelect={setMonthFilter} />
         <FilterChips options={ENQUIRY_STATUS_FILTERS} selected={statusFilter} onSelect={setStatusFilter} />
       </div>

@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { PageHeader, Card, Button, EmptyState } from '../components/Layout';
-import { SearchInput } from '../components/ui';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
+import { usePageSearch } from '../context/PageSearchContext';
 import { createWorker } from '../api/client';
 
 export default function WorkersPage() {
@@ -26,6 +26,7 @@ export default function WorkersPage() {
   }, [workers, search]);
 
   useCreateActionListener('worker', () => setShowForm(true));
+  usePageSearch('Search by name, role, or phone...', search, setSearch);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -49,13 +50,6 @@ export default function WorkersPage() {
         description={`${workers.length} workers — click a name to open profile and assign duties`}
       />
 
-      <div className="mb-6 max-w-md">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name, role, or phone..."
-        />
-      </div>
       {showForm && (
         <Card id="page-create-form" className="p-6 mb-6">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">

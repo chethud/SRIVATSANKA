@@ -7,7 +7,7 @@ from app.database import get_db
 from app.schemas import ChatConversationOut, ChatMessageOut, OwnerChatMessageIn
 from app.services.chat_handoff import pause_bot_for_phone, resume_bot_for_phone
 from app.services.enquiry_service import mark_enquiry_seen_for_phone
-from app.services.chat_log import get_messages, list_conversations, log_owner_message
+from app.services.chat_log import delete_conversation, get_messages, list_conversations, log_owner_message
 from app.services.whatsapp_client import normalize_phone, send_whatsapp_message
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -66,3 +66,15 @@ async def resume_bot_for_conversation(
     await resume_bot_for_phone(db, normalized)
     logger.info("Bot auto-reply resumed for %s", normalized)
     return {"ok": True, "phoneNumber": normalized, "botPaused": False}
+
+
+@router.delete("/conversations/{phone}")
+async def delete_chat_conversation(
+    phone: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    normalized = normalize_phone(phone)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    deleted = await delete_conversation(db, normalized)
+    return {"ok": True, "phoneNumber": normalized, "deletedMessages": deleted}

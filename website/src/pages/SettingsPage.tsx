@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
+import { FONT_SCALE_OPTIONS, useTheme } from '../context/ThemeContext';
 import { fetchWhatsAppStatus, seedExcelReferenceOrders, type WhatsAppStatus } from '../api/client';
 import { ErrorBanner } from '../components/ui';
 
 export default function SettingsPage() {
   const { connected, stats, lastSync, refresh } = useAppData();
+  const { fontScale, setFontScale } = useTheme();
   const [wa, setWa] = useState<WhatsAppStatus | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState('');
@@ -38,6 +40,35 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="Live connection status and integrations" />
       <ErrorBanner message={!connected ? 'API offline — start FastAPI on port 8001' : ''} />
       <div className="space-y-6 max-w-2xl">
+        <Card className="p-6">
+          <h3 className="font-semibold mb-2">Display</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Increase or decrease text size across the whole dashboard. Saved on this device.
+          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-2">
+            Font size
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Font size">
+            {FONT_SCALE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setFontScale(opt.id)}
+                className={`px-3.5 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                  fontScale === opt.id
+                    ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                    : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-[var(--muted)] mt-3">
+            Preview: The quick brown fox jumps over the lazy dog.
+          </p>
+        </Card>
+
         <Card className="p-6">
           <h3 className="font-semibold mb-4">System Status</h3>
           <dl className="space-y-2 text-sm">
@@ -84,7 +115,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="text-sm text-[var(--muted)]">Owner Phone (WhatsApp alerts)</label>
-              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 99459 27101'} className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
+              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 99456 07074'} className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
             </div>
           </div>
         </Card>
@@ -115,37 +146,12 @@ export default function SettingsPage() {
           ) : (
             <p className="text-sm text-[var(--muted)] mb-4">Connect API to see live WhatsApp status.</p>
           )}
-          <p className="text-sm text-[var(--muted)] mb-3">
-            Webhook: <code>https://YOUR-DOMAIN/webhook</code>
-          </p>
-          <p className="text-sm text-[var(--muted)] mb-4">
-            Guide: <code>docs/META_WHATSAPP_SETUP.md</code>
-          </p>
           <Link
             to="/bot-tester"
             className="inline-block px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm hover:bg-[var(--primary-hover)] mr-3"
           >
             Open WhatsApp Chat
           </Link>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4">WhatsApp AI Agent</h3>
-          <p className="text-sm text-[var(--muted)]">
-            Set <code>GEMINI_API_KEY</code> in <code>whatsapp/.env</code> for AI conversations.
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4">Notifications</h3>
-          <label className="flex items-center gap-3 text-sm">
-            <input type="checkbox" defaultChecked disabled />
-            Instant notification on new WhatsApp enquiry (enabled in backend)
-          </label>
-          <label className="flex items-center gap-3 text-sm mt-3">
-            <input type="checkbox" defaultChecked disabled />
-            Callback reminder 15–20 min before preferred time (enabled in backend)
-          </label>
         </Card>
       </div>
     </>

@@ -155,6 +155,11 @@ async def process_guided_flow(
         if customer_wants_to_proceed(text):
             return _start_detail_collection(session, text)
 
+        # Customer already sharing a date — jump into details and store it this turn
+        if is_likely_field_answer(text, "event_date") and not looks_like_question(text):
+            session.guided_step = GuidedStep.COLLECT_DETAILS
+            return await process_guided_flow(session, whatsapp_id, text)
+
         wants_photos = customer_wants_photos(text)
         media: list[MediaAttachment] = prepare_gallery_photos(session, limit=4) if wants_photos else []
         reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
@@ -204,8 +209,7 @@ async def process_guided_flow(
             session.fields.preferred_callback,
         )
         reply = (
-            f"Perfect, *{name}* — we'll call you around *{callback_when.split(' (')[0]}*. "
-            f"Last thing: which meal services do you need? (e.g. *1,3* or *breakfast, dinner*)"
+            f"Perfect, *{name}* — we'll call you around *{callback_when.split(' (')[0]}*."
         )
         record_exchange(session, text, reply)
         return AgentTurnResult(

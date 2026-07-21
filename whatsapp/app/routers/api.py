@@ -287,5 +287,5 @@ async def dashboard_ai_assistant(
     payload: AIAssistantRequest,
     db: AsyncSession = Depends(get_db),
 ) -> AIAssistantResponse:
-    reply = await answer_dashboard_query(payload.query, db)
+    reply = await answer_dashboard_query(payload.query, db, rule_id=payload.ruleId)
     return AIAssistantResponse(reply=reply)

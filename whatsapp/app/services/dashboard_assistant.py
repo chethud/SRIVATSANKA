@@ -1,10 +1,25 @@
+"""Dashboard AI — answers predefined quick questions with live DB data."""
+
+from __future__ import annotations
+
 import re
 from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Enquiry, EnquiryStatus, Notification
+from app.models import Enquiry, EnquiryStatus, Expense, Notification, Vendor, Worker
+
+# Must stay in sync with website/src/utils/aiAssistantRules.tsx
+PREDEFINED_RULE_QUERIES: dict[str, str] = {
+    "upcoming": "Show all upcoming events",
+    "wedding": "Show wedding enquiries",
+    "birthday": "Show birthday enquiries",
+    "corporate": "Show corporate enquiries",
+    "guests-200": "Show enquiries above 200 guests",
+    "recent": "Show recent enquiries",
+    "summary": "Business summary",
+}
 
 
 def _fmt_date(dt: datetime) -> str:
@@ -15,18 +30,28 @@ def _fmt_datetime(dt: datetime) -> str:
     return dt.strftime("%d %b %Y, %I:%M %p")
 
 
-def _format_enquiry_list(enquiries: list[Enquiry], title: str) -> str:
+def _status_label(enquiry: Enquiry) -> str:
+    return enquiry.status.value if hasattr(enquiry.status, "value") else str(enquiry.status)
+
+
+def _guest_label(enquiry: Enquiry) -> str:
+    if enquiry.guestCount and enquiry.guestCount > 0:
+        return str(enquiry.guestCount)
+    return "Set on order (session pax)"
+
+
+def _format_enquiry_list(enquiries: list[Enquiry], title: str, empty_hint: str = "") -> str:
     if not enquiries:
-        return f"No results for: {title}"
+        hint = f"\n\n{empty_hint}" if empty_hint else ""
+        return f"No results for: **{title}**.{hint}"
 
     lines = [f"**{title}** ({len(enquiries)})\n"]
     for i, e in enumerate(enquiries, 1):
-        status = e.status.value if hasattr(e.status, "value") else str(e.status)
         lines.append(
             f"{i}. **{e.customerName}** – {e.eventType}\n"
             f"   Event: {_fmt_date(e.eventDate)} | {e.eventLocation}\n"
-            f"   Guests: {e.guestCount} | Phone: {e.phoneNumber}\n"
-            f"   Callback: {_fmt_datetime(e.preferredCallbackAt)} | Status: {status}"
+            f"   Guests: {_guest_label(e)} | Phone: {e.phoneNumber}\n"
+            f"   Callback: {_fmt_datetime(e.preferredCallbackAt)} | Status: {_status_label(e)}"
         )
     return "\n\n".join(lines)
 
@@ -74,100 +99,116 @@ async def _enquiry_stats(db: AsyncSession) -> str:
         .select_from(Enquiry)
         .where(Enquiry.status == EnquiryStatus.NEW, Enquiry.ownerViewedAt.is_(None))
     ) or 0
+    converted = await db.scalar(
+        select(func.count()).select_from(Enquiry).where(Enquiry.status == EnquiryStatus.CONVERTED)
+    ) or 0
     upcoming = await db.scalar(
         select(func.count()).select_from(Enquiry).where(Enquiry.eventDate >= datetime.now())
     ) or 0
     unread = await db.scalar(
         select(func.count()).select_from(Notification).where(Notification.read.is_(False))
     ) or 0
+    vendors = await db.scalar(select(func.count()).select_from(Vendor)) or 0
+    workers = await db.scalar(select(func.count()).select_from(Worker)) or 0
+    expenses = await db.scalar(select(func.count()).select_from(Expense)) or 0
+    expense_total = await db.scalar(select(func.coalesce(func.sum(Expense.amount), 0))) or 0
 
     return (
         "**Business Summary**\n\n"
         f"• Total enquiries: {total}\n"
-        f"• New enquiries: {new}\n"
+        f"• New (unviewed): {new}\n"
+        f"• Converted orders: {converted}\n"
         f"• Upcoming events: {upcoming}\n"
-        f"• Unread notifications: {unread}"
+        f"• Unread notifications: {unread}\n"
+        f"• Vendors: {vendors}\n"
+        f"• Workers: {workers}\n"
+        f"• Expense records: {expenses}"
+        + (f" (₹{float(expense_total):,.0f})" if expenses else "")
     )
 
 
-async def answer_dashboard_query(query: str, db: AsyncSession) -> str:
-    q = query.lower().strip()
+def _resolve_rule_id(rule_id: str | None, query: str) -> str | None:
+    if rule_id and rule_id in PREDEFINED_RULE_QUERIES:
+        return rule_id
 
-    # Upcoming events
-    if any(k in q for k in ("upcoming", "future event", "next event", "scheduled")):
+    normalized = " ".join(query.lower().strip().split())
+    for rid, canonical in PREDEFINED_RULE_QUERIES.items():
+        if normalized == canonical.lower():
+            return rid
+
+    # Fuzzy fallbacks for free-typed variants of the same questions
+    if any(k in normalized for k in ("upcoming", "future event", "next event", "scheduled")):
+        return "upcoming"
+    if "wedding" in normalized:
+        return "wedding"
+    if "birthday" in normalized:
+        return "birthday"
+    if "corporate" in normalized:
+        return "corporate"
+    if "guest" in normalized and re.search(r"(?:above|over|more than|>\s*)\s*200\b", normalized):
+        return "guests-200"
+    if any(k in normalized for k in ("recent enquir", "new enquir", "latest enquir", "all enquir")):
+        return "recent"
+    if any(k in normalized for k in ("summary", "stats", "overview", "how many", "total", "business")):
+        return "summary"
+    return None
+
+
+async def _answer_rule(rule_id: str, db: AsyncSession) -> str:
+    if rule_id == "upcoming":
         events = await _upcoming_enquiries(db)
-        return _format_enquiry_list(events, "Upcoming Events")
-
-    # Wedding / event type filters
-    event_keywords = {
-        "wedding": "wedding",
-        "birthday": "birthday",
-        "corporate": "corporate",
-        "reception": "reception",
-    }
-    for label, keyword in event_keywords.items():
-        if label in q:
-            items = await _enquiries_by_event_type(db, keyword)
-            return _format_enquiry_list(items, f"{label.title()} Enquiries")
-
-    # Guest count filter
-    guest_match = re.search(r"(?:above|over|more than|>\s*)\s*(\d+)", q)
-    if "guest" in q and guest_match:
-        min_guests = int(guest_match.group(1))
-        items = await _enquiries_above_guests(db, min_guests)
-        return _format_enquiry_list(items, f"Enquiries with {min_guests}+ Guests")
-
-    # Order lookup (orders module not yet in DB)
-    order_match = re.search(r"ord[-\s]?(\d+)", q, re.I)
-    if "order" in q and order_match:
-        order_id = f"ORD-{order_match.group(1).zfill(4)}"
-        return (
-            f"No order found for **{order_id}**.\n\n"
-            "Orders are not in the system yet. You can view enquiries instead — "
-            "try: *Show all upcoming events* or *Show wedding enquiries*."
+        return _format_enquiry_list(
+            events,
+            "Upcoming Events",
+            empty_hint="There are no events with a future date yet.",
         )
 
-    # Expenses
-    if "expense" in q or "cost" in q or "spending" in q:
-        return (
-            "The **Expenses** module is not set up yet.\n\n"
-            "You can currently ask about:\n"
-            "• Upcoming events\n"
-            "• Wedding / birthday / corporate enquiries\n"
-            "• Enquiries above a guest count\n"
-            "• Business summary"
+    if rule_id == "wedding":
+        items = await _enquiries_by_event_type(db, "wedding")
+        return _format_enquiry_list(items, "Wedding Enquiries")
+
+    if rule_id == "birthday":
+        items = await _enquiries_by_event_type(db, "birthday")
+        return _format_enquiry_list(items, "Birthday Enquiries")
+
+    if rule_id == "corporate":
+        items = await _enquiries_by_event_type(db, "corporate")
+        return _format_enquiry_list(items, "Corporate Enquiries")
+
+    if rule_id == "guests-200":
+        items = await _enquiries_above_guests(db, 200)
+        return _format_enquiry_list(
+            items,
+            "Enquiries with 200+ Guests",
+            empty_hint=(
+                "No enquiries currently store 200+ guests on the enquiry record. "
+                "Session pax is often set later on the order menu."
+            ),
         )
 
-    # Vendors
-    if "vendor" in q or "supplier" in q or "contact details" in q:
-        return (
-            "The **Vendor Directory** is not set up yet.\n\n"
-            "Add vendors from the Vendors page when available. "
-            "For now, try: *Show all upcoming events*."
-        )
-
-    # Stats / summary
-    if any(k in q for k in ("summary", "stats", "overview", "how many", "total")):
-        return await _enquiry_stats(db)
-
-    # New / recent enquiries
-    if any(k in q for k in ("new enquiry", "recent enquiry", "latest enquiry", "all enquiry")):
+    if rule_id == "recent":
         items = await _all_enquiries(db)
         return _format_enquiry_list(items, "Recent Enquiries")
 
-    # Default: show upcoming if any, else help
-    upcoming = await _upcoming_enquiries(db)
-    if upcoming:
-        return (
-            _format_enquiry_list(upcoming, "Upcoming Events")
-            + "\n\n_Tip: Try \"Show wedding enquiries\" or \"Show enquiries above 200 guests\"._"
-        )
+    if rule_id == "summary":
+        return await _enquiry_stats(db)
 
     return (
-        "I can help you with your events data. Try asking:\n\n"
-        "• Show all upcoming events\n"
-        "• Show wedding enquiries\n"
-        "• Show enquiries above 200 guests\n"
-        "• Business summary\n\n"
-        "Orders, expenses, and vendors will be available once those modules are added."
+        "I can answer these questions:\n\n"
+        + "\n".join(f"• {q}" for q in PREDEFINED_RULE_QUERIES.values())
+    )
+
+
+async def answer_dashboard_query(
+    query: str,
+    db: AsyncSession,
+    rule_id: str | None = None,
+) -> str:
+    resolved = _resolve_rule_id(rule_id, query)
+    if resolved:
+        return await _answer_rule(resolved, db)
+
+    return (
+        "Please choose one of the quick questions below, or ask:\n\n"
+        + "\n".join(f"• {q}" for q in PREDEFINED_RULE_QUERIES.values())
     )

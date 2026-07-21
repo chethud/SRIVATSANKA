@@ -256,6 +256,7 @@ export interface BotTestResponse {
 export interface ChatConversation {
   phoneNumber: string;
   customerName: string | null;
+  enquiryId?: string | null;
   lastMessage: string;
   lastRole: string;
   lastAt: string;
@@ -599,6 +600,15 @@ export async function resumeChatBot(phone: string): Promise<{ ok: boolean; botPa
   );
 }
 
+export async function deleteChatConversation(
+  phone: string,
+): Promise<{ ok: boolean; phoneNumber: string; deletedMessages: number }> {
+  return apiFetch<{ ok: boolean; phoneNumber: string; deletedMessages: number }>(
+    `/api/chat/conversations/${encodeURIComponent(phone)}`,
+    { method: 'DELETE' },
+  );
+}
+
 export function normalizePhoneInput(value: string): string {
   return value.replace(/\D/g, '');
 }
@@ -614,11 +624,14 @@ export function formatPhoneDisplay(digits: string): string {
   return d ? `+${d}` : '';
 }
 
-export async function askDashboardAssistant(query: string): Promise<{ reply: string }> {
+export async function askDashboardAssistant(
+  query: string,
+  ruleId?: string,
+): Promise<{ reply: string }> {
   return apiFetch<{ reply: string }>('/api/ai-assistant', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, ruleId: ruleId ?? null }),
   });
 }
 

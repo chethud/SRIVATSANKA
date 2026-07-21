@@ -4,7 +4,7 @@ import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { createDish } from '../api/client';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
-import { SearchInput } from '../components/ui';
+import { usePageSearch } from '../context/PageSearchContext';
 import { MEAL_SESSIONS, isPresetMealSession, resolveSessionTabs } from '../utils/mealSessions';
 
 const CUSTOM_OPTION = '__custom__';
@@ -33,6 +33,7 @@ export default function DishesPage() {
       customCategory: cat !== 'ALL' && !isPresetMealSession(cat) ? cat : '',
     }));
   });
+  usePageSearch('Search dishes by name...', search, setSearch);
 
   useCreateActionListener('session', () => {
     setAddingSession(true);
@@ -252,14 +253,13 @@ export default function DishesPage() {
         </Card>
       )}
 
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-6">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search dishes by name..." />
-        {cat !== 'ALL' && (
+      {cat !== 'ALL' && (
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-6">
           <Button type="button" onClick={() => openAddDishForSession(cat)} className="!py-2 !px-4 text-sm">
             <Plus size={16} className="inline mr-1" /> Add dish to {cat}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <EmptyState

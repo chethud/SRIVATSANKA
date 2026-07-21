@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import AgentTurnResult
@@ -9,6 +11,46 @@ from app.services.enquiry_service import save_enquiry
 from app.services.session_store import ConversationPhase, GuidedStep, session_store
 
 ai_agent = AIAgent()
+logger = logging.getLogger(__name__)
+
+
+def _merge_replies(prefix: str | None, main: AgentTurnResult) -> AgentTurnResult:
+    head = (prefix or "").strip()
+    body = (main.reply or "").strip()
+    if head and body:
+        reply = f"{head}\n\n{body}"
+    else:
+        reply = body or head
+    return main.model_copy(update={"reply": reply})
+
+
+async def _persist_enquiry(
+    db: AsyncSession,
+    session,
+    whatsapp_id: str,
+    result: AgentTurnResult,
+) -> tuple[AgentTurnResult, bool]:
+    try:
+        await save_enquiry(db, session.fields, whatsapp_id, session.selected_dishes)
+        session._saved = True
+        return result, True
+    except Exception:
+        logger.exception("Failed to save WhatsApp enquiry for %s", whatsapp_id)
+        session.completed = False
+        session._saved = False
+        session.phase = ConversationPhase.SELECT_CATEGORIES
+        return (
+            AgentTurnResult(
+                reply=(
+                    "Sorry — I couldn't save that just now. "
+                    "Please reply with your meal services again (e.g. *1,3* or *breakfast, dinner*), "
+                    "or say *skip*, and I'll retry. Send *new* to start over."
+                ),
+                fields=session.fields,
+                enquiry_fields_complete=True,
+            ),
+            False,
+        )
 
 
 async def handle_conversation(
@@ -35,13 +77,16 @@ async def handle_conversation(
             False,
         )
 
+    # Incomplete save left session stuck — send them back to meal selection
+    if session.completed and not session._saved:
+        session.completed = False
+        session.phase = ConversationPhase.SELECT_CATEGORIES
+
     # Cuisine preference (types only — no individual dishes)
     if session.phase == ConversationPhase.SELECT_CATEGORIES:
         result = await handle_dish_flow(session, user_text, db)
         if result.is_complete and not session._saved:
-            await save_enquiry(db, session.fields, whatsapp_id, session.selected_dishes)
-            session._saved = True
-            return result, True
+            return await _persist_enquiry(db, session, whatsapp_id, result)
         return result, False
 
     if session.phase == ConversationPhase.ENQUIRY and session.guided_step != GuidedStep.DONE:
@@ -49,7 +94,7 @@ async def handle_conversation(
         if guided is not None:
             if guided.enquiry_fields_complete:
                 dish_result = await start_dish_flow(session, db)
-                return dish_result, False
+                return _merge_replies(guided.reply, dish_result), False
             return guided, False
 
     # Agent-led enquiry (fallback if guided flow completed without all fields)
@@ -57,11 +102,9 @@ async def handle_conversation(
 
     if _all_fields_filled(session.fields) and session.phase == ConversationPhase.ENQUIRY:
         dish_result = await start_dish_flow(session, db)
-        return dish_result, False
+        return _merge_replies(result.reply if result.reply else None, dish_result), False
 
     if result.is_complete and not session._saved:
-        await save_enquiry(db, session.fields, whatsapp_id, session.selected_dishes)
-        session._saved = True
-        return result, True
+        return await _persist_enquiry(db, session, whatsapp_id, result)
 
     return result, False

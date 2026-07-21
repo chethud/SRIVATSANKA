@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MessageCircle, Plus, RefreshCw, Send, User } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Plus, RefreshCw, Send, Trash2, User, X } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 import {
+  deleteChatConversation,
   fetchChatConversations,
   fetchChatMessages,
   formatDateTime,
@@ -23,6 +25,22 @@ function roleLabel(role: string) {
   return 'Bot';
 }
 
+function profileInitials(name: string | null | undefined, phone: string) {
+  const trimmed = name?.trim();
+  if (trimmed) {
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    const letters = `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase();
+    if (letters) return letters;
+  }
+  const digits = normalizePhoneInput(phone);
+  return (digits.slice(-2) || '?').toUpperCase();
+}
+
+function whatsappDpUrl(name: string | null | undefined, phone: string) {
+  const label = name?.trim() || formatPhoneDisplay(phone) || phone;
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=25D366&color=ffffff&size=512&bold=true&format=png`;
+}
+
 export default function BotTesterPage() {
   const { refresh, connected } = useAppData();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,6 +53,9 @@ export default function BotTesterPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [dpFailed, setDpFailed] = useState(false);
   const [error, setError] = useState('');
   const threadRef = useRef<HTMLDivElement>(null);
   const autoSelectedRef = useRef(false);
@@ -110,6 +131,8 @@ export default function BotTesterPage() {
     setSearchParams({ phone });
     setSendMode(mode);
     setError('');
+    setProfileOpen(false);
+    setDpFailed(false);
   }
 
   function startNewChat() {
@@ -131,6 +154,31 @@ export default function BotTesterPage() {
       await loadConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not resume bot.');
+    }
+  }
+
+  async function deleteChat() {
+    if (!selectedPhone || deleting) return;
+    const row = conversations.find((c) => c.phoneNumber === selectedPhone);
+    const label = row?.customerName
+      ? `${row.customerName} (${formatPhoneDisplay(selectedPhone)})`
+      : formatPhoneDisplay(selectedPhone);
+    if (!window.confirm(`Delete chat with ${label}? This removes the message history from the dashboard.`)) {
+      return;
+    }
+    setDeleting(true);
+    setError('');
+    try {
+      await deleteChatConversation(selectedPhone);
+      setMessages([]);
+      setSelectedPhone('');
+      setSearchParams({}, { replace: true });
+      autoSelectedRef.current = false;
+      await loadConversations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete chat.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -158,11 +206,68 @@ export default function BotTesterPage() {
   }
 
   const active = conversations.find((c) => c.phoneNumber === selectedPhone);
+  const profileName = active?.customerName ?? null;
+  const profileDp = selectedPhone ? whatsappDpUrl(profileName, selectedPhone) : '';
+  const profileLetters = selectedPhone ? profileInitials(profileName, selectedPhone) : '?';
 
   return (
     <div className="wa-chats">
+      {profileOpen && selectedPhone && (
+        <div
+          className="wa-dp-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="WhatsApp profile photo"
+          onClick={() => setProfileOpen(false)}
+        >
+          <button
+            type="button"
+            className="wa-dp-close"
+            onClick={() => setProfileOpen(false)}
+            aria-label="Close profile photo"
+          >
+            <X size={22} />
+          </button>
+          <div className="wa-dp-body" onClick={(e) => e.stopPropagation()}>
+            {!dpFailed ? (
+              <img
+                src={profileDp}
+                alt={profileName || formatPhoneDisplay(selectedPhone)}
+                className="wa-dp-photo"
+                onError={() => setDpFailed(true)}
+              />
+            ) : (
+              <div className="wa-dp-fallback">{profileLetters}</div>
+            )}
+            <p className="wa-dp-name">{profileName || formatPhoneDisplay(selectedPhone)}</p>
+            {profileName && (
+              <p className="wa-dp-phone">{formatPhoneDisplay(selectedPhone)}</p>
+            )}
+            <div className="wa-dp-actions">
+              <a
+                href={`https://wa.me/${normalizePhoneInput(selectedPhone)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="wa-dp-action"
+              >
+                Open in WhatsApp
+              </a>
+              {active?.enquiryId && (
+                <Link
+                  to={`/enquiries?id=${encodeURIComponent(active.enquiryId)}`}
+                  className="wa-dp-action wa-dp-action--muted"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  View enquiry
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="wa-chats__header">
-        <MessageCircle size={22} className="text-[var(--primary)] shrink-0" />
+        <WhatsAppIcon size={22} title="WhatsApp" />
         <h1 className="wa-chats__title">WhatsApp Chats</h1>
         {!connected && (
           <p className="wa-chats__offline">API offline — sign in again after the backend is running.</p>
@@ -249,18 +354,35 @@ export default function BotTesterPage() {
         <section className="wa-chats__thread">
           {!selectedPhone ? (
             <div className="wa-chats__empty">
-              <MessageCircle size={48} className="opacity-25 mb-3" />
+              <WhatsAppIcon size={48} className="opacity-40 mb-3" />
               <p className="text-sm text-[var(--muted)]">Select a chat or open a number to start</p>
             </div>
           ) : (
             <>
               <div className="wa-chats__thread-head">
-                <div className="min-w-0">
-                  <p className="font-semibold truncate">{formatPhoneDisplay(selectedPhone)}</p>
-                  {active?.customerName && (
-                    <p className="text-xs text-[var(--muted)] truncate">{active.customerName}</p>
+                <button
+                  type="button"
+                  className="wa-chats__thread-profile"
+                  onClick={() => setProfileOpen(true)}
+                  title="View profile photo"
+                >
+                  {!dpFailed ? (
+                    <img
+                      src={profileDp}
+                      alt=""
+                      className="wa-chats__avatar"
+                      onError={() => setDpFailed(true)}
+                    />
+                  ) : (
+                    <span className="wa-chats__avatar wa-chats__avatar--fallback">{profileLetters}</span>
                   )}
-                </div>
+                  <div className="min-w-0 text-left">
+                    <p className="font-semibold truncate">{formatPhoneDisplay(selectedPhone)}</p>
+                    {active?.customerName && (
+                      <p className="text-xs text-[var(--muted)] truncate">{active.customerName}</p>
+                    )}
+                  </div>
+                </button>
                 <div className="flex items-center gap-2 shrink-0">
                   {active?.botPaused && (
                     <button
@@ -271,6 +393,16 @@ export default function BotTesterPage() {
                       Resume bot
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void deleteChat()}
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-[var(--border)] text-[var(--danger)] hover:bg-[var(--danger-bg)] disabled:opacity-50"
+                    title="Delete chat"
+                  >
+                    <Trash2 size={14} />
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </button>
                 </div>
               </div>
 

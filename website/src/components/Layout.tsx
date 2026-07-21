@@ -1,8 +1,9 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
-  HardHat, FileText, BarChart3, Settings, MessageCircle,
+  HardHat, FileText, BarChart3, Settings,
   PanelLeftClose, PanelLeft, LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -10,16 +11,20 @@ import { useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
 import { CreateActionProvider } from '../context/CreateActionContext';
 import { LayoutProvider, useLayout } from '../context/LayoutContext';
+import { PageSearchProvider } from '../context/PageSearchContext';
 import { BrandLogo } from './BrandLogo';
 import { TopNav } from './TopNav';
 import { AIChatWidget } from './AIChatWidget';
+import { WhatsAppIcon } from './WhatsAppIcon';
 
 type AppDataSlice = ReturnType<typeof useAppData>;
+
+type NavIcon = LucideIcon | typeof WhatsAppIcon;
 
 const navItems: {
   to: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: NavIcon;
   badge?: (d: AppDataSlice) => number | null | undefined;
 }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,7 +35,7 @@ const navItems: {
   { to: '/vendors', label: 'Vendors', icon: Users },
   { to: '/workers', label: 'Workers', icon: HardHat },
   { to: '/invoices', label: 'Invoices', icon: FileText },
-  { to: '/bot-tester', label: 'WhatsApp Chats', icon: MessageCircle },
+  { to: '/bot-tester', label: 'WhatsApp Chats', icon: WhatsAppIcon },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -163,7 +168,9 @@ export function DashboardLayout() {
   return (
     <LayoutProvider>
       <CreateActionProvider>
-        <DashboardLayoutInner />
+        <PageSearchProvider>
+          <DashboardLayoutInner />
+        </PageSearchProvider>
       </CreateActionProvider>
     </LayoutProvider>
   );

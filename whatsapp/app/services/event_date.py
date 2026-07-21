@@ -59,6 +59,11 @@ def _safe_date(year: int, month: int, day: int) -> datetime:
     return datetime(year, month, day, 12, 0, 0)
 
 
+def _start_of_day(when: datetime) -> datetime:
+    """Normalize to noon local (stable calendar-day marker for events)."""
+    return when.replace(hour=12, minute=0, second=0, microsecond=0)
+
+
 def _strip_ordinals(text: str) -> str:
     return re.sub(r"\b(\d{1,2})(?:st|nd|rd|th)\b", r"\1", text.lower())
 

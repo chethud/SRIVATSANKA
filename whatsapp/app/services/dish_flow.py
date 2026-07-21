@@ -46,7 +46,8 @@ def _format_confirmation(session: ConversationSession) -> str:
     )
 
 
-def _resolve_session_selections(text: str) -> list[str]:
+def _resolve_session_selections(text: str) -> list[str] | None:
+    """Return selected meal labels, [] for skip, or None if the reply was unclear."""
     lower = text.strip().lower()
     if lower in {"skip", "0", "none", "no", "later"}:
         return []
@@ -58,13 +59,10 @@ def _resolve_session_selections(text: str) -> list[str]:
             selected.append(SESSION_BY_KEY[k])
 
     for label_key, label in SESSION_BY_LABEL.items():
-        if label_key in lower and label not in selected:
+        if re.search(rf"\b{re.escape(label_key)}\b", lower) and label not in selected:
             selected.append(label)
 
-    if not selected and len(text.strip()) > 2:
-        return [text.strip()[:120]]
-
-    return selected
+    return selected or None
 
 
 def _preferences_to_items(labels: list[str]) -> list[SelectedDishItem]:
@@ -96,6 +94,18 @@ async def handle_dish_flow(
         )
 
     labels = _resolve_session_selections(user_text)
+    if labels is None:
+        reply = (
+            "I didn't catch that. Reply with numbers or names "
+            "(e.g. *1,3* or *breakfast, dinner*), or say *skip*."
+        )
+        session.history.append({"role": "assistant", "content": reply})
+        return AgentTurnResult(
+            reply=reply,
+            fields=session.fields,
+            enquiry_fields_complete=True,
+        )
+
     session.selected_dishes = _preferences_to_items(labels)
     session.phase = ConversationPhase.DONE
     session.completed = True

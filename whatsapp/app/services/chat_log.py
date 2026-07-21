@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Enquiry, WhatsappChatMessage, WhatsappChatState
@@ -68,15 +68,17 @@ async def log_owner_message(db: AsyncSession, phone: str, text: str) -> None:
     await db.commit()
 
 
-async def _customer_name_for_phone(db: AsyncSession, phone: str) -> str | None:
+async def _enquiry_for_phone(db: AsyncSession, phone: str) -> tuple[str | None, str | None]:
     result = await db.execute(
-        select(Enquiry.customerName)
+        select(Enquiry.id, Enquiry.customerName)
         .where(Enquiry.phoneNumber == phone)
         .order_by(desc(Enquiry.createdAt))
         .limit(1)
     )
-    row = result.scalar_one_or_none()
-    return row if row else None
+    row = result.one_or_none()
+    if not row:
+        return None, None
+    return row[0], row[1]
 
 
 async def list_conversations(db: AsyncSession) -> list[dict]:
@@ -99,12 +101,13 @@ async def list_conversations(db: AsyncSession) -> list[dict]:
             .limit(1)
         )
         msg = latest.scalar_one()
-        name = await _customer_name_for_phone(db, phone)
+        enquiry_id, name = await _enquiry_for_phone(db, phone)
         state = await db.get(WhatsappChatState, phone)
         conversations.append(
             {
                 "phoneNumber": phone,
                 "customerName": name,
+                "enquiryId": enquiry_id,
                 "lastMessage": msg.body[:160],
                 "lastRole": msg.role,
                 "lastAt": last_at,
@@ -135,3 +138,23 @@ async def get_messages(db: AsyncSession, phone: str) -> list[dict]:
             }
         )
     return messages
+
+
+async def delete_conversation(db: AsyncSession, phone: str) -> int:
+    """Delete all chat messages and pause state for a phone. Returns deleted message count."""
+    phone = normalize_phone(phone)
+    if not phone:
+        return 0
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(WhatsappChatMessage)
+        .where(WhatsappChatMessage.phoneNumber == phone)
+    )
+    count = int(count_result.scalar_one() or 0)
+    await db.execute(delete(WhatsappChatMessage).where(WhatsappChatMessage.phoneNumber == phone))
+    state = await db.get(WhatsappChatState, phone)
+    if state:
+        await db.delete(state)
+    await db.commit()
+    logger.info("Deleted WhatsApp chat for %s (%s messages)", phone, count)
+    return count
