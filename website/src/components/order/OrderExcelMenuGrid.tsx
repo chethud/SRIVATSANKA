@@ -189,6 +189,7 @@ function SessionBlock({
         order={order}
         column={column}
         dishes={dishes}
+        sessionItems={items}
         onOrderUpdated={onOrderUpdated}
         onDishesCatalogUpdated={onDishesCatalogUpdated}
       />
@@ -385,12 +386,14 @@ function SessionAddDishForm({
   order,
   column,
   dishes,
+  sessionItems,
   onOrderUpdated,
   onDishesCatalogUpdated,
 }: {
   order: Enquiry;
   column: MenuColumn;
   dishes: Dish[];
+  sessionItems: EnquiryDish[];
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
 }) {
@@ -400,12 +403,44 @@ function SessionAddDishForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const usedCatalogIds = new Set(
+    sessionItems.map((d) => d.dishId).filter((id): id is string => Boolean(id)),
+  );
+  const usedNames = new Set(sessionItems.map((d) => d.dishName.trim().toLowerCase()).filter(Boolean));
+
+  const availableDishes = dishes.filter((d) => {
+    if (usedCatalogIds.has(d.id)) return false;
+    if (usedNames.has(d.name.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  function isAlreadyInSession(opts: { dishId?: string; dishName?: string }): boolean {
+    if (opts.dishId && usedCatalogIds.has(opts.dishId)) return true;
+    const name = opts.dishName?.trim().toLowerCase();
+    if (name && usedNames.has(name)) return true;
+    if (opts.dishId) {
+      const catalog = dishes.find((d) => d.id === opts.dishId);
+      if (catalog && usedNames.has(catalog.name.trim().toLowerCase())) return true;
+    }
+    return false;
+  }
+
   async function handleAdd(opts?: { dishIdOverride?: string; dishNameOverride?: string }) {
     setError('');
     const resolvedDishId = opts?.dishIdOverride ?? dishId;
     const customName = (opts?.dishNameOverride ?? customDishName).trim();
     if (!resolvedDishId && !customName) {
       setError('Select a menu item or type a dish name.');
+      return;
+    }
+
+    if (
+      isAlreadyInSession({
+        dishId: resolvedDishId || undefined,
+        dishName: customName || undefined,
+      })
+    ) {
+      setError('This dish is already in this session.');
       return;
     }
 
@@ -437,10 +472,11 @@ function SessionAddDishForm({
   return (
     <div className="excel-session-add">
       <DishSearchSelect
-        dishes={dishes}
+        dishes={availableDishes}
         value={dishId}
         customName={customDishName}
         sessionCategory={column.baseSession}
+        blockedNames={[...usedNames]}
         onChange={setDishId}
         onCustomNameChange={setCustomDishName}
         onConfirmCustom={(name) => {

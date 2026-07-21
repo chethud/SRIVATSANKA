@@ -7,6 +7,7 @@ export function DishSearchSelect({
   value,
   customName = '',
   sessionCategory,
+  blockedNames,
   onChange,
   onCustomNameChange,
   onSelectDish,
@@ -18,6 +19,8 @@ export function DishSearchSelect({
   customName?: string;
   /** Prefer dishes from this meal session (e.g. Lunch) in suggestions */
   sessionCategory?: string;
+  /** Dish names already in this session (lowercase) — block re-adding */
+  blockedNames?: string[];
   onChange: (dishId: string) => void;
   onCustomNameChange?: (name: string) => void;
   onSelectDish?: (dish: Dish | null) => void;
@@ -33,6 +36,11 @@ export function DishSearchSelect({
   const trimmedQuery = query.trim();
   const hasCustom = Boolean(customName.trim()) && !value;
   const sessionKey = (sessionCategory ?? '').trim().toLowerCase();
+  const blocked = useMemo(
+    () => new Set((blockedNames ?? []).map((n) => n.trim().toLowerCase()).filter(Boolean)),
+    [blockedNames],
+  );
+  const queryBlocked = Boolean(trimmedQuery) && blocked.has(trimmedQuery.toLowerCase());
 
   const filtered = useMemo(() => {
     const q = trimmedQuery.toLowerCase();
@@ -82,6 +90,7 @@ export function DishSearchSelect({
 
   function commitTypedName() {
     if (!trimmedQuery) return;
+    if (blocked.has(trimmedQuery.toLowerCase())) return;
     const exact = filtered.find((d) => d.name.toLowerCase() === trimmedQuery.toLowerCase());
     if (exact) {
       pick(exact);
@@ -186,7 +195,14 @@ export function DishSearchSelect({
                 );
               })
             )}
-            {trimmedQuery && filtered.every((d) => d.name.toLowerCase() !== trimmedQuery.toLowerCase()) && (
+            {queryBlocked && (
+              <li className="px-3 py-2 text-[var(--muted)] border-t border-[var(--border)]">
+                Already added in this session
+              </li>
+            )}
+            {trimmedQuery &&
+              !queryBlocked &&
+              filtered.every((d) => d.name.toLowerCase() !== trimmedQuery.toLowerCase()) && (
               <li className="border-t border-[var(--border)]">
                 <button
                   type="button"
