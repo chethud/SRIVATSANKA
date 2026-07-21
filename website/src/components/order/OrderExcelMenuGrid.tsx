@@ -12,7 +12,6 @@ import { DishSearchSelect } from '../DishSearchSelect';
 import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
 import { serializeOrderNotes, toDateInputValue, type OrderExtras } from '../../utils/orderNotes';
-import { DEFAULT_MEAL_TIMES } from '../../utils/mealSessions';
 import { resolveSessionTabs } from '../../utils/mealSessions';
 import {
   dishesForColumn,
@@ -223,28 +222,21 @@ function EmptySessionCard({
   onOrderUpdated: (order: Enquiry) => void;
 }) {
   const defaultDate = extras.scheduleDateFrom ?? toDateInputValue(order.eventDate);
-  const defaultTimes = extras.mealSchedules?.[activeSession] ?? DEFAULT_MEAL_TIMES[activeSession] ?? {
-    timeFrom: '',
-    timeTo: '',
-  };
   const [columnDate, setColumnDate] = useState(defaultDate);
   const [columnPax, setColumnPax] = useState('');
-  const [sessionTimeFrom, setSessionTimeFrom] = useState(defaultTimes.timeFrom ?? '');
-  const [sessionTimeTo, setSessionTimeTo] = useState(defaultTimes.timeTo ?? '');
+  const [sessionTimeFrom, setSessionTimeFrom] = useState('');
+  const [sessionTimeTo, setSessionTimeTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setColumnDate(extras.scheduleDateFrom ?? toDateInputValue(order.eventDate));
-    const times = extras.mealSchedules?.[activeSession] ?? DEFAULT_MEAL_TIMES[activeSession] ?? {
-      timeFrom: '',
-      timeTo: '',
-    };
-    setSessionTimeFrom(times.timeFrom ?? '');
-    setSessionTimeTo(times.timeTo ?? '');
+    // Fresh session: start with empty times so minutes are chosen explicitly (not stuck on 00)
+    setSessionTimeFrom('');
+    setSessionTimeTo('');
     setColumnPax('');
     setError('');
-  }, [activeSession, extras, order.eventDate]);
+  }, [activeSession, extras.scheduleDateFrom, order.eventDate]);
 
   async function saveSession() {
     setError('');
@@ -259,8 +251,8 @@ function EmptySessionCard({
     }
     const from = sessionTimeFrom.trim();
     const to = sessionTimeTo.trim();
-    if ((from && !to) || (!from && to)) {
-      setError('Enter both start and end time, or leave both empty.');
+    if (!from || !to) {
+      setError('Set start and end time (hour and minutes).');
       return;
     }
 
@@ -361,7 +353,7 @@ function EmptySessionCard({
           {saving ? 'Saving…' : 'Save session'}
         </Button>
         <p className="excel-session-empty">
-          Save this session first. You can add dishes after it appears.
+          Set date, pax, and time (including minutes), then Save session. Add dishes after it saves.
         </p>
         {error && <p className="excel-session-add-error">{error}</p>}
       </div>

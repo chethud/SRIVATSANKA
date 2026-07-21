@@ -896,9 +896,16 @@ body {
   text-align: center;
 }
 
+.ampm-time-minute {
+  width: 3.5rem;
+  min-width: 3.5rem;
+  padding-left: 0.25rem;
+  padding-right: 0.15rem;
+}
+
 .ampm-time-period {
-  width: 3.25rem;
-  min-width: 3.25rem;
+  width: 3.5rem;
+  min-width: 3.5rem;
 }
 
 .ampm-time-sep {
@@ -913,9 +920,14 @@ body {
   min-width: 2.5rem;
 }
 
+.excel-meta-ampm .ampm-time-minute {
+  width: 3.25rem;
+  min-width: 3.25rem;
+}
+
 .excel-meta-ampm .ampm-time-period {
-  width: 3rem;
-  min-width: 3rem;
+  width: 3.25rem;
+  min-width: 3.25rem;
 }
 
 .excel-session-dishes {
