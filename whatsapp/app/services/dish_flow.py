@@ -30,37 +30,31 @@ def _parse_numbers(text: str) -> list[str]:
 def _format_session_prompt() -> str:
     lead = random.choice(
         (
-            "Almost there — which meals are you thinking of? Numbers or names both work:",
-            "Before we wrap up, which meal services would you like us to plan for?",
-            "Quick one — which of these meals should we keep in mind?",
+            "Almost there — which meals do you need?",
+            "Which meal services should we plan for?",
+            "Quick one — which meals?",
         )
     )
     lines = [lead, ""]
     for key, label in MEAL_SESSION_OPTIONS:
         lines.append(f"{key}. {label}")
-    lines.append("\nOr just say *skip* if you'd rather decide on the call — no problem at all.")
+    lines.append("\nReply with numbers/names, or say *skip*.")
     return "\n".join(lines)
 
 
 def _format_confirmation(session: ConversationSession) -> str:
     f = session.fields
     name = f.customer_name or "there"
-    occasion = (f.event_type or "celebration").lower()
-    if occasion == "general":
-        occasion = "celebration"
     meals = (
         ", ".join(d.dish_name for d in session.selected_dishes)
         if session.selected_dishes
-        else "we'll suggest options on the call"
+        else "to discuss on the call"
     )
     return random.choice(
         (
-            f"Wonderful, *{name}*! ✅ We've noted *{meals}* for your {occasion}. "
-            f"Our team will call around {f.preferred_callback}. Looking forward to it — send *new* anytime.",
-            f"All set, *{name}*! Meals: *{meals}*. "
-            f"We'll ring you around {f.preferred_callback} about your {occasion}. Talk soon 🌿",
-            f"Thank you, *{name}*. Your {occasion} enquiry is with us — meals noted as *{meals}*. "
-            f"We'll call around {f.preferred_callback}.",
+            f"Perfect, *{name}*! Noted *{meals}*. We'll call around {f.preferred_callback}.",
+            f"All set ✅ Meals: *{meals}*. Talk soon around {f.preferred_callback}.",
+            f"Got it, *{name}*. We'll ring you around {f.preferred_callback}.",
         )
     )
 
@@ -115,8 +109,7 @@ async def handle_dish_flow(
     labels = _resolve_session_selections(user_text)
     if labels is None:
         reply = (
-            "Hmm, didn’t quite get that — try numbers or names "
-            "(e.g. *1,3* or *breakfast, dinner*), or just say *skip*."
+            "Hmm, didn’t quite get that — try *1,3* or *breakfast, dinner*, or say *skip*."
         )
         session.history.append({"role": "assistant", "content": reply})
         return AgentTurnResult(

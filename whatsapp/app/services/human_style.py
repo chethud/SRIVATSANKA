@@ -1,4 +1,4 @@
-"""Human-like WhatsApp consultant voice — shared rules + copy helpers."""
+"""Human-like WhatsApp consultant voice — short, natural chat copy."""
 
 from __future__ import annotations
 
@@ -7,49 +7,39 @@ import re
 
 from app.data.company_knowledge import COMPANY
 
-# Injected into Gemini system prompts (highest priority for tone).
-HUMAN_CONSULTANT_STYLE = f"""# HUMAN-LIKE CONVERSATION (HIGHEST PRIORITY)
+# Injected into Gemini system prompts (highest priority for tone + length).
+HUMAN_CONSULTANT_STYLE = f"""# SHORT & NATURAL RESPONSE STYLE (HIGHEST PRIORITY)
 
-You are an experienced catering consultant for {COMPANY['brand_name']} on WhatsApp.
-The customer must feel they are chatting with a real Srivatsanka team member — never a chatbot.
+You are an experienced celebration consultant for {COMPANY['brand_name']} on WhatsApp
+(catering, décor, rituals, venues, and guest hospitality).
+Every reply must feel like a real human WhatsApp chat — never a chatbot or support script.
 
-Write naturally, like a real person. Avoid robotic or scripted wording.
-Never repeat the same sentence structure every turn. Every reply should feel unique.
+## LENGTH (STRICT)
+- Ideal: 1–3 short sentences.
+- Most replies: under 40 words.
+- Greeting: 10–20 words. Simple answer: 5–20 words. Answer + next question: 15–35 words.
+- Longer only if they ask for detailed info (still under ~100 words).
+- No long paragraphs. No walls of text. Do not dump lists of services unless asked.
 
-## UNDERSTAND BEFORE RESPONDING
-For every message:
-1. Read carefully.
-2. Understand the meaning.
-3. Identify all information they shared.
-4. Answer any questions (if they asked 2–3, answer ALL first).
-5. Show understanding / acknowledge what they said.
-6. Only then continue the enquiry naturally.
+## UNDERSTAND → ACKNOWLEDGE → ANSWER → CONTINUE
+1. Read carefully and understand first.
+2. Acknowledge what they said (briefly).
+3. Answer any questions (if they asked several, answer ALL briefly).
+4. Only then continue the enquiry if needed — one short question max.
 
-Never jump to the next enquiry question without acknowledging what they said.
-Never ignore what they just told you.
+Never jump to the next question without acknowledging them.
+Never re-greet every turn. Never repeat info they already know.
+Use "your wedding" (etc.) once known — not generic "event".
 
-## ACTIVE LISTENING
-Acknowledge specifics: dates, occasions, areas, names, concerns.
-Use details already shared (say "your wedding" not "your event" when you know it's a wedding).
+## VOICE
+Write like WhatsApp: simple everyday language. Vary wording — never the same phrase every turn.
+Prefer: Got it. / Sounds good. / Absolutely. / Certainly. / No problem. / Happy to help. /
+Of course. / Perfect. / Great. / Thanks for sharing. / I understand. / That sounds wonderful. / No worries.
 
-## CONVERSATION FLOW
-Do NOT make every response follow Answer → Question.
-Sometimes: Acknowledgement → Answer → short conversational line → Question.
-Not every message must advance the enquiry — if they small-talk, respond warmly, then gently continue.
-If they are undecided or browsing, be patient — do not pressure for details.
+Never say: "Thank you for contacting…", "Kindly provide", "Your information has been recorded",
+"Please wait while I process", "I am an AI", "Input received", "delighted to assist you with your enquiry".
 
-## EMPATHY & MIRRORING
-Match excitement, reassure worry, explain patiently if confused, keep it short if they seem busy.
-If they write briefly, reply briefly. If detailed, reply with similar detail.
-Casual ↔ politely casual. Formal ↔ formal.
-
-## NEVER SOUND LIKE A FORM OR BOT
-Never say: "I have recorded your response", "I am processing", "According to the system",
-"Please provide the required information", "I am an AI", "Input received", "Kindly".
-Prefer: Thank you for sharing that / Got it / That helps / I understand / Certainly / Happy to help.
-
-## LENGTH
-Most replies 20–70 words. Short sentences. No walls of text. At most one emoji, only if natural.
+If a short answer is enough, stop. At most one emoji, only if it fits.
 Never claim to be a bot or AI.
 """
 
@@ -109,17 +99,19 @@ def is_small_talk(text: str) -> bool:
 def soft_ack() -> str:
     return random.choice(
         (
-            "Certainly.",
+            "Got it.",
             "Sounds good.",
             "Absolutely.",
+            "Certainly.",
             "Sure.",
             "Of course.",
-            "No worries.",
+            "No problem.",
             "Happy to help.",
-            "That works.",
-            "Great.",
             "Perfect.",
-            "Thank you for letting me know.",
+            "Great.",
+            "No worries.",
+            "Thanks for sharing.",
+            "I understand.",
         )
     )
 
@@ -127,9 +119,10 @@ def soft_ack() -> str:
 def thanks_reply() -> str:
     return random.choice(
         (
-            "You're most welcome! Let me know if there's anything else I can help you with.",
-            "My pleasure! Happy to help anytime.",
-            "You're welcome — reach out whenever you need us.",
+            "You're welcome!",
+            "Anytime 🙂",
+            "Happy to help!",
+            "My pleasure!",
         )
     )
 
@@ -137,19 +130,19 @@ def thanks_reply() -> str:
 def undecided_reply() -> str:
     return random.choice(
         (
-            "No problem at all. Take your time. If there's anything you'd like to know about our catering, I'm happy to help.",
-            "That's completely fine — no rush. Feel free to ask about our menus, experience, or anything else.",
-            "Of course. Whenever you're ready, we're here. Happy to answer any questions in the meantime.",
+            "No problem — take your time. Happy to answer any questions.",
+            "No rush at all. Ask me anything about our catering.",
+            "Of course. We're here whenever you're ready.",
         )
     )
 
 
 def small_talk_reply(*, event_label: str | None = None) -> str:
-    occasion = event_label or "your celebration"
+    occasion = (event_label or "your celebration").lower()
     return random.choice(
         (
-            f"I'm doing well, thank you for asking! I hope you're having a good day too.\n\nHow can I help with {occasion} today?",
-            f"Doing great, thanks! Hope you are too 🌿\n\nWhat would you like to know about {occasion}?",
+            f"Doing well, thanks! How can I help with {occasion}?",
+            f"Great, thanks for asking 🙂 What would you like to know?",
         )
     )
 
@@ -158,42 +151,35 @@ def welcome_message() -> str:
     brand = COMPANY["brand_name"]
     return random.choice(
         (
-            f"Hello! Welcome to *{brand}*. I'm happy to assist you today.\nMay I know your name?",
-            f"Hi there! Welcome to *{brand}* 🌿 Happy to help you plan your celebration.\nMay I know your name?",
-            f"Hello! Thanks for messaging *{brand}*.\nWho am I speaking with today?",
+            f"Hi! Welcome to *{brand}* 😊\nMay I know your name?",
+            f"Hello! Happy to help with *{brand}*.\nWhat's your name?",
+            f"Hi there! Thanks for messaging *{brand}*.\nWho am I speaking with?",
         )
     )
 
 
 def acknowledge_opening_without_name(text: str, event_type: str | None) -> str:
-    """First message shared occasion/details but no name — acknowledge, then ask name."""
-    brand = COMPANY["brand_name"]
-    lower = text.lower()
+    """First message shared occasion/details but no name — short ack, then ask name."""
     if event_type and event_type != "General":
         label = event_type.lower()
-        if "december" in lower or "wedding" in lower:
-            return random.choice(
-                (
-                    f"That sounds wonderful! We'd be happy to help make your {label} special.\nMay I know your name?",
-                    f"Lovely — a {label} is such a special occasion. We're glad you reached out to *{brand}*.\nMay I know your name?",
-                )
-            )
         return random.choice(
             (
-                f"Wonderful! We'd love to help with your {label}.\nMay I know your name?",
-                f"That sounds great — happy to assist with your {label}.\nCould I have your name, please?",
+                f"That sounds wonderful! Happy to help with your {label}.\nMay I know your name?",
+                f"Lovely — we'd love to help with your {label}.\nWhat's your name?",
+                f"Great! We can help with your {label}.\nWho am I speaking with?",
             )
         )
+    brand = COMPANY["brand_name"]
     return random.choice(
         (
-            f"Hi! Welcome to *{brand}* 🌿 Happy to help.\nMay I know your name?",
-            f"Hello! Thanks for reaching out to *{brand}*.\nWho am I speaking with?",
+            f"Hi! Happy to help with *{brand}*.\nMay I know your name?",
+            f"Hello! Thanks for reaching out.\nWhat's your name?",
         )
     )
 
 
 def detail_question(field_key: str, *, event_type: str | None = None) -> str:
-    """Varied, non-form questions for enquiry fields."""
+    """Short, varied enquiry questions."""
     occasion = (event_type or "celebration").lower()
     if occasion == "general":
         occasion = "celebration"
@@ -201,65 +187,62 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
     if field_key == "event_date":
         return random.choice(
             (
-                f"May I know when your {occasion} is planned?",
-                f"When is the {occasion} scheduled?",
-                f"Could you tell me the date for your {occasion}?",
-                f"When are you planning the {occasion}?",
+                f"When is your {occasion} planned?",
+                f"When's the {occasion}?",
+                f"What date works for your {occasion}?",
             )
         )
     if field_key == "event_location":
         return random.choice(
             (
-                "May I know which area in Bengaluru the venue will be in?",
-                "Which part of Bengaluru will the function be held?",
-                "Could you share the venue area in Bengaluru?",
-                "Where in Bengaluru is the celebration taking place?",
+                "Which area in Bengaluru is the venue?",
+                "Where in Bengaluru will it be held?",
+                "Which part of Bengaluru is the venue in?",
             )
         )
     if field_key == "preferred_callback":
         return random.choice(
             (
-                "When would be a good time for our team to give you a quick call?",
-                "What time works best for a short call from our team?",
-                "When should we ring you to discuss the details?",
-                "When's convenient for a quick callback?",
+                "When's a good time for a quick call?",
+                "What time should we call you?",
+                "When works for a short callback?",
             )
         )
-    return "Could you share a bit more when you have a moment?"
+    return "Could you share a bit more?"
 
 
 def acknowledge_field(field_key: str, value: str, *, event_type: str | None = None) -> str:
-    """Content-aware acknowledgement before the next question."""
+    """Short content-aware acknowledgement."""
     occasion = (event_type or "celebration").lower()
     if occasion == "general":
         occasion = "celebration"
     v = value.strip()
-
+    # Keep acknowledgements tiny — often just soft_ack or a few words
     if field_key == "event_date":
         return random.choice(
             (
-                f"Wonderful, thank you for sharing your {occasion} date.",
-                f"Perfect — noted for {v}.",
-                f"Thank you for letting me know about {v}.",
-                f"That helps — {v} sounds lovely.",
+                "Got it.",
+                f"Perfect — {v}.",
+                f"Thanks for sharing your {occasion} date.",
+                "That sounds wonderful.",
             )
         )
     if field_key == "event_location":
         return random.choice(
             (
-                f"Got it — {v} works well for us.",
-                f"Thank you for sharing the venue area ({v}).",
-                f"Understood, {v}. That helps.",
-                f"Perfect, noted {v}.",
+                f"Got it — {v}.",
+                "Sounds good.",
+                f"Perfect, {v}.",
+                "Thanks!",
             )
         )
     if field_key == "preferred_callback":
         return random.choice(
             (
-                f"Certainly — we'll aim for {v}.",
-                f"Sounds good, thank you for letting me know ({v}).",
-                f"Perfect, we'll call around then.",
-                f"Absolutely — noted for {v}.",
+                f"Perfect — {v}.",
+                "Sounds good.",
+                "Absolutely.",
+                "Got it.",
             )
         )
     return soft_ack()
@@ -273,22 +256,17 @@ def natural_field_ack(
     event_type: str | None = None,
 ) -> str:
     ack = acknowledge_field(field_key, value, event_type=event_type)
-    # Vary structure: sometimes one line, sometimes two.
-    if random.random() < 0.45:
-        return f"{ack}\n\n{next_prompt}"
+    if random.random() < 0.5:
+        return f"{ack}\n{next_prompt}"
     return f"{ack} {next_prompt}"
 
 
 def continue_hint(*, event_type: str | None = None) -> str:
-    occasion = (event_type or "celebration").lower()
-    if occasion == "general":
-        occasion = "celebration"
     return random.choice(
         (
-            f"Ask me anything about our catering, or say when you're ready to share the date and venue for your {occasion}.",
-            "Happy to answer questions — or we can note the date and location whenever you're ready.",
-            f"Feel free to ask more about your {occasion}, or we can continue with a couple of quick details.",
-            "Any questions at all? Or shall we note the date and venue next?",
+            "Any questions, or shall we note the date next?",
+            "Ask me anything — or say when you're ready to continue.",
+            "Happy to answer questions, or we can take a few details next.",
         )
     )
 

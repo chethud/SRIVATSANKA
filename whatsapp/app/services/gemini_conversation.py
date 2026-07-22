@@ -36,9 +36,13 @@ def _build_chat_history(session: ConversationSession) -> list[dict]:
 NATURAL_STYLE = HUMAN_CONSULTANT_STYLE
 
 
-def trim_whatsapp_reply(text: str, max_chars: int = 420) -> str:
-    """Keep bot replies concise — WhatsApp should feel like texting, not email."""
+def trim_whatsapp_reply(text: str, max_chars: int = 280) -> str:
+    """Keep bot replies short — WhatsApp chat style (~40 words)."""
     text = re.sub(r"\n{3,}", "\n\n", (text or "").strip())
+    # Soft word cap when not asking for detail
+    words = text.split()
+    if len(words) > 55 and len(text) > max_chars:
+        text = " ".join(words[:50]).rstrip(".,;") + "…"
     if len(text) <= max_chars:
         return text
     chunk = text[:max_chars]
@@ -64,7 +68,7 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
             model = genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_instruction,
-                generation_config=genai.GenerationConfig(temperature=0.9, max_output_tokens=220),
+                generation_config=genai.GenerationConfig(temperature=0.9, max_output_tokens=140),
             )
             chat = model.start_chat(history=_build_chat_history(session))
             response = chat.send_message(user_text)
@@ -91,7 +95,8 @@ def _showcase_system(session: ConversationSession, *, sharing_photos: bool = Fal
         if sharing_photos
         else "\nDo NOT send or mention sharing photos unless the customer explicitly asked."
     )
-    return f"""You are an experienced human catering consultant for {COMPANY['brand_name']} on WhatsApp.
+    return f"""You are an experienced celebration consultant for {COMPANY['brand_name']} on WhatsApp
+(catering, décor, pooja/rituals, venues, guest hospitality).
 You work with {COMPANY['managing_director']}'s team in Bengaluru.
 
 Chatting with *{name}* about their *{event}* — refer to it as their {event.lower()} when natural, not a generic "event".
@@ -101,11 +106,12 @@ Chatting with *{name}* about their *{event}* — refer to it as their {event.low
 {NATURAL_STYLE}
 
 RIGHT NOW
-- Acknowledge what they said, then answer fully (if multiple questions, answer all).
-- Use website knowledge for company / service answers.
-- Do NOT rush into date, venue, or callback unless they ask what you need next or clearly want to continue.
-- If undecided or only browsing, be patient and helpful — no pressure.
-- If they seem ready, gently offer to note date & venue next.{photo_note}"""
+- Keep it short (under 40 words unless they asked for detail).
+- Answer ONLY from the website knowledge above (services, menus, rituals, venues, Eat Rep Eat, FAQs).
+- Acknowledge briefly, answer fully if they asked questions, then at most one gentle next step.
+- Do NOT rush into date/venue/callback unless they ask what you need next or clearly want to continue.
+- If undecided or browsing, be patient — no pressure.
+- If ready, offer to note date & venue next in one short line.{photo_note}"""
 
 
 def _collect_details_system(session: ConversationSession, next_prompt: str | None) -> str:
@@ -125,10 +131,11 @@ Still helpful to know: {pending}
 {NATURAL_STYLE}
 
 RIGHT NOW
-- Acknowledge specifics they just shared before asking anything else.
-- If they asked something else, answer that first — then gently ask for: {pending}
-- Do NOT invent dates, locations, or callback times they didn't say.
-- Never sound like a form checklist."""
+- Keep replies under 40 words when possible.
+- Acknowledge specifics they just shared, then ask for: {pending}
+- If they asked something else, answer briefly first — then one short ask for {pending}
+- Do NOT invent dates, locations, or callback times.
+- Never sound like a form."""
 
 
 async def generate_showcase_reply(

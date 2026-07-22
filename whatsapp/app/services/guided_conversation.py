@@ -1,8 +1,15 @@
-"""Conversational replies during guided WhatsApp enquiry (Gemini + fallback)."""
+"""Conversational replies during guided WhatsApp enquiry (Gemini + website knowledge)."""
 
 import logging
 
-from app.data.company_knowledge import COMPANY, EVENT_TYPE_DETAILS, POPULAR_DISHES
+from app.data.company_knowledge import (
+    COMPANY,
+    POPULAR_DISHES,
+    WEBSITE_URL,
+    match_service_key,
+    service_answer,
+    short_services_reply,
+)
 from app.services.conversation_turns import customer_wants_to_proceed, natural_continue_hint
 from app.services.gemini_conversation import (
     generate_details_phase_reply,
@@ -30,34 +37,48 @@ def _fallback_answer(
     sharing_photos: bool = False,
 ) -> str:
     name = session.fields.customer_name or "there"
-    event = session.fields.event_type or "celebrations"
+    event = session.fields.event_type or "celebration"
     occasion = event if event != "General" else "celebration"
-    details = EVENT_TYPE_DETAILS.get(event, EVENT_TYPE_DETAILS["General"])
-    hook = details.get("short_reply") or "Happy to help!"
     t = user_text.lower()
     hint = natural_continue_hint(event_type=session.fields.event_type)
 
     if sharing_photos or customer_wants_photos(user_text):
-        return f"Of course — sharing a few photos from similar celebrations 👇 {hint}"
+        return f"Sure — sharing a few photos from our site 👇 {hint}"
+
+    service_key = match_service_key(user_text)
+    if service_key:
+        return service_answer(service_key)
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We're *{COMPANY['brand_name']}* — pure veg celebrations in Bengaluru since {COMPANY['established']}. "
-            f"Happy to tell you more. {hint}"
+            f"We're *{COMPANY['brand_name']}* — catering & celebration services in Bengaluru "
+            f"since {COMPANY['established']}. More at {WEBSITE_URL}"
         )
 
-    if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio")):
-        return f"We've been part of hundreds of celebrations around Bengaluru. {hook} {hint}"
-
-    if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
+    if any(w in t for w in ("eat rep", "eat repeat", "restaurant", "dining")):
         return (
-            f"Pricing depends on the menu and guest count for your {occasion.lower()} — "
-            f"easiest to walk through on a quick call. {hint}"
+            f"That's *Eat Rep Eat* — our vegetarian experience center at N R Colony. "
+            f"Hours {COMPANY['eat_rep_eat_hours']}. {COMPANY['eat_rep_eat_url']}"
         )
 
-    if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "service")):
+    if any(w in t for w in ("how many", "work", "done", "experience", "portfolio", "1000")):
+        return f"We've supported many celebrations in Bengaluru, including large gatherings (1000+). {hint}"
+
+    if any(w in t for w in ("price", "cost", "charge", "budget", "rate", "quote")):
+        return (
+            f"Pricing depends on menu & guest count for your {occasion.lower()} — "
+            f"easiest on a quick call. {hint}"
+        )
+
+    if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "live counter", "live station")):
         dishes = ", ".join(POPULAR_DISHES[:3])
-        return f"We're fully vegetarian — favourites include {dishes}, and there's plenty more. {hint}"
+        return f"Fully vegetarian — {dishes}, plus live counters. {hint}"
+
+    if any(w in t for w in ("contact", "phone", "number", "email", "address", "location of")):
+        return f"Call {COMPANY['phone']} or email {COMPANY['email']}. We're at {COMPANY['address']}."
+
+    if "service" in t or "offer" in t or "what do you" in t:
+        return short_services_reply()
 
     return f"Happy to help, *{name}*! {hint}"
 
@@ -70,7 +91,7 @@ async def _gemini_or_fallback(
     sharing_photos: bool = False,
 ) -> str:
     if not is_gemini_configured():
-        logger.warning("GEMINI_API_KEY not set — using template reply for: %s", user_text[:80])
+        logger.warning("GEMINI_API_KEY not set — using website knowledge reply for: %s", user_text[:80])
         return _fallback_answer(session, user_text, sharing_photos=sharing_photos)
 
     try:

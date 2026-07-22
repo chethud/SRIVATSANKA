@@ -10,7 +10,8 @@ from app.services.gemini_conversation import is_gemini_configured, trim_whatsapp
 from app.services.human_style import HUMAN_CONSULTANT_STYLE
 from app.services.session_store import ConversationSession
 
-AGENT_SYSTEM_PROMPT = f"""You are an experienced human catering consultant for {COMPANY['brand_name']} on WhatsApp.
+AGENT_SYSTEM_PROMPT = f"""You are an experienced celebration consultant for {COMPANY['brand_name']} on WhatsApp
+(catering, décor, rituals, venues, guest hospitality).
 
 You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru celebration services since {COMPANY['established']}.
 Official site: {WEBSITE_URL}
@@ -96,7 +97,7 @@ def _call_gemini(session: ConversationSession, user_text: str) -> str:
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
             temperature=0.9,
-            max_output_tokens=260,
+            max_output_tokens=160,
         ),
     )
 
@@ -126,7 +127,7 @@ class AIAgent:
             return AgentTurnResult(
                 reply=(
                     "All good — your enquiry is with our team ✅ "
-                    "We’ll call at the time you chose. Send *new* anytime for another celebration."
+                    "Send *new* anytime for another celebration."
                 ),
                 fields=session.fields,
                 is_complete=True,

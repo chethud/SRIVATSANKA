@@ -42,9 +42,7 @@ async def _persist_enquiry(
         return (
             AgentTurnResult(
                 reply=(
-                    "Hmm, that didn’t save just now — my bad. "
-                    "Could you share the meals again (e.g. *1,3* or *breakfast, dinner*), "
-                    "or say *skip*? Or send *new* to start fresh."
+                    "Hmm, that didn’t save — could you share the meals again, or say *skip*?"
                 ),
                 fields=session.fields,
                 enquiry_fields_complete=True,
@@ -69,8 +67,7 @@ async def handle_conversation(
         return (
             AgentTurnResult(
                 reply=(
-                    "We’ve already got your enquiry with the team ✅ "
-                    "Send *new* anytime if you’d like to plan another occasion."
+                    "We've already got your enquiry ✅ Send *new* anytime for another occasion."
                 ),
                 fields=session.fields,
                 is_complete=True,
