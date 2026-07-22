@@ -40,8 +40,9 @@ Never say: "Thank you for contacting…", "Kindly provide", "Your information ha
 
 If a short answer is enough, stop. At most one emoji, only if it fits.
 Never claim to be a bot or AI.
-Never output internal labels, markdown headings, or words like RULES / COMPANY / FAQS.
+Never output internal labels, markdown headings, or words like RULES / COMPANY / FAQS / Requirements / Tone.
 Never dump lists unless the customer asked for a list.
+Never continue a reply with instruction headings — stop after the customer-facing answer.
 """
 
 
@@ -120,7 +121,6 @@ def soft_ack() -> str:
 def normalize_customer_text(text: str) -> str:
     """Fix common WhatsApp typos before understanding intent."""
     t = (text or "").lower().strip()
-    # digit-for-letter typos: mor3 -> more, forther already text
     replacements = (
         (r"\bmor3\b", "more"),
         (r"\bm0re\b", "more"),
@@ -128,16 +128,22 @@ def normalize_customer_text(text: str) -> str:
         (r"\bdetials\b", "details"),
         (r"\bdetial\b", "detail"),
         (r"\bdetals\b", "details"),
+        (r"\bderails\b", "details"),
+        (r"\bderail\b", "detail"),
+        (r"\bdetaills\b", "details"),
         (r"\bforther\b", "further"),
         (r"\bfurthur\b", "further"),
         (r"\bfurtherr\b", "further"),
         (r"\bweding\b", "wedding"),
         (r"\bweddign\b", "wedding"),
         (r"\bmarraige\b", "marriage"),
+        (r"\bfoof\b", "food"),
+        (r"\bfod\b", "food"),
+        (r"\bfoood\b", "food"),
+        (r"\bmenue\b", "menu"),
         (r"\bpls\b", "please"),
         (r"\bplz\b", "please"),
         (r"\bkno\b", "know"),
-        (r"\b kno w\b", " know "),
         (r"\binfo+m?ation\b", "information"),
         (r"\bphtos\b", "photos"),
         (r"\bphto\b", "photo"),
@@ -145,10 +151,28 @@ def normalize_customer_text(text: str) -> str:
     )
     for pat, repl in replacements:
         t = re.sub(pat, repl, t)
-    # mor3details / moredetails glued
     t = re.sub(r"\bmor3\s*", "more ", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
+    # Fuzzy near-misses for details/food on single tokens
+    fixed: list[str] = []
+    for word in t.split():
+        if word in {"details", "detail", "food", "more", "further", "wedding"}:
+            fixed.append(word)
+            continue
+        if _near(word, ("details", "detail", "derails")):
+            fixed.append("details")
+        elif _near(word, ("food", "foof", "menu")):
+            fixed.append("food")
+        else:
+            fixed.append(word)
+    return re.sub(r"\s+", " ", " ".join(fixed)).strip()
+
+
+def _near(word: str, options: tuple[str, ...], cutoff: float = 0.75) -> bool:
+    import difflib
+
+    if len(word) < 3:
+        return False
+    return bool(difflib.get_close_matches(word, list(options), n=1, cutoff=cutoff))
 
 
 def wants_more_info(text: str) -> bool:
@@ -167,6 +191,8 @@ def wants_more_info(text: str) -> bool:
         "about the",
         "about event",
         "about events",
+        "about food",
+        "about menu",
         "explain",
         "what all",
         "what do you include",
@@ -177,8 +203,9 @@ def wants_more_info(text: str) -> bool:
     )
     if any(c in t for c in cues):
         return True
-    # "yeah i need more" / "i want details"
-    if re.search(r"\b(need|want|give|share|tell)\b.*\b(more|detail|info|information)\b", t):
+    if re.search(r"\b(need|want|give|share|tell|just)\b.*\b(more|detail|info|information|food|menu)\b", t):
+        return True
+    if re.search(r"\b(about|just)\s+(food|menu|decor|décor|pooja|venue)", t):
         return True
     return False
 
@@ -282,9 +309,10 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
     if field_key == "event_date":
         return random.choice(
             (
-                f"When is your {occasion} planned?",
-                f"When's the {occasion}?",
-                f"What date works for your {occasion}?",
+                f"When is your {occasion}?",
+                f"When’s your {occasion} planned?",
+                f"What date is your {occasion}?",
+                f"When are you planning your {occasion}?",
             )
         )
     if field_key == "event_location":
@@ -298,7 +326,7 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
     if field_key == "preferred_callback":
         return random.choice(
             (
-                "When's a good time for a quick call?",
+                "When’s a good time for a quick call?",
                 "What time should we call you?",
                 "When works for a short callback?",
             )
@@ -307,42 +335,16 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
 
 
 def acknowledge_field(field_key: str, value: str, *, event_type: str | None = None) -> str:
-    """Short content-aware acknowledgement — never echo long / messy customer text."""
-    occasion = (event_type or "celebration").lower()
-    if occasion == "general":
-        occasion = "celebration"
+    """Short acknowledgement — avoid echoing long/messy customer text."""
     v = (value or "").strip()
-    # Don't repeat sentences, typos, or long dumps back to the customer
-    if len(v) > 28 or len(v.split()) > 4 or re.search(r"[?]|(need|more|detail|know|tell)", v, re.I):
+    if len(v) > 20 or len(v.split()) > 3 or re.search(r"[?]|(need|more|detail|know|tell)", v, re.I):
         return soft_ack()
-
     if field_key == "event_date":
-        return random.choice(
-            (
-                "Got it.",
-                f"Perfect — {v}.",
-                f"Thanks for sharing your {occasion} date.",
-                "That sounds wonderful.",
-            )
-        )
+        return random.choice(("Got it.", "Perfect.", "Thanks!", "Noted."))
     if field_key == "event_location":
-        return random.choice(
-            (
-                f"Got it — {v}.",
-                "Sounds good.",
-                f"Perfect, {v}.",
-                "Thanks!",
-            )
-        )
+        return random.choice((f"Got it — {v}.", "Sounds good.", "Perfect.", "Thanks!"))
     if field_key == "preferred_callback":
-        return random.choice(
-            (
-                f"Perfect — {v}.",
-                "Sounds good.",
-                "Absolutely.",
-                "Got it.",
-            )
-        )
+        return random.choice(("Perfect.", "Sounds good.", "Absolutely.", "Got it."))
     return soft_ack()
 
 

@@ -53,20 +53,43 @@ def _more_info_reply(session: ConversationSession) -> str:
     )
 
 
+def _food_reply(session: ConversationSession) -> str:
+    occasion = (session.fields.event_type or "celebration").lower()
+    if occasion == "general":
+        occasion = "celebration"
+    dishes = ", ".join(POPULAR_DISHES[:3])
+    return random.choice(
+        (
+            f"For food, we do pure-veg South Indian menus — Karnataka, Andhra, Tamil Nadu, and Kerala styles, "
+            f"with live counters too. Want to know about a specific meal, or can we move further?",
+            f"Happy to focus on food — authentic vegetarian catering for your {occasion}, including {dishes}. "
+            f"Any cuisine preference?",
+            f"Sure — food is our main strength. Custom pure-veg menus and live stations for your {occasion}. "
+            f"What would you like to know about the menu?",
+        )
+    )
+
+
 def _fallback_answer(
     session: ConversationSession,
     user_text: str,
     *,
     sharing_photos: bool = False,
 ) -> str:
+    from app.services.human_style import normalize_customer_text
+
     name = session.fields.customer_name or "there"
     event = session.fields.event_type or "celebration"
     occasion = event if event != "General" else "celebration"
-    t = user_text.lower()
+    t = normalize_customer_text(user_text)
     hint = natural_continue_hint(event_type=session.fields.event_type)
 
     if sharing_photos or customer_wants_photos(user_text):
-        return f"Sure — sharing a few photos from our site 👇"
+        return "Sure — sharing a few photos from our site 👇"
+
+    # Focus on the topic they asked about
+    if any(w in t for w in ("food", "menu", "dish", "cuisine", "veg", "live counter", "live station", "cater")):
+        return _food_reply(session)
 
     if _wants_more_info(user_text):
         return _more_info_reply(session)
@@ -96,10 +119,6 @@ def _fallback_answer(
             f"easiest on a quick call. {hint}"
         )
 
-    if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "live counter", "live station")):
-        dishes = ", ".join(POPULAR_DISHES[:3])
-        return f"Fully vegetarian — {dishes}, plus live counters. {hint}"
-
     if any(w in t for w in ("contact", "phone", "number", "email", "address", "location of")):
         return f"You can call {COMPANY['phone']} or email {COMPANY['email']}."
 
@@ -116,9 +135,18 @@ async def _gemini_or_fallback(
     next_detail_prompt: str | None = None,
     sharing_photos: bool = False,
 ) -> str:
-    # Prefer a solid website-based reply for "know more" style asks
-    if _wants_more_info(user_text) and not sharing_photos:
-        return _more_info_reply(session)
+    # Prefer a solid website-based reply for "know more" / topic asks (typos included)
+    from app.services.human_style import normalize_customer_text
+
+    norm = normalize_customer_text(user_text)
+    if not sharing_photos and (
+        _wants_more_info(user_text)
+        or any(w in norm for w in ("food", "menu", "decor", "décor", "pooja", "venue"))
+    ):
+        if any(w in norm for w in ("food", "menu", "dish", "cuisine", "veg", "cater")):
+            return _food_reply(session)
+        if _wants_more_info(user_text):
+            return _more_info_reply(session)
 
     if not is_gemini_configured():
         logger.warning("GEMINI_API_KEY not set — using website knowledge reply for: %s", user_text[:80])

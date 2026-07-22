@@ -47,6 +47,11 @@ _LEAK_MARKERS = (
     "still need from them",
     "right now\n",
     "how you think",
+    "requirements & tone",
+    "requirements and tone",
+    "your task",
+    "short & natural",
+    "understand before responding",
 )
 
 
@@ -57,13 +62,15 @@ def looks_like_leaked_prompt(text: str) -> bool:
         return True
     lower = t.lower()
     if any(m in lower for m in _LEAK_MARKERS):
-        return True
-    # Headings / markdown dumps
-    if re.match(r"^(rules|company|services|faqs|photos|legacy|about)\s*[:\*]", lower):
+        # If leak is only a trailing fragment after a real answer, sanitize() will trim —
+        # treat full-message leaks / short garbage as bad.
+        first_line = lower.split("\n", 1)[0].strip()
+        if any(m in first_line for m in _LEAK_MARKERS) or len(t) < 48:
+            return True
+    if re.match(r"^(rules|company|services|faqs|photos|legacy|about|requirements)\s*[:\*]", lower):
         return True
     if lower.startswith("rules") and len(t) < 40:
         return True
-    # Mostly punctuation / broken markdown
     letters = sum(1 for c in t if c.isalpha())
     if letters < 12:
         return True
@@ -77,12 +84,40 @@ def sanitize_whatsapp_reply(text: str) -> str:
     text = (text or "").strip()
     if not text:
         return ""
-    # Drop fenced / heading noise
     text = re.sub(r"^#+\s*", "", text, flags=re.M)
     text = re.sub(r"\*\*+", "", text)
     text = re.sub(r"`+", "", text)
+
+    # Cut off any leaked instruction section, keep the human answer above it
+    cut_patterns = (
+        r"(?i)\n\s*requirements\s*&\s*tone\b.*",
+        r"(?i)\n\s*requirements\s+and\s+tone\b.*",
+        r"(?i)\n\s*rules\s*:?\s*\n.*",
+        r"(?i)\n\s*your task\b.*",
+        r"(?i)\n\s*reply guidance\b.*",
+        r"(?i)\n\s*official website knowledge\b.*",
+        r"(?i)\n\s*how you think\b.*",
+    )
+    for pat in cut_patterns:
+        text = re.sub(pat, "", text, flags=re.S).strip()
+
+    # Drop trailing orphan bullets / stars
+    text = re.sub(r"\n\s*[\*\-•]+\s*$", "", text).strip()
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
     if looks_like_leaked_prompt(text):
+        # Try keeping only the first 1–2 sentences if a leak marker appears later
+        lower = text.lower()
+        earliest = min(
+            (lower.find(m) for m in _LEAK_MARKERS if m in lower),
+            default=-1,
+        )
+        if earliest > 40:
+            text = text[:earliest].strip().rstrip(":-*")
+            text = re.sub(r"\n{2,}", "\n", text).strip()
+            if looks_like_leaked_prompt(text):
+                return ""
+            return text
         return ""
     return text
 

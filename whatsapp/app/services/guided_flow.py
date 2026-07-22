@@ -163,12 +163,14 @@ def _start_detail_collection(session: ConversationSession, user_text: str) -> Ag
     session.guided_step = GuidedStep.COLLECT_DETAILS
     first_prompt = _next_detail_prompt(session)
     name = session.fields.customer_name or "there"
+    occasion = (_event_label(session) or "celebration").lower()
+    # Prefer natural "When is your wedding?" style openers
     reply = random.choice(
         (
             f"Sure, {name}! {first_prompt}",
             f"Sounds good. {first_prompt}",
             f"Perfect. {first_prompt}",
-            f"Got it. {first_prompt}",
+            first_prompt or f"When is your {occasion}?",
         )
     )
     record_exchange(session, user_text, reply)
