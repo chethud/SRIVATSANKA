@@ -158,7 +158,13 @@ export default function SettingsPage() {
               </li>
               <li className="flex justify-between">
                 <span>Phone Number ID</span>
-                <span>{wa.phone_number_id_set ? 'Set' : 'Missing'}</span>
+                <span>
+                  {wa.phone_number_id_set
+                    ? wa.phone_number_id_suffix
+                      ? `Set (…${wa.phone_number_id_suffix})`
+                      : 'Set'
+                    : 'Missing'}
+                </span>
               </li>
               <li className="flex justify-between">
                 <span>Access Token</span>

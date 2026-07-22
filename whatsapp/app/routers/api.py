@@ -72,9 +72,11 @@ async def health() -> dict:
 async def whatsapp_status() -> dict:
     from app.config import settings
 
+    phone_id = settings.whatsapp_phone_number_id.strip()
     return {
         "configured": is_whatsapp_configured(),
-        "phone_number_id_set": bool(settings.whatsapp_phone_number_id.strip()),
+        "phone_number_id_set": bool(phone_id),
+        "phone_number_id_suffix": phone_id[-6:] if len(phone_id) >= 6 else phone_id,
         "token_set": bool(settings.whatsapp_token.strip()),
         "verify_token": settings.whatsapp_verify_token,
         "webhook_path": "/webhook",

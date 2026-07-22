@@ -242,6 +242,7 @@ export interface InvoiceUploadWithOrder extends InvoiceUpload {
 export interface WhatsAppStatus {
   configured: boolean;
   phone_number_id_set: boolean;
+  phone_number_id_suffix?: string;
   token_set: boolean;
   owner_phone: string;
 }
@@ -613,6 +614,13 @@ export async function sendOwnerChatMessage(phone: string, text: string): Promise
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
+}
+
+export async function pauseChatBot(phone: string): Promise<{ ok: boolean; botPaused: boolean }> {
+  return apiFetch<{ ok: boolean; botPaused: boolean }>(
+    `/api/chat/conversations/${encodeURIComponent(phone)}/pause`,
+    { method: 'POST' },
+  );
 }
 
 export async function resumeChatBot(phone: string): Promise<{ ok: boolean; botPaused: boolean }> {

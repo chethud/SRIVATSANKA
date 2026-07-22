@@ -79,7 +79,12 @@ async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
     if response.status_code >= 400:
         logger.error("WhatsApp send failed (%s): %s", response.status_code, response.text)
         detail = response.text[:240] if response.text else f"HTTP {response.status_code}"
-        return False, f"WhatsApp API error: {detail}"
+        phone_id = settings.whatsapp_phone_number_id.strip()
+        hint = (
+            " Check WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_TOKEN in Meta → WhatsApp → API Setup "
+            f"(current Phone number ID ends …{phone_id[-6:] if len(phone_id) >= 6 else phone_id})."
+        )
+        return False, f"WhatsApp API error: {detail}.{hint}"
     logger.info("WhatsApp message sent to %s", to)
     return True, None
 

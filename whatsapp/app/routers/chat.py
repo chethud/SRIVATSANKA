@@ -55,6 +55,21 @@ async def send_owner_message(
     return {"ok": True, "phoneNumber": normalized, "botPaused": True}
 
 
+@router.post("/conversations/{phone}/pause")
+async def pause_bot_for_conversation(
+    phone: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Owner clicked Reply — stop auto-replies so they can message manually."""
+    normalized = normalize_phone(phone)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    await pause_bot_for_phone(db, normalized)
+    await mark_enquiry_seen_for_phone(db, normalized)
+    logger.info("Bot auto-reply paused for %s (owner taking over)", normalized)
+    return {"ok": True, "phoneNumber": normalized, "botPaused": True}
+
+
 @router.post("/conversations/{phone}/resume")
 async def resume_bot_for_conversation(
     phone: str,

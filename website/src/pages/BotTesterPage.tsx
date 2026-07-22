@@ -12,12 +12,14 @@ import {
   normalizePhoneInput,
   sendOwnerChatMessage,
   testBotMessage,
+  pauseChatBot,
   resumeChatBot,
   type ChatConversation,
   type ChatMessage,
 } from '../api/client';
 
-type SendMode = 'customer' | 'owner';
+/** idle = bot auto-replies; owner = manual reply; customer = simulate inbound */
+type SendMode = 'idle' | 'customer' | 'owner';
 
 function roleLabel(role: string) {
   if (role === 'customer') return 'Customer';
@@ -49,10 +51,11 @@ export default function BotTesterPage() {
   const [selectedPhone, setSelectedPhone] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [input, setInput] = useState('');
-  const [sendMode, setSendMode] = useState<SendMode>('owner');
+  const [sendMode, setSendMode] = useState<SendMode>('idle');
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [dpFailed, setDpFailed] = useState(false);
@@ -101,7 +104,7 @@ export default function BotTesterPage() {
     const fromUrl = normalizePhoneInput(searchParams.get('phone') || '');
     if (fromUrl) {
       setSelectedPhone(fromUrl);
-      setSendMode('owner');
+      setSendMode('idle');
       autoSelectedRef.current = true;
       return;
     }
@@ -110,7 +113,7 @@ export default function BotTesterPage() {
       const first = conversations[0].phoneNumber;
       setSelectedPhone(first);
       setSearchParams({ phone: first }, { replace: true });
-      setSendMode('owner');
+      setSendMode('idle');
       autoSelectedRef.current = true;
     }
   }, [loadingList, conversations, searchParams, setSearchParams]);
@@ -126,10 +129,13 @@ export default function BotTesterPage() {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loadingThread]);
 
-  function selectConversation(phone: string, mode: SendMode = 'owner') {
+  function selectConversation(phone: string, mode?: SendMode) {
+    const row = conversations.find((c) => c.phoneNumber === phone);
+    const nextMode = mode ?? (row?.botPaused ? 'owner' : 'idle');
     setSelectedPhone(phone);
     setSearchParams({ phone });
-    setSendMode(mode);
+    setSendMode(nextMode);
+    setInput('');
     setError('');
     setProfileOpen(false);
     setDpFailed(false);
@@ -146,11 +152,37 @@ export default function BotTesterPage() {
     setNewPhone('');
   }
 
+  function patchBotPaused(phone: string, paused: boolean) {
+    setConversations((prev) =>
+      prev.map((c) => (c.phoneNumber === phone ? { ...c, botPaused: paused } : c)),
+    );
+  }
+
+  async function startReply() {
+    if (!selectedPhone || pausing) return;
+    setPausing(true);
+    setError('');
+    try {
+      await pauseChatBot(selectedPhone);
+      patchBotPaused(selectedPhone, true);
+      setSendMode('owner');
+      await loadConversations();
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not take over this chat.');
+    } finally {
+      setPausing(false);
+    }
+  }
+
   async function resumeBot() {
     if (!selectedPhone) return;
     setError('');
     try {
       await resumeChatBot(selectedPhone);
+      patchBotPaused(selectedPhone, false);
+      setSendMode('idle');
+      setInput('');
       await loadConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not resume bot.');
@@ -191,7 +223,7 @@ export default function BotTesterPage() {
         await sendOwnerChatMessage(selectedPhone, text.trim());
         setSendMode('owner');
         refresh();
-      } else {
+      } else if (sendMode === 'customer') {
         const res = await testBotMessage(selectedPhone, text.trim());
         if (res.enquiry_saved) refresh();
       }
@@ -206,9 +238,16 @@ export default function BotTesterPage() {
   }
 
   const active = conversations.find((c) => c.phoneNumber === selectedPhone);
+  const botPaused = Boolean(active?.botPaused);
+  const ownerReplying = botPaused || sendMode === 'owner';
   const profileName = active?.customerName ?? null;
   const profileDp = selectedPhone ? whatsappDpUrl(profileName, selectedPhone) : '';
   const profileLetters = selectedPhone ? profileInitials(profileName, selectedPhone) : '?';
+
+  useEffect(() => {
+    if (!selectedPhone || !botPaused) return;
+    setSendMode((mode) => (mode === 'customer' ? mode : 'owner'));
+  }, [selectedPhone, botPaused]);
 
   return (
     <div className="wa-chats">
@@ -325,7 +364,7 @@ export default function BotTesterPage() {
                   <button
                     key={c.phoneNumber}
                     type="button"
-                    onClick={() => selectConversation(c.phoneNumber, 'owner')}
+                    onClick={() => selectConversation(c.phoneNumber)}
                     className={`wa-chats__row ${activeRow ? 'wa-chats__row--active' : ''}`}
                   >
                     <div className="w-9 h-9 rounded-full bg-[var(--background)] border border-[var(--border)] flex items-center justify-center shrink-0">
@@ -458,53 +497,85 @@ export default function BotTesterPage() {
 
               <div className="wa-chats__composer">
                 {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setSendMode('owner')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                      sendMode === 'owner'
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'bg-[var(--background)] border border-[var(--border)]'
-                    }`}
-                  >
-                    Reply
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSendMode('customer')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                      sendMode === 'customer'
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'bg-[var(--background)] border border-[var(--border)]'
-                    }`}
-                  >
-                    Bot test
-                  </button>
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void sendMessage(input);
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder={sendMode === 'owner' ? 'Type a message…' : 'Simulate customer…'}
-                    disabled={sending}
-                    className="form-input flex-1 min-w-0 px-4 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] disabled:opacity-50"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sending || !input.trim()}
-                    className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-hover)] disabled:opacity-50 shrink-0"
-                  >
-                    <Send size={18} />
-                  </button>
-                </form>
+                {!ownerReplying && sendMode !== 'customer' ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-[var(--muted)]">
+                      Bot is auto-replying on WhatsApp. Click Reply to take over and message manually.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void startReply()}
+                        disabled={pausing || !connected}
+                        className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-50"
+                      >
+                        {pausing ? 'Taking over…' : 'Reply'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSendMode('customer')}
+                        className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-[var(--background)] border border-[var(--border)] hover:bg-[var(--sidebar-hover)]"
+                      >
+                        Bot test
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {ownerReplying ? (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)]">
+                          You are replying — bot paused
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--background)] border border-[var(--border)]">
+                          Bot test mode
+                        </span>
+                      )}
+                      {sendMode === 'customer' && !ownerReplying && (
+                        <button
+                          type="button"
+                          onClick={() => setSendMode('idle')}
+                          className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)]"
+                        >
+                          Back
+                        </button>
+                      )}
+                      {ownerReplying && (
+                        <button
+                          type="button"
+                          onClick={() => void resumeBot()}
+                          className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)]"
+                        >
+                          Resume bot
+                        </button>
+                      )}
+                    </div>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void sendMessage(input);
+                      }}
+                      className="flex gap-2"
+                    >
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder={ownerReplying ? 'Type your WhatsApp reply…' : 'Simulate customer…'}
+                        disabled={sending}
+                        className="form-input flex-1 min-w-0 px-4 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={sending || !input.trim()}
+                        className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-hover)] disabled:opacity-50 shrink-0"
+                      >
+                        <Send size={18} />
+                      </button>
+                    </form>
+                  </>
+                )}
               </div>
             </>
           )}
