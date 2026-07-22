@@ -211,7 +211,7 @@ def wants_more_info(text: str) -> bool:
 
 
 def wants_to_move_further(text: str) -> bool:
-    """Customer agrees to continue collecting enquiry details."""
+    """Customer clearly wants to continue collecting enquiry details."""
     t = normalize_customer_text(text)
     if wants_more_info(text):
         return False
@@ -222,16 +222,27 @@ def wants_to_move_further(text: str) -> bool:
         "go ahead",
         "continue",
         "proceed",
-        "next",
+        "next step",
         "note the",
         "take details",
-        "share details",
+        "take my detail",
+        "share my detail",
         "lets continue",
         "let's continue",
+        "we can continue",
+        "no more questions",
+        "no questions",
+        "nothing else",
+        "that's all",
+        "thats all",
+        "i am ready",
+        "im ready",
+        "ready to share",
     )
     if any(c in t for c in cues):
         return True
-    return False
+    # Exact short confirms that mean "let's proceed" after we already asked move-further
+    return t in {"further", "move", "yes move", "yes further", "yes continue"}
 
 
 
@@ -367,6 +378,18 @@ def continue_hint(*, event_type: str | None = None) -> str:
             "Any questions, or can we move further?",
             "Want to know anything, or can we move further?",
             "Happy to answer questions — or can we move further?",
+        )
+    )
+
+
+def ask_move_further_prompt() -> str:
+    """After answering questions — check before collecting enquiry details."""
+    return random.choice(
+        (
+            "Do you still need more information, or can we move further?",
+            "Would you like more information, or can we move further?",
+            "Any more questions, or can we move further?",
+            "Do you need anything else, or can we move further?",
         )
     )
 

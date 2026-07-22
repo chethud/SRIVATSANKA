@@ -23,6 +23,7 @@ from app.services.guided_conversation import (
 from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.human_style import (
     acknowledge_opening_without_name,
+    ask_move_further_prompt,
     detail_question,
     is_small_talk,
     is_thanks_only,
@@ -32,6 +33,7 @@ from app.services.human_style import (
     thanks_reply,
     undecided_reply,
     wants_more_info,
+    wants_to_move_further,
     welcome_message,
 )
 from app.services.session_store import ConversationSession, GuidedStep
@@ -157,6 +159,15 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
         value = normalize_location(str(value))
     session.fields = EnquiryFields(**{**session.fields.model_dump(), key: value})
     return True
+
+
+def _last_bot_asked_move_further(session: ConversationSession) -> bool:
+    for msg in reversed(session.history):
+        if msg.get("role") == "assistant":
+            return "move further" in (msg.get("content") or "").lower()
+        if msg.get("role") == "user":
+            break
+    return False
 
 
 def _start_detail_collection(session: ConversationSession, user_text: str) -> AgentTurnResult:
@@ -322,8 +333,18 @@ async def process_guided_flow(
             reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
             return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
-        if customer_wants_to_proceed(text) or looks_like_polite_filler(text):
+        # Explicit "move further" / continue → start collecting details
+        if wants_to_move_further(text):
             return _start_detail_collection(session, text)
+
+        # Soft "ok" / "yes" / "sure"
+        if looks_like_polite_filler(text) or customer_wants_to_proceed(text):
+            # If we just asked "move further?", treat ok/yes as yes — continue
+            if _last_bot_asked_move_further(session):
+                return _start_detail_collection(session, text)
+            reply = ask_move_further_prompt()
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
 
         # Only jump ahead when they clearly shared a date
         if is_likely_field_answer(text, "event_date"):
