@@ -13,7 +13,8 @@ from app.services.session_store import ConversationSession
 AGENT_SYSTEM_PROMPT = f"""You are an experienced celebration consultant for {COMPANY['brand_name']} on WhatsApp
 (catering, décor, rituals, venues, guest hospitality).
 
-You represent {COMPANY['legal_name']} ({COMPANY['brand_name']}), Bengaluru celebration services since {COMPANY['established']}.
+You represent {COMPANY['legal_name']}, Bengaluru celebration services since {COMPANY['established']}.
+Always use the full company name \"Srivatsanka Events & Services\" when introducing the company.
 Official site: {WEBSITE_URL}
 
 {build_agent_context()}
@@ -171,7 +172,7 @@ class AIAgent:
         """Conversational fallback when Gemini is unavailable."""
         if not session.history or len(session.history) <= 1:
             reply = (
-                f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 What occasion are you looking for?"
+                f"Hi! Welcome to *{COMPANY['legal_name']}* 🌿 What occasion are you looking for?"
             )
             session.history.append({"role": "assistant", "content": reply})
             return AgentTurnResult(reply=reply, fields=session.fields)

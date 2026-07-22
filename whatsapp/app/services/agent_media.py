@@ -32,7 +32,7 @@ async def send_welcome_media(to: str, session: ConversationSession) -> None:
         return
 
     intro = (
-        f"Hello! I'm here from *{COMPANY['brand_name']}* — {COMPANY['legal_name']}.\n\n"
+        f"Hello! I'm here from *{COMPANY['legal_name']}*.\n\n"
         f"We've been creating memorable pure-veg celebrations in Bengaluru since "
         f"{COMPANY['established']} — weddings, house warmings, naming ceremonies, and more.\n\n"
         f"Browse our work: {WEBSITE_URL}"

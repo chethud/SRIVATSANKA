@@ -8,7 +8,7 @@ WEBSITE_URL = "https://srivatsanka.com/"
 
 COMPANY = {
     "legal_name": "Srivatsanka Events & Services",
-    "brand_name": "SRIVATSANKA",
+    "brand_name": "Srivatsanka Events & Services",
     "established": "2017",
     "managing_director": "Mr. Kannan Sharangapani",
     "founder": "Sri R. V. Sharangapani",
@@ -408,14 +408,29 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
 
 
 def match_event_type(text: str) -> str:
-    """Map customer text to a known occasion type (tolerates common spelling mistakes)."""
+    """Map customer text to a known occasion type. Never invents custom types from names."""
     import difflib
 
     lower = re.sub(r"\s+", " ", (text or "").lower().strip())
     if len(lower) < 2:
         return "General"
 
-    skip = {"ok", "okay", "yes", "yeah", "sure", "fine", "continue", "proceed", "go ahead", "hi", "hello"}
+    skip = {
+        "ok",
+        "okay",
+        "yes",
+        "yeah",
+        "sure",
+        "fine",
+        "continue",
+        "proceed",
+        "go ahead",
+        "hi",
+        "hello",
+        "hey",
+        "thanks",
+        "thank you",
+    }
     if lower in skip:
         return "General"
 
@@ -437,23 +452,19 @@ def match_event_type(text: str) -> str:
         "babyshower": "Baby Shower",
         "seemantham": "Baby Shower",
         "seemanth": "Baby Shower",
-        "naming": "Naming Ceremony",
         "naming ceremony": "Naming Ceremony",
-        "namimg": "Naming Ceremony",
+        "namimg ceremony": "Naming Ceremony",
+        "name ceremony": "Naming Ceremony",
         "upanayanam": "Upanayanam",
         "upanayan": "Upanayanam",
         "engagement": "Engagement",
         "birthday": "Birthday",
         "corporate": "Corporate events",
-        "office": "Corporate events",
         "office lunch": "Corporate events",
         "corporate lunch": "Corporate events",
-        "anniversary": "General",
-        "occasion": "General",
-        "function": "General",
-        "celebration": "General",
     }
-    for key, canonical in aliases.items():
+    # Prefer longer / multi-word keys first
+    for key, canonical in sorted(aliases.items(), key=lambda kv: -len(kv[0])):
         if key in lower:
             return canonical
 
@@ -461,12 +472,13 @@ def match_event_type(text: str) -> str:
         if event.lower() in lower:
             return event
 
+    # Fuzzy match only against known occasion words — never free-text names
+    occasion_keys = list(aliases.keys()) + [e.lower() for e in EVENT_TYPES]
     words = re.findall(r"[a-z]+", lower)
-    alias_keys = list(aliases.keys()) + [e.lower() for e in EVENT_TYPES]
     for word in words:
-        if len(word) < 4:
+        if len(word) < 5:
             continue
-        matches = difflib.get_close_matches(word, alias_keys, n=1, cutoff=0.78)
+        matches = difflib.get_close_matches(word, occasion_keys, n=1, cutoff=0.86)
         if matches:
             matched = matches[0]
             if matched in aliases:
@@ -475,9 +487,14 @@ def match_event_type(text: str) -> str:
                 if event.lower() == matched:
                     return event
 
-    if len(lower) >= 4 and lower not in {"general", "other", "others"}:
-        return text.strip().title()
     return "General"
+
+
+def is_known_event_type(event_type: str | None) -> bool:
+    if not event_type:
+        return False
+    return event_type in EVENT_TYPE_DETAILS and event_type != "General"
+
 
 
 def _partner_venues_blurb() -> str:
@@ -490,11 +507,12 @@ def _partner_venues_blurb() -> str:
 
 def build_short_company_context() -> str:
     return (
-        f"{COMPANY['brand_name']} ({COMPANY['legal_name']}) — Bengaluru since {COMPANY['established']}, "
+        f"{COMPANY['legal_name']} — Bengaluru since {COMPANY['established']}, "
         f"led by {COMPANY['managing_director']}. "
         f"Phone {COMPANY['phone']}. Site {WEBSITE_URL}. "
         f"Offers: catering, décor, pooja/rituals, venues, guest hospitality. "
         f"Cuisines: Karnataka, Andhra, Tamil Nadu, Kerala. "
+        f"Always introduce the company as \"{COMPANY['legal_name']}\" (full name). "
         f"Reply only from this website knowledge."
     )
 
@@ -521,7 +539,8 @@ Answer customer questions ONLY using this data. Keep replies short (WhatsApp sty
 If unsure, share {WEBSITE_URL} or offer a callback — never invent prices or packages.
 
 COMPANY
-- {COMPANY['legal_name']} ({COMPANY['brand_name']}), est. {COMPANY['established']}
+- {COMPANY['legal_name']}, est. {COMPANY['established']}
+- Always say the full company name: Srivatsanka Events & Services (not a short brand only)
 - Tagline: {COMPANY['tagline']}
 - {COMPANY['hero_line']}
 - {COMPANY['services_intro']}

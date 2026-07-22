@@ -51,7 +51,7 @@ def _fallback_answer(
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We're *{COMPANY['brand_name']}* — catering & celebration services in Bengaluru "
+            f"We're *{COMPANY['legal_name']}* — catering & celebration services in Bengaluru "
             f"since {COMPANY['established']}. More at {WEBSITE_URL}"
         )
 

@@ -10,8 +10,9 @@ from app.data.company_knowledge import COMPANY
 # Injected into Gemini system prompts (highest priority for tone + length).
 HUMAN_CONSULTANT_STYLE = f"""# SHORT & NATURAL RESPONSE STYLE (HIGHEST PRIORITY)
 
-You are an experienced celebration consultant for {COMPANY['brand_name']} on WhatsApp
+You are an experienced celebration consultant for {COMPANY['legal_name']} on WhatsApp
 (catering, décor, rituals, venues, and guest hospitality).
+Always introduce the company using the full name \"Srivatsanka Events & Services\".
 Every reply must feel like a real human WhatsApp chat — never a chatbot or support script.
 
 ## LENGTH (STRICT)
@@ -148,32 +149,35 @@ def small_talk_reply(*, event_label: str | None = None) -> str:
 
 
 def welcome_message() -> str:
-    brand = COMPANY["brand_name"]
+    brand = COMPANY["legal_name"]
     return random.choice(
         (
-            f"Hi! Welcome to *{brand}* 😊\nMay I know your name?",
-            f"Hello! Happy to help with *{brand}*.\nWhat's your name?",
-            f"Hi there! Thanks for messaging *{brand}*.\nWho am I speaking with?",
+            f"Hi! Welcome to {brand} 😊\nMay I know your name?",
+            f"Hello! You've reached {brand}. What's your name?",
+            f"Hi there — {brand} here. Who am I speaking with?",
         )
     )
 
 
 def acknowledge_opening_without_name(text: str, event_type: str | None) -> str:
     """First message shared occasion/details but no name — short ack, then ask name."""
-    if event_type and event_type != "General":
-        label = event_type.lower()
+    from app.data.company_knowledge import is_known_event_type
+
+    brand = COMPANY["legal_name"]
+    if is_known_event_type(event_type):
+        label = event_type.lower()  # type: ignore[union-attr]
         return random.choice(
             (
                 f"That sounds wonderful! Happy to help with your {label}.\nMay I know your name?",
-                f"Lovely — we'd love to help with your {label}.\nWhat's your name?",
-                f"Great! We can help with your {label}.\nWho am I speaking with?",
+                f"Lovely — we can help with your {label}. What's your name?",
+                f"Great! What's your name?",
             )
         )
-    brand = COMPANY["brand_name"]
     return random.choice(
         (
-            f"Hi! Happy to help with *{brand}*.\nMay I know your name?",
-            f"Hello! Thanks for reaching out.\nWhat's your name?",
+            f"Hi! Welcome to {brand} 🙂 May I know your name?",
+            f"Hello from {brand}! What's your name?",
+            f"Hi there — {brand} here. Who am I speaking with?",
         )
     )
 
@@ -264,9 +268,9 @@ def natural_field_ack(
 def continue_hint(*, event_type: str | None = None) -> str:
     return random.choice(
         (
-            "Any questions, or shall we note the date next?",
-            "Ask me anything — or say when you're ready to continue.",
-            "Happy to answer questions, or we can take a few details next.",
+            "Any questions?",
+            "Want to know anything, or shall we note a few details?",
+            "Happy to answer questions — or we can continue when you're ready.",
         )
     )
 
