@@ -212,7 +212,7 @@ body {
   padding: 0;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   font-size: 18px;
-  color: var(--foreground);
+  color: #0f172a;
   background: #ffffff;
 }
 
@@ -401,7 +401,7 @@ body {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--foreground);
+  color: #0f172a;
 }
 
 .copy-overall-total {
@@ -446,6 +446,12 @@ body {
 }
 
 @media print {
+  .order-copy-surface {
+    padding: 0;
+    border: none;
+    border-radius: 0;
+  }
+
   .order-copy-print {
     max-width: 100%;
   }
@@ -586,6 +592,15 @@ body {
   color: var(--foreground);
 }
 
+.order-stat-value--sessions {
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: justify;
+  text-justify: inter-word;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
 .order-copy-bar {
   display: flex;
   flex-wrap: wrap;
@@ -644,6 +659,33 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+/* Kitchen / billing copy preview — always document colors (readable in dark app theme) */
+.order-copy-surface {
+  padding: 1.25rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: #0f172a;
+  --foreground: #0f172a;
+  --primary: #0b6b3a;
+  --primary-dark: #084d2b;
+  --primary-light: #eaf7e9;
+  --muted: #64748b;
+  --border: #e2e8e2;
+  --border-strong: #cbd5cb;
+  --background-alt: #eef2ee;
+  --table-header-bg: #f8faf8;
+  --order-cream: #faf8f5;
+  --order-accent: #9a7b4f;
+  --accent: #7ac943;
+}
+
+@media (min-width: 768px) {
+  .order-copy-surface {
+    padding: 1.75rem 2rem;
+  }
 }
 
 .order-section {
@@ -2133,6 +2175,20 @@ select:focus {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.875rem;
+}
+
+.topnav__panel-item--action {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.topnav__panel-item--action:hover {
+  background: var(--sidebar-hover);
 }
 
 .topnav__panel-item:last-child {

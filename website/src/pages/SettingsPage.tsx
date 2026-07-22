@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { FONT_SCALE_OPTIONS, useTheme } from '../context/ThemeContext';
-import { fetchWhatsAppStatus, seedExcelReferenceOrders, type WhatsAppStatus } from '../api/client';
+import { fetchWhatsAppStatus, seedDemoData, seedExcelReferenceOrders, type WhatsAppStatus } from '../api/client';
 import { ErrorBanner } from '../components/ui';
 
 export default function SettingsPage() {
@@ -30,6 +30,22 @@ export default function SettingsPage() {
       await refresh();
     } catch (err) {
       setSeedMsg(err instanceof Error ? err.message : 'Could not load Excel reference orders.');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  async function loadDemoData() {
+    setSeeding(true);
+    setSeedMsg('');
+    try {
+      const [demo, excel] = await Promise.all([seedDemoData(), seedExcelReferenceOrders()]);
+      setSeedMsg(
+        `Loaded ${demo.enquiries} demo enquiries, ${demo.vendors} vendors, ${demo.workers} workers, ${demo.expenses} expenses, and ${excel.created} Excel-reference orders.`,
+      );
+      await refresh();
+    } catch (err) {
+      setSeedMsg(err instanceof Error ? err.message : 'Could not load sample data.');
     } finally {
       setSeeding(false);
     }
@@ -93,15 +109,25 @@ export default function SettingsPage() {
         </Card>
 
         <Card className="p-6">
-          <h3 className="font-semibold mb-2">Excel reference orders</h3>
+          <h3 className="font-semibold mb-2">Sample data</h3>
           <p className="text-sm text-[var(--muted)] mb-4">
-            Load 4 sample converted orders modeled on your reference Excels (Nithin wedding menu,
-            Muralidharan wedding menu, Casagrand invoice, RA Hospitalities invoice). Then open each
-            order and use Download Excel to compare.
+            Load demo enquiries, vendors, workers, expenses, and 4 Excel-reference converted orders
+            (Nithin, Muralidharan, Casagrand, RA). Safe to run on live — only replaces rows marked
+            <span className="font-mono"> [demo]</span> or Excel-reference orders.
           </p>
-          <Button type="button" onClick={() => void loadExcelRefs()} disabled={!connected || seeding}>
-            {seeding ? 'Loading…' : 'Load 4 Excel reference orders'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => void loadDemoData()} disabled={!connected || seeding}>
+              {seeding ? 'Loading…' : 'Load all sample data'}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void loadExcelRefs()}
+              disabled={!connected || seeding}
+              className="!bg-[var(--card)] !text-[var(--foreground)] border border-[var(--border)] hover:!bg-[var(--sidebar-hover)]"
+            >
+              Excel orders only
+            </Button>
+          </div>
           {seedMsg && <p className="text-sm mt-3 text-[var(--foreground)]">{seedMsg}</p>}
         </Card>
 

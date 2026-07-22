@@ -242,6 +242,7 @@ async def seed_demo_data(session: AsyncSession, *, force: bool = True) -> dict:
                 title="Demo enquiry",
                 message=f"{enquiry.customerName} – {enquiry.eventType} {DEMO_MARKER}",
                 read=row["status"] != EnquiryStatus.NEW,
+                enquiryId=enquiry.id,
             )
         )
         created_enquiries += 1

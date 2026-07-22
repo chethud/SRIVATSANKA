@@ -160,6 +160,7 @@ export interface Notification {
   title: string;
   message: string;
   read: boolean;
+  enquiryId?: string | null;
   createdAt: string;
 }
 
@@ -332,6 +333,14 @@ export const fetchStats = () => apiFetch<DashboardStats>('/api/stats');
 export const fetchEnquiries = () => apiFetch<Enquiry[]>('/api/enquiries');
 export const fetchDishes = () => apiFetch<Dish[]>('/api/dishes');
 export const fetchNotifications = () => apiFetch<Notification[]>('/api/notifications');
+
+export async function markNotificationsRead(ids?: string[]): Promise<{ marked: number }> {
+  return apiFetch<{ marked: number }>('/api/notifications/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ids?.length ? { ids } : {}),
+  });
+}
 export const fetchVendors = () => apiFetch<Vendor[]>('/api/vendors');
 export const fetchWorkers = () => apiFetch<Worker[]>('/api/workers');
 export const fetchExpenses = () => apiFetch<Expense[]>('/api/expenses');
@@ -382,6 +391,19 @@ export async function seedExcelReferenceOrders(): Promise<{
   marker: string;
 }> {
   return apiFetch('/api/seed-excel-refs', { method: 'POST' });
+}
+
+export async function seedDemoData(): Promise<{
+  enquiries: number;
+  menuLines: number;
+  dishesInCatalog: number;
+  vendors: number;
+  workers: number;
+  workerAssignments: number;
+  expenses: number;
+  marker: string;
+}> {
+  return apiFetch('/api/seed-demo', { method: 'POST' });
 }
 
 export async function createDish(data: { name: string; category: string; price: number; description?: string }) {

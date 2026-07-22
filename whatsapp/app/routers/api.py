@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.data.meal_sessions import dish_category_label
+from app.data.seed_demo_data import seed_demo_data
 from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
 from app.datetime_util import as_naive_utc
@@ -21,6 +22,7 @@ from app.schemas import (
     EnquiryOut,
     EnquiryUpdateIn,
     NotificationOut,
+    NotificationReadIn,
     UpdateEnquiryStatus,
 )
 from app.services.dashboard_assistant import answer_dashboard_query
@@ -165,6 +167,7 @@ async def create_enquiry(
             type=NotificationType.NEW_ENQUIRY,
             title="New Enquiry",
             message=f"{enquiry.customerName} – {enquiry.eventType} (manual)",
+            enquiryId=enquiry.id,
         )
     )
     await db.commit()
@@ -274,12 +277,35 @@ async def seed_excel_reference_orders_api(db: AsyncSession = Depends(get_db)) ->
     return await seed_excel_reference_orders(db, replace=True)
 
 
+@router.post("/seed-demo")
+async def seed_demo_dashboard(db: AsyncSession = Depends(get_db)) -> dict:
+    """Load demo enquiries, vendors, workers, expenses, and notifications."""
+    return await seed_demo_data(db, force=True)
+
+
 @router.get("/notifications", response_model=list[NotificationOut])
 async def list_notifications(db: AsyncSession = Depends(get_db)) -> list[Notification]:
     result = await db.execute(
         select(Notification).order_by(Notification.createdAt.desc()).limit(20)
     )
     return list(result.scalars().all())
+
+
+@router.post("/notifications/read")
+async def mark_notifications_read(
+    payload: NotificationReadIn,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    query = select(Notification).where(Notification.read.is_(False))
+    if payload.ids:
+        query = query.where(Notification.id.in_(payload.ids))
+    result = await db.execute(query)
+    rows = list(result.scalars().all())
+    for row in rows:
+        row.read = True
+    if rows:
+        await db.commit()
+    return {"marked": len(rows)}
 
 
 @router.post("/ai-assistant", response_model=AIAssistantResponse)

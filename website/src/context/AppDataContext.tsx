@@ -10,6 +10,7 @@ import {
   checkApiHealth,
   getApiBaseUrl,
   markEnquiryViewed as markEnquiryViewedApi,
+  markNotificationsRead as markNotificationsReadApi,
   type DashboardStats,
   type Enquiry,
   type Dish,
@@ -76,6 +77,7 @@ interface AppData {
   refreshDishes: () => Promise<void>;
   patchEnquiry: (updated: Enquiry) => void;
   markEnquiryViewed: (id: string) => Promise<void>;
+  markNotificationsRead: (ids?: string[]) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppData | null>(null);
@@ -98,6 +100,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setEnquiries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
     });
   }, []);
+
+  const markNotificationsRead = useCallback(async (ids?: string[]) => {
+    const unreadIds = ids ?? notifications.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    const idSet = new Set(unreadIds);
+    startTransition(() => {
+      setNotifications((prev) =>
+        prev.map((n) => (idSet.has(n.id) ? { ...n, read: true } : n)),
+      );
+      setStats((prev) => {
+        if (!prev) return prev;
+        const marked = notifications.filter((n) => idSet.has(n.id) && !n.read).length;
+        return {
+          ...prev,
+          unread_notifications: Math.max(0, prev.unread_notifications - marked),
+        };
+      });
+    });
+    try {
+      await markNotificationsReadApi(unreadIds);
+    } catch {
+      /* badge will refresh on next poll */
+    }
+  }, [notifications]);
 
   const markEnquiryViewed = useCallback(async (id: string) => {
     const current = enquiries.find((e) => e.id === id);
@@ -216,6 +242,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         refreshDishes,
         patchEnquiry,
         markEnquiryViewed,
+        markNotificationsRead,
       }}
     >
       {children}

@@ -116,6 +116,7 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String)
     message: Mapped[str] = mapped_column(String)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    enquiryId: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

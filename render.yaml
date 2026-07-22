@@ -23,7 +23,9 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: SEED_DEMO_ON_STARTUP
-        value: "false"
+        value: "true"
+      - key: SEED_EXCEL_REFS_ON_STARTUP
+        value: "true"
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL

@@ -168,12 +168,17 @@ class NotificationOut(BaseModel):
     title: str
     message: str
     read: bool
+    enquiryId: str | None = None
     createdAt: datetime
 
     @field_validator("type", mode="before")
     @classmethod
     def type_to_str(cls, v: object) -> str:
         return v.value if hasattr(v, "value") else str(v)
+
+
+class NotificationReadIn(BaseModel):
+    ids: list[str] | None = None
 
 
 class DashboardStats(BaseModel):

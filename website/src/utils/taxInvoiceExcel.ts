@@ -21,7 +21,6 @@ import { PREFERENCE_CATEGORIES } from './mealSessions';
 
 type LineItem = {
   description: string;
-  hsn: string | number;
   qty: number | string;
   unitRate: number | string;
   amount: number;
@@ -61,7 +60,6 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
 
     lines.push({
       description: descParts.join('\n'),
-      hsn: INVOICE_COMPANY.hsnSac,
       qty,
       unitRate: unitRate === '' ? 'NA' : unitRate,
       amount,
@@ -73,7 +71,6 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
       const amount = typeof item.amount === 'number' ? item.amount : 0;
       lines.push({
         description: item.title + (item.description ? `\n${item.description}` : ''),
-        hsn: INVOICE_COMPANY.hsnSac,
         qty: item.quantity?.trim() || 'NA',
         unitRate: amount || 'NA',
         amount,
@@ -84,7 +81,6 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
   if (lines.length === 0) {
     lines.push({
       description: `${enquiry.eventType || 'Event'} — ${enquiry.customerName}`,
-      hsn: INVOICE_COMPANY.hsnSac,
       qty: enquiry.guestCount || 'NA',
       unitRate: 'NA',
       amount: 0,
@@ -95,7 +91,6 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
 }
 
 function billingAddressBlock(enquiry: Enquiry): string {
-  const extras = parseOrderNotes(enquiry.notes);
   const parts = [
     enquiry.customerName,
     enquiry.eventLocation,
@@ -103,7 +98,6 @@ function billingAddressBlock(enquiry: Enquiry): string {
     enquiry.eventType ? `Event : ${enquiry.eventType}` : null,
     enquiry.eventDate ? `Event Date : ${formatInvoiceDate(enquiry.eventDate)}` : null,
     enquiry.guestCount ? `Guests : ${enquiry.guestCount}` : null,
-    extras.venueMapLink ? `Map : ${extras.venueMapLink}` : null,
   ].filter(Boolean);
   return parts.join('\n');
 }
@@ -277,15 +271,14 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
   }
 
   // Header row 12
-  merge('B12:C12');
+  merge('B12:D12');
   merge('F12:G12');
   ws.getCell('A12').value = 'S. NO.';
   ws.getCell('B12').value = 'Part Description';
-  ws.getCell('D12').value = 'HSN/SAC';
   ws.getCell('E12').value = 'QTY';
   ws.getCell('F12').value = 'Unit Rate';
   ws.getCell('H12').value = 'Amount ';
-  for (const col of [1, 2, 4, 5, 6, 8]) {
+  for (const col of [1, 2, 5, 6, 8]) {
     const cell = ws.getCell(12, col);
     cell.font = { bold: true, size: 11 };
     cell.alignment = center;
@@ -295,18 +288,16 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
   const firstDataRow = 13;
   lines.forEach((line, i) => {
     const r = firstDataRow + i;
-    merge(`B${r}:C${r}`);
+    merge(`B${r}:D${r}`);
     merge(`F${r}:G${r}`);
     ws.getRow(r).height = Math.max(18, 14 + line.description.split('\n').length * 12);
     ws.getCell(`A${r}`).value = i + 1;
     ws.getCell(`B${r}`).value = line.description;
-    ws.getCell(`D${r}`).value = line.hsn;
     ws.getCell(`E${r}`).value = line.qty;
     ws.getCell(`F${r}`).value = line.unitRate;
     ws.getCell(`H${r}`).value = line.amount;
     ws.getCell(`A${r}`).alignment = center;
     ws.getCell(`B${r}`).alignment = left;
-    ws.getCell(`D${r}`).alignment = center;
     ws.getCell(`E${r}`).alignment = center;
     ws.getCell(`F${r}`).alignment = center;
     ws.getCell(`H${r}`).alignment = { horizontal: 'right', vertical: 'middle' };

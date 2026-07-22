@@ -17,7 +17,7 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
       title="SRIVATSANKA EVENTS — Dashboard"
       aria-label="Go to dashboard"
     >
-      <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>
+      <div className={`flex items-center gap-2.5 w-full min-w-0 ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>
         <img
           src="/brand/logo-icon.svg?v=4"
           alt=""
@@ -28,8 +28,9 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
           draggable={false}
         />
         {!sidebarCollapsed && (
-          <span className="text-[12px] font-bold tracking-[0.08em] text-[var(--primary)] leading-tight truncate">
-            SRIVATSANKA EVENTS
+          <span className="min-w-0 flex-1 text-[11px] font-bold tracking-[0.05em] text-[var(--primary)] leading-[1.15]">
+            <span className="block">SRIVATSANKA</span>
+            <span className="block tracking-[0.12em]">EVENTS</span>
           </span>
         )}
       </div>

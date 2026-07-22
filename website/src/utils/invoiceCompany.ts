@@ -8,7 +8,6 @@ export const INVOICE_COMPANY = {
   gstin: '29AAZCS3400N1ZM',
   cin: 'U93090KA2017PTC107116',
   pan: 'AAZCS3400N',
-  hsnSac: '996334',
   bankName: 'Kotak Mahindra Bank',
   bankAccount: '4412031591',
   bankIfsc: 'KKBK0008066',

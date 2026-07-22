@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Layers, Moon, Plus, Search, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
 import { usePageSearchSlot } from '../context/PageSearchContext';
 import { useTheme } from '../context/ThemeContext';
+import type { Notification } from '../api/client';
 import {
   getCreateActionForPath,
   getCreateButtonLabel,
@@ -12,24 +13,36 @@ import {
   getSecondaryCreateButtonLabel,
 } from '../utils/createAction';
 import { getUnreadNotifications } from '../utils/dashboardData';
+import { getNotificationHref } from '../utils/notificationLink';
 import { getTopNavTitle } from '../utils/topNavTitle';
 
 export function TopNav() {
-  const { notifications, stats } = useAppData();
+  const { notifications, stats, enquiries, markNotificationsRead } = useAppData();
   const { theme, toggleTheme } = useTheme();
   const { triggerCreate } = useCreateAction();
   const { config: pageSearch } = usePageSearchSlot();
   const location = useLocation();
+  const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const unread = getUnreadNotifications(notifications);
+  const unreadCount = stats?.unread_notifications ?? 0;
   const pageAction = getCreateActionForPath(location.pathname);
   const secondaryAction = getSecondaryCreateActionForPath(location.pathname);
   const createLabel = getCreateButtonLabel(location.pathname);
   const secondaryLabel = getSecondaryCreateButtonLabel(secondaryAction);
-  const unreadCount = stats?.unread_notifications ?? 0;
   const pageTitle = !pageSearch ? getTopNavTitle(location.pathname) : null;
+
+  function toggleNotifications() {
+    setNotifOpen((open) => !open);
+  }
+
+  function handleNotificationClick(notification: Notification) {
+    void markNotificationsRead([notification.id]);
+    setNotifOpen(false);
+    navigate(getNotificationHref(notification, enquiries));
+  }
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -110,7 +123,7 @@ export function TopNav() {
           <div className="relative" ref={notifRef}>
             <button
               type="button"
-              onClick={() => setNotifOpen((o) => !o)}
+              onClick={toggleNotifications}
               className={`topnav__icon-btn ${notifOpen ? 'topnav__icon-btn--active' : ''}`}
               aria-label="Notifications"
               aria-expanded={notifOpen}
@@ -129,10 +142,15 @@ export function TopNav() {
                   <p className="topnav__panel-empty">No new notifications</p>
                 ) : (
                   unread.map((n) => (
-                    <div key={n.id} className="topnav__panel-item">
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => handleNotificationClick(n)}
+                      className="topnav__panel-item topnav__panel-item--action"
+                    >
                       <p className="font-medium text-[var(--foreground)]">{n.title}</p>
                       <p className="text-xs text-[var(--muted)] mt-0.5 line-clamp-2">{n.message}</p>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>

@@ -81,6 +81,7 @@ async def save_enquiry(
         type=NotificationType.NEW_ENQUIRY,
         title="New Enquiry",
         message=f"{enquiry.customerName} – {enquiry.eventType} on {fields.event_date}",
+        enquiryId=enquiry.id,
     )
     db.add(notification)
     await db.commit()

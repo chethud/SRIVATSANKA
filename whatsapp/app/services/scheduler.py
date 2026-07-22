@@ -37,6 +37,7 @@ async def check_callback_reminders() -> None:
                     type=NotificationType.CALLBACK_REMINDER,
                     title="Callback Reminder",
                     message=f"Call {enquiry.customerName} in 15–20 minutes",
+                    enquiryId=enquiry.id,
                 )
             )
         if enquiries:

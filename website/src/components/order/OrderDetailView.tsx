@@ -172,7 +172,7 @@ export function OrderDetailView({
     const cols = resolveMenuColumns(extras, order, menuItems);
     const withPax = cols.filter((c) => c.pax != null && c.pax > 0);
     if (withPax.length === 0) return 'Set per session when adding menu';
-    return withPax.map((c) => `${c.sessionLabel} ${c.pax}`).join(' · ');
+    return withPax.map((c) => `${c.sessionLabel} ${c.pax}`).join('\n');
   }, [extras, order, menuItems]);
 
   async function saveExtras() {
@@ -246,7 +246,11 @@ export function OrderDetailView({
             </div>
             <div className="min-w-0">
               <p className="order-stat-label">{label}</p>
-              <p className="order-stat-value">{value}</p>
+              <p
+                className={`order-stat-value${label === 'Session pax' ? ' order-stat-value--sessions' : ''}`}
+              >
+                {value}
+              </p>
             </div>
           </div>
         ))}
@@ -293,7 +297,7 @@ export function OrderDetailView({
               {excelBusy ? 'Preparing Excel…' : 'Download Excel'}
             </Button>
           </div>
-          <div className="print:border-0 print:shadow-none print:p-0 bg-white">
+          <div className="order-copy-surface print:border-0 print:shadow-none print:p-0">
             <OrderCopyView enquiry={order} copyType={pageView} />
           </div>
         </div>
