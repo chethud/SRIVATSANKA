@@ -43,6 +43,8 @@ def _format_session_prompt() -> str:
 
 
 def _format_confirmation(session: ConversationSession) -> str:
+    from app.services.callback_time import format_callback_display, parse_callback_time
+
     f = session.fields
     name = f.customer_name or "there"
     meals = (
@@ -50,11 +52,15 @@ def _format_confirmation(session: ConversationSession) -> str:
         if session.selected_dishes
         else "to discuss on the call"
     )
+    when = format_callback_display(
+        parse_callback_time(f.preferred_callback or "in 2 hours"),
+        f.preferred_callback,
+    ).split(" (")[0]
     return random.choice(
         (
-            f"Perfect, *{name}*! Noted *{meals}*. We'll call around {f.preferred_callback}.",
-            f"All set ✅ Meals: *{meals}*. Talk soon around {f.preferred_callback}.",
-            f"Got it, *{name}*. We'll ring you around {f.preferred_callback}.",
+            f"Perfect, {name}! Noted *{meals}*. We'll call around {when}.",
+            f"All set ✅ Meals: *{meals}*. Talk soon around {when}.",
+            f"Got it, {name}. We'll ring you around {when}.",
         )
     )
 

@@ -12,7 +12,11 @@ sys.path.insert(0, str(ROOT))
 from starlette.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
-from app.services.callback_time import format_callback_display, parse_callback_time  # noqa: E402
+from app.services.callback_time import (  # noqa: E402
+    format_callback_display,
+    normalize_callback_label,
+    parse_callback_time,
+)
 from app.services.enquiry_service import _callback_text_from_notes  # noqa: E402
 
 PASS = 0
@@ -39,8 +43,12 @@ def test_parser_cases() -> None:
         ("tomorrow 4pm", datetime(2026, 6, 4, 16, 0)),
         ("today 4pm", datetime(2026, 6, 3, 16, 0)),
         ("tomorrow afternoon", datetime(2026, 6, 4, 14, 0)),
-        ("today morning", datetime(2026, 6, 3, 10, 0)),
+        # Exactly at morning slot → roll forward (already "past")
+        ("today morning", datetime(2026, 6, 4, 10, 0)),
         ("in 2 hours", datetime(2026, 6, 3, 12, 0)),
+        ("Imideatly", datetime(2026, 6, 3, 10, 10)),
+        ("asap", datetime(2026, 6, 3, 10, 10)),
+        ("right now", datetime(2026, 6, 3, 10, 10)),
         ("4:30 PM", datetime(2026, 6, 3, 16, 30)),
         ("4pm", datetime(2026, 6, 3, 16, 0)),
         ("tomorrow 4:30 pm", datetime(2026, 6, 4, 16, 30)),
@@ -73,6 +81,27 @@ def test_parser_cases() -> None:
         ok("format_callback_display includes original text")
     else:
         bad("format_callback_display", display)
+
+    if normalize_callback_label("Imideatly") == "Immediately":
+        ok("normalize_callback_label fixes Imideatly")
+    else:
+        bad("normalize_callback_label", normalize_callback_label("Imideatly"))
+
+    asap_display = format_callback_display(datetime(2026, 7, 23, 1, 19), "Imideatly")
+    if "23 Jul 2026" in asap_display and "Immediately" in asap_display and "Imideatly" not in asap_display:
+        ok("ASAP display uses IST date + Immediately label")
+    else:
+        bad("ASAP display", asap_display)
+
+    # Server UTC evening must still schedule in IST calendar when now is aware UTC
+    from datetime import timezone
+
+    utc_evening = datetime(2026, 7, 22, 19, 39, tzinfo=timezone.utc)  # 01:09 IST Jul 23
+    got_ist = parse_callback_time("Imideatly", utc_evening)
+    if got_ist.date() == datetime(2026, 7, 23).date() and got_ist.hour == 1:
+        ok("UTC server clock maps Immediate to IST Jul 23")
+    else:
+        bad("UTC→IST immediate", str(got_ist))
 
     notes = "Callback requested: tomorrow 4pm\nCallback scheduled: 04 Jun 2026, 04:00 PM"
     extracted = _callback_text_from_notes(notes)

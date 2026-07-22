@@ -375,7 +375,11 @@ def is_likely_field_answer(text: str, field_key: str) -> bool:
 
 
 def _is_probable_callback(text: str) -> bool:
+    from app.services.callback_time import IMMEDIATE_RE
+
     t = text.lower()
+    if IMMEDIATE_RE.search(t):
+        return True
     if re.search(r"@?\s*\d{1,2}\s*(am|pm|:\d{2})", t):
         return True
     if re.search(r"\bin\s+\d+\s*(min|hour)", t):

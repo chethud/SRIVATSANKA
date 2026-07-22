@@ -152,11 +152,15 @@ def _detect_event(text: str, *, name: str | None = None) -> str | None:
 
 
 def _store_detail_field(session: ConversationSession, key: str, user_text: str) -> bool:
+    from app.services.callback_time import normalize_callback_label
+
     value: str | int | None = user_text.strip()
     if not value:
         return False
     if key == "event_location":
         value = normalize_location(str(value))
+    if key == "preferred_callback":
+        value = normalize_callback_label(str(value))
     session.fields = EnquiryFields(**{**session.fields.model_dump(), key: value})
     return True
 

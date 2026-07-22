@@ -148,6 +148,10 @@ def normalize_customer_text(text: str) -> str:
         (r"\bphtos\b", "photos"),
         (r"\bphto\b", "photo"),
         (r"\bpics?\b", "photos"),
+        (r"\bimideatly\b", "immediately"),
+        (r"\bimediately\b", "immediately"),
+        (r"\bimmediatly\b", "immediately"),
+        (r"\bimidiately\b", "immediately"),
     )
     for pat, repl in replacements:
         t = re.sub(pat, repl, t)
@@ -155,7 +159,7 @@ def normalize_customer_text(text: str) -> str:
     # Fuzzy near-misses for details/food on single tokens
     fixed: list[str] = []
     for word in t.split():
-        if word in {"details", "detail", "food", "more", "further", "wedding"}:
+        if word in {"details", "detail", "food", "more", "further", "wedding", "immediately"}:
             fixed.append(word)
             continue
         if _near(word, ("details", "detail", "derails")):
