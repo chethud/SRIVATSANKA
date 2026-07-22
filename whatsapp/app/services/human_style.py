@@ -22,15 +22,13 @@ Every reply must feel like a real human WhatsApp chat — never a chatbot or sup
 - Longer only if they ask for detailed info (still under ~100 words).
 - No long paragraphs. No walls of text. Do not dump lists of services unless asked.
 
-## UNDERSTAND → ACKNOWLEDGE → ANSWER → CONTINUE
-1. Read carefully and understand first.
-2. Acknowledge what they said (briefly).
-3. Answer any questions (if they asked several, answer ALL briefly).
-4. Only then continue the enquiry if needed — one short question max.
-
-Never jump to the next question without acknowledging them.
-Never re-greet every turn. Never repeat info they already know.
-Use "your wedding" (etc.) once known — not generic "event".
+## UNDERSTAND BEFORE RESPONDING (STRICT)
+1. Read the customer's message carefully — including spelling mistakes.
+2. Infer what they meant (e.g. "mor3" = more, "forther" = further, "weding" = wedding).
+3. Focus only on what they asked — do not jump to a new form question if they asked for information.
+4. Acknowledge briefly, answer that point simply, then continue only if needed.
+5. Never repeat their message back word-for-word (especially with typos).
+6. Keep language simple — not complicated.
 
 ## VOICE
 Write like WhatsApp: simple everyday language. Vary wording — never the same phrase every turn.
@@ -117,6 +115,97 @@ def soft_ack() -> str:
             "I understand.",
         )
     )
+
+
+def normalize_customer_text(text: str) -> str:
+    """Fix common WhatsApp typos before understanding intent."""
+    t = (text or "").lower().strip()
+    # digit-for-letter typos: mor3 -> more, forther already text
+    replacements = (
+        (r"\bmor3\b", "more"),
+        (r"\bm0re\b", "more"),
+        (r"\bmoree\b", "more"),
+        (r"\bdetials\b", "details"),
+        (r"\bdetial\b", "detail"),
+        (r"\bdetals\b", "details"),
+        (r"\bforther\b", "further"),
+        (r"\bfurthur\b", "further"),
+        (r"\bfurtherr\b", "further"),
+        (r"\bweding\b", "wedding"),
+        (r"\bweddign\b", "wedding"),
+        (r"\bmarraige\b", "marriage"),
+        (r"\bpls\b", "please"),
+        (r"\bplz\b", "please"),
+        (r"\bkno\b", "know"),
+        (r"\b kno w\b", " know "),
+        (r"\binfo+m?ation\b", "information"),
+        (r"\bphtos\b", "photos"),
+        (r"\bphto\b", "photo"),
+        (r"\bpics?\b", "photos"),
+    )
+    for pat, repl in replacements:
+        t = re.sub(pat, repl, t)
+    # mor3details / moredetails glued
+    t = re.sub(r"\bmor3\s*", "more ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def wants_more_info(text: str) -> bool:
+    """Customer wants information — not ready to fill the next form field."""
+    t = normalize_customer_text(text)
+    cues = (
+        "know more",
+        "need more",
+        "more detail",
+        "more details",
+        "tell me more",
+        "share more",
+        "more info",
+        "more information",
+        "about your",
+        "about the",
+        "about event",
+        "about events",
+        "explain",
+        "what all",
+        "what do you include",
+        "what do you offer",
+        "what services",
+        "details",
+        "information",
+    )
+    if any(c in t for c in cues):
+        return True
+    # "yeah i need more" / "i want details"
+    if re.search(r"\b(need|want|give|share|tell)\b.*\b(more|detail|info|information)\b", t):
+        return True
+    return False
+
+
+def wants_to_move_further(text: str) -> bool:
+    """Customer agrees to continue collecting enquiry details."""
+    t = normalize_customer_text(text)
+    if wants_more_info(text):
+        return False
+    cues = (
+        "move further",
+        "move forward",
+        "go further",
+        "go ahead",
+        "continue",
+        "proceed",
+        "next",
+        "note the",
+        "take details",
+        "share details",
+        "lets continue",
+        "let's continue",
+    )
+    if any(c in t for c in cues):
+        return True
+    return False
+
 
 
 def thanks_reply() -> str:
@@ -218,12 +307,15 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
 
 
 def acknowledge_field(field_key: str, value: str, *, event_type: str | None = None) -> str:
-    """Short content-aware acknowledgement."""
+    """Short content-aware acknowledgement — never echo long / messy customer text."""
     occasion = (event_type or "celebration").lower()
     if occasion == "general":
         occasion = "celebration"
-    v = value.strip()
-    # Keep acknowledgements tiny — often just soft_ack or a few words
+    v = (value or "").strip()
+    # Don't repeat sentences, typos, or long dumps back to the customer
+    if len(v) > 28 or len(v.split()) > 4 or re.search(r"[?]|(need|more|detail|know|tell)", v, re.I):
+        return soft_ack()
+
     if field_key == "event_date":
         return random.choice(
             (
@@ -270,9 +362,9 @@ def natural_field_ack(
 def continue_hint(*, event_type: str | None = None) -> str:
     return random.choice(
         (
-            "Any questions?",
-            "Want to know anything, or shall we note a few details?",
-            "Happy to answer questions — or we can continue when you're ready.",
+            "Any questions, or can we move further?",
+            "Want to know anything, or can we move further?",
+            "Happy to answer questions — or can we move further?",
         )
     )
 

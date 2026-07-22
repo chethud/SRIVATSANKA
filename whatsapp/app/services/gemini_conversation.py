@@ -216,8 +216,12 @@ async def generate_details_phase_reply(
 
 
 def looks_like_question(text: str) -> bool:
-    t = text.lower().strip()
+    from app.services.human_style import normalize_customer_text, wants_more_info
+
+    t = normalize_customer_text(text)
     if "?" in text:
+        return True
+    if wants_more_info(text):
         return True
     cues = (
         "what ",
@@ -242,20 +246,47 @@ def looks_like_question(text: str) -> bool:
         "your menu",
         "your price",
         "your cost",
+        "share more",
+        "about your event",
+        "about events",
     )
     return any(c in t for c in cues)
 
 
 def _is_probable_date(text: str) -> bool:
-    t = text.lower()
-    if re.search(r"\d", text):
+    """True only when the message actually looks like a date — not any digit (e.g. mor3)."""
+    t = text.lower().strip()
+    if re.search(
+        r"\b\d{1,2}([/-]\d{1,2})?([/-]\d{2,4})?\b|"
+        r"\b\d{1,2}(st|nd|rd|th)\b|"
+        r"\b(20\d{2}|19\d{2})\b",
+        t,
+    ):
+        # Reject if it's clearly "more" mistyped with a digit and asking for info
+        if re.search(r"\bmor\d\b|\bdetai", t) and not re.search(
+            r"\b\d{1,2}(st|nd|rd|th)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",
+            t,
+        ):
+            if any(w in t for w in ("detail", "info", "know", "tell", "about", "need")):
+                return False
         return True
     months = (
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
         "jan",
         "feb",
         "mar",
         "apr",
-        "may",
         "jun",
         "jul",
         "aug",
@@ -264,7 +295,48 @@ def _is_probable_date(text: str) -> bool:
         "nov",
         "dec",
     )
-    return any(m in t for m in months) or "tomorrow" in t or "next week" in t or "this weekend" in t or "this month" in t or "next month" in t
+    if any(m in t for m in months):
+        return True
+    return any(
+        p in t
+        for p in (
+            "tomorrow",
+            "next week",
+            "this weekend",
+            "this month",
+            "next month",
+            "next year",
+        )
+    )
+
+
+def is_likely_field_answer(text: str, field_key: str) -> bool:
+    from app.services.human_style import wants_more_info
+
+    if wants_more_info(text):
+        return False
+    if looks_like_question(text):
+        if field_key == "event_date" and _is_probable_date(text):
+            return True
+        if field_key == "preferred_callback" and _is_probable_callback(text):
+            return True
+        if field_key == "event_location" and len(text.strip()) > 4 and "?" not in text:
+            if not text.lower().startswith(("what", "how", "why", "can", "do ", "tell")):
+                return True
+        return False
+    if field_key == "event_date":
+        return _is_probable_date(text)
+    if field_key == "preferred_callback":
+        return _is_probable_callback(text) or (2 <= len(text.strip()) <= 60)
+    # Location: short place-like answers, not long sentences asking for info
+    if field_key == "event_location":
+        t = text.strip()
+        if len(t) < 2 or len(t) > 80:
+            return False
+        if len(t.split()) > 10:
+            return False
+        return True
+    return 2 <= len(text.strip()) <= 80
 
 
 def _is_probable_callback(text: str) -> bool:
@@ -288,17 +360,3 @@ def _is_probable_callback(text: str) -> bool:
             "tonight",
         )
     ) or bool(re.search(r"\btom\w*row\b", t))
-
-
-def is_likely_field_answer(text: str, field_key: str) -> bool:
-    if looks_like_question(text):
-        if field_key == "event_date" and _is_probable_date(text):
-            return True
-        if field_key == "preferred_callback" and _is_probable_callback(text):
-            return True
-        if field_key == "event_location" and len(text.strip()) > 4 and "?" not in text:
-            # "Indiranagar" or "Whitefield area" — not a question
-            if not text.lower().startswith(("what", "how", "why", "can", "do ", "tell")):
-                return True
-        return False
-    return len(text.strip()) >= 2

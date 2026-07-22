@@ -31,6 +31,7 @@ from app.services.human_style import (
     small_talk_reply,
     thanks_reply,
     undecided_reply,
+    wants_more_info,
     welcome_message,
 )
 from app.services.session_store import ConversationSession, GuidedStep
@@ -310,18 +311,25 @@ async def process_guided_flow(
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
+        # Understand first: info questions (even with typos) before form progress
+        if wants_more_info(text) or looks_like_question(text):
+            wants_photos = customer_wants_photos(text)
+            media: list[MediaAttachment] = (
+                prepare_gallery_photos(session, limit=4, user_text=text) if wants_photos else []
+            )
+            reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
+            return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+
         if customer_wants_to_proceed(text) or looks_like_polite_filler(text):
             return _start_detail_collection(session, text)
 
-        # Customer already sharing a date — jump into details and store it this turn
-        if is_likely_field_answer(text, "event_date") and not looks_like_question(text):
+        # Only jump ahead when they clearly shared a date
+        if is_likely_field_answer(text, "event_date"):
             session.guided_step = GuidedStep.COLLECT_DETAILS
             return await process_guided_flow(session, whatsapp_id, text)
 
         wants_photos = customer_wants_photos(text)
-        media: list[MediaAttachment] = (
-            prepare_gallery_photos(session, limit=4, user_text=text) if wants_photos else []
-        )
+        media = prepare_gallery_photos(session, limit=4, user_text=text) if wants_photos else []
         reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
         return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
@@ -352,8 +360,19 @@ async def process_guided_flow(
                 reply = await answer_showcase_question(session, text, sharing_photos=bool(media))
                 return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
-            if looks_like_question(text) and not is_likely_field_answer(text, key):
+            # Info / questions first — never store "need more details" as a date/venue
+            if wants_more_info(text) or (looks_like_question(text) and not is_likely_field_answer(text, key)):
                 reply = await answer_details_question(session, text, prompt)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
+            if not is_likely_field_answer(text, key):
+                reply = random.choice(
+                    (
+                        f"No worries — {prompt}",
+                        f"Could you share that again? {prompt}",
+                    )
+                )
+                record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
             if not _store_detail_field(session, key, text):

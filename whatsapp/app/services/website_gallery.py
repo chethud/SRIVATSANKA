@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 def customer_wants_photos(text: str) -> bool:
-    t = text.lower().strip()
+    from app.services.human_style import normalize_customer_text
+
+    t = normalize_customer_text(text)
     cues = (
         "photo",
         "photos",
@@ -24,6 +26,8 @@ def customer_wants_photos(text: str) -> bool:
         "see your",
         "show me",
         "show your",
+        "want photo",
+        "want photos",
         "old event",
         "past event",
         "previous event",

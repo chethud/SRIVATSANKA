@@ -32,21 +32,9 @@ def customer_is_asking(text: str) -> bool:
 
 
 def _wants_more_info(text: str) -> bool:
-    t = text.lower().strip()
-    cues = (
-        "know more",
-        "more detail",
-        "more details",
-        "tell me more",
-        "more info",
-        "more information",
-        "explain",
-        "what all",
-        "what do you include",
-        "what do you offer",
-        "details",
-    )
-    return any(c in t for c in cues)
+    from app.services.human_style import wants_more_info
+
+    return wants_more_info(text)
 
 
 def _more_info_reply(session: ConversationSession) -> str:
@@ -55,13 +43,12 @@ def _more_info_reply(session: ConversationSession) -> str:
         occasion = "celebration"
     return random.choice(
         (
-            f"For your {occasion}, we handle catering, décor, pooja/ritual setup, venue help, "
-            f"and guest hospitality — all with traditional pure-veg food. "
-            f"Want photos, or shall we note the date?",
-            f"Happy to share — {COMPANY['legal_name']} covers catering, décor, rituals, venues, "
-            f"and hospitality for your {occasion}. What would you like to know first?",
-            f"Of course. We do end-to-end {occasion} support: food, décor, pooja setup, and venues. "
-            f"Any particular part you're curious about?",
+            f"For your {occasion}, we handle catering, décor, pooja setup, venue help, "
+            f"and guest hospitality — all pure veg. Want photos, or can we move further?",
+            f"Sure — we cover food, décor, rituals, venues, and hospitality for your {occasion}. "
+            f"What would you like to know first?",
+            f"Of course. End-to-end {occasion} support: catering, décor, pooja, and venues. "
+            f"Any particular part you're asking about?",
         )
     )
 

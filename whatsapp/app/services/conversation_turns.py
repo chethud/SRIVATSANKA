@@ -70,7 +70,13 @@ def is_greeting_only(text: str) -> bool:
 
 
 def customer_wants_to_proceed(text: str) -> bool:
-    t = text.lower().strip().rstrip("!.,")
+    from app.services.human_style import wants_more_info, wants_to_move_further, normalize_customer_text
+
+    if wants_more_info(text):
+        return False
+    if wants_to_move_further(text):
+        return True
+    t = normalize_customer_text(text).rstrip("!.,")
     if t in READY_PHRASES:
         return True
     return any(
@@ -88,6 +94,7 @@ def customer_wants_to_proceed(text: str) -> bool:
             "we can continue",
             "let us continue",
             "share details",
+            "move further",
         )
     )
 
