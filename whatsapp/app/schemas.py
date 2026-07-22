@@ -181,6 +181,10 @@ class NotificationReadIn(BaseModel):
     ids: list[str] | None = None
 
 
+class OwnerPhoneIn(BaseModel):
+    phone: str
+
+
 class DashboardStats(BaseModel):
     new_enquiries: int
     new_orders: int

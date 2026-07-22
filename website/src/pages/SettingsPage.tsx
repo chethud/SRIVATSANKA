@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 import { FONT_SCALE_OPTIONS, useTheme } from '../context/ThemeContext';
-import { fetchWhatsAppStatus, seedDemoData, seedExcelReferenceOrders, type WhatsAppStatus } from '../api/client';
+import { fetchWhatsAppStatus, seedDemoData, seedExcelReferenceOrders, updateOwnerPhone, formatPhoneDisplay, normalizePhoneInput, type WhatsAppStatus } from '../api/client';
 import { ErrorBanner } from '../components/ui';
 
 export default function SettingsPage() {
@@ -12,12 +12,39 @@ export default function SettingsPage() {
   const [wa, setWa] = useState<WhatsAppStatus | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [editingOwnerPhone, setEditingOwnerPhone] = useState(false);
+  const [savingOwnerPhone, setSavingOwnerPhone] = useState(false);
+  const [ownerPhoneMsg, setOwnerPhoneMsg] = useState('');
 
   useEffect(() => {
     if (connected) {
-      fetchWhatsAppStatus().then(setWa).catch(() => setWa(null));
+      fetchWhatsAppStatus()
+        .then((status) => {
+          setWa(status);
+          if (!editingOwnerPhone) {
+            setOwnerPhone(formatPhoneDisplay(status.owner_phone) || status.owner_phone);
+          }
+        })
+        .catch(() => setWa(null));
     }
-  }, [connected, lastSync]);
+  }, [connected, lastSync, editingOwnerPhone]);
+
+  async function saveOwnerPhone() {
+    setSavingOwnerPhone(true);
+    setOwnerPhoneMsg('');
+    try {
+      const result = await updateOwnerPhone(normalizePhoneInput(ownerPhone) || ownerPhone);
+      setOwnerPhone(formatPhoneDisplay(result.owner_phone));
+      setWa((prev) => (prev ? { ...prev, owner_phone: result.owner_phone } : prev));
+      setEditingOwnerPhone(false);
+      setOwnerPhoneMsg('Owner alert number saved. New enquiries will notify this WhatsApp.');
+    } catch (err) {
+      setOwnerPhoneMsg(err instanceof Error ? err.message : 'Could not save owner phone.');
+    } finally {
+      setSavingOwnerPhone(false);
+    }
+  }
 
   async function loadExcelRefs() {
     setSeeding(true);
@@ -140,8 +167,56 @@ export default function SettingsPage() {
               <p className="text-xs text-[var(--muted)] mt-1">Pure Veg Events for all Occasions</p>
             </div>
             <div>
-              <label className="text-sm text-[var(--muted)]">Owner Phone (WhatsApp alerts)</label>
-              <input type="tel" defaultValue={wa?.owner_phone ?? '+91 99456 07074'} className="form-input w-full mt-1 px-4 py-2 rounded-lg" readOnly />
+              <label className="text-sm text-[var(--muted)]" htmlFor="owner-phone">
+                Owner Phone (WhatsApp alerts)
+              </label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input
+                  id="owner-phone"
+                  type="tel"
+                  value={ownerPhone}
+                  readOnly={!editingOwnerPhone}
+                  onChange={(e) => setOwnerPhone(e.target.value)}
+                  placeholder="919945607074"
+                  className={`form-input flex-1 min-w-[12rem] px-4 py-2 rounded-lg ${
+                    editingOwnerPhone ? '' : 'opacity-90'
+                  }`}
+                />
+                {editingOwnerPhone ? (
+                  <>
+                    <Button type="button" onClick={() => void saveOwnerPhone()} disabled={!connected || savingOwnerPhone}>
+                      {savingOwnerPhone ? 'Saving…' : 'Save'}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingOwnerPhone(false);
+                        setOwnerPhoneMsg('');
+                        setOwnerPhone(formatPhoneDisplay(wa?.owner_phone || '') || wa?.owner_phone || '');
+                      }}
+                      className="px-4 py-2 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)]"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingOwnerPhone(true);
+                      setOwnerPhoneMsg('');
+                    }}
+                    disabled={!connected}
+                    className="px-4 py-2 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)] disabled:opacity-50"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-[var(--muted)] mt-1">
+                New enquiry and callback alerts are sent to this number.
+              </p>
+              {ownerPhoneMsg && <p className="text-sm mt-2 text-[var(--foreground)]">{ownerPhoneMsg}</p>}
             </div>
           </div>
         </Card>

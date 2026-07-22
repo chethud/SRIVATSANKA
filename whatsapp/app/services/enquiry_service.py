@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models import Enquiry, EnquiryDish, EnquiryStatus, Notification, NotificationType
 from app.schemas import EnquiryFields, SelectedDishItem
+from app.services.app_settings import get_owner_phone
 from app.services.event_date import parse_event_date
 from app.services.location_normalize import normalize_location
 from app.services.callback_time import format_callback_display, parse_callback_time
@@ -88,7 +88,7 @@ async def save_enquiry(
     await db.refresh(enquiry)
 
     logger.info("Enquiry saved: %s (%s) with %d dishes", enquiry.id, enquiry.customerName, len(dishes or []))
-    await notify_owner_new_enquiry(enquiry, dishes)
+    await notify_owner_new_enquiry(db, enquiry, dishes)
     return enquiry
 
 
@@ -102,9 +102,11 @@ def _format_dishes_for_whatsapp(dishes: list[SelectedDishItem] | None) -> str:
 
 
 async def notify_owner_new_enquiry(
-    enquiry: Enquiry, dishes: list[SelectedDishItem] | None = None
+    db: AsyncSession,
+    enquiry: Enquiry,
+    dishes: list[SelectedDishItem] | None = None,
 ) -> None:
-    owner = normalize_phone(settings.owner_phone_number)
+    owner = await get_owner_phone(db)
     if not owner:
         logger.warning("OWNER_PHONE_NUMBER not set – skipping owner alert")
         return
@@ -130,8 +132,8 @@ async def notify_owner_new_enquiry(
         logger.error("Failed to send owner WhatsApp alert to %s", owner)
 
 
-async def notify_owner_callback_reminder(enquiry: Enquiry) -> None:
-    owner = normalize_phone(settings.owner_phone_number)
+async def notify_owner_callback_reminder(db: AsyncSession, enquiry: Enquiry) -> None:
+    owner = await get_owner_phone(db)
     if not owner:
         return
 

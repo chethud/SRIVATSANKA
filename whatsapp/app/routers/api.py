@@ -23,6 +23,7 @@ from app.schemas import (
     EnquiryUpdateIn,
     NotificationOut,
     NotificationReadIn,
+    OwnerPhoneIn,
     UpdateEnquiryStatus,
 )
 from app.services.dashboard_assistant import answer_dashboard_query
@@ -69,10 +70,12 @@ async def health() -> dict:
 
 
 @router.get("/whatsapp/status")
-async def whatsapp_status() -> dict:
+async def whatsapp_status(db: AsyncSession = Depends(get_db)) -> dict:
     from app.config import settings
+    from app.services.app_settings import get_owner_phone
 
     phone_id = settings.whatsapp_phone_number_id.strip()
+    owner = await get_owner_phone(db)
     return {
         "configured": is_whatsapp_configured(),
         "phone_number_id_set": bool(phone_id),
@@ -80,8 +83,22 @@ async def whatsapp_status() -> dict:
         "token_set": bool(settings.whatsapp_token.strip()),
         "verify_token": settings.whatsapp_verify_token,
         "webhook_path": "/webhook",
-        "owner_phone": settings.owner_phone_number,
+        "owner_phone": owner,
     }
+
+
+@router.patch("/settings/owner-phone")
+async def update_owner_phone(
+    payload: OwnerPhoneIn,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    from app.services.app_settings import set_owner_phone
+
+    try:
+        phone = await set_owner_phone(db, payload.phone)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "owner_phone": phone}
 
 
 @router.get("/stats", response_model=DashboardStats)

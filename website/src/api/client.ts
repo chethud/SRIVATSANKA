@@ -346,6 +346,14 @@ export const fetchVendors = () => apiFetch<Vendor[]>('/api/vendors');
 export const fetchWorkers = () => apiFetch<Worker[]>('/api/workers');
 export const fetchExpenses = () => apiFetch<Expense[]>('/api/expenses');
 export const fetchAnalytics = () => apiFetch<Analytics>('/api/analytics');
+export async function updateOwnerPhone(phone: string): Promise<{ ok: boolean; owner_phone: string }> {
+  return apiFetch<{ ok: boolean; owner_phone: string }>('/api/settings/owner-phone', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  });
+}
+
 export const fetchWhatsAppStatus = () => apiFetch<WhatsAppStatus>('/api/whatsapp/status');
 
 export async function createEnquiry(data: {

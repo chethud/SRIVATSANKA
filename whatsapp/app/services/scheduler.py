@@ -30,7 +30,7 @@ async def check_callback_reminders() -> None:
 
         for enquiry in enquiries:
             logger.info("Sending callback reminder for %s (%s)", enquiry.customerName, enquiry.id)
-            await notify_owner_callback_reminder(enquiry)
+            await notify_owner_callback_reminder(db, enquiry)
             enquiry.reminderSent = True
             db.add(
                 Notification(

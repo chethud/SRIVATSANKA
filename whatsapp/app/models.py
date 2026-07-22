@@ -195,3 +195,13 @@ class Expense(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     expenseDate: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AppSetting(Base):
+    """Key/value overrides for runtime settings (e.g. owner WhatsApp alert number)."""
+
+    __tablename__ = "AppSetting"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
