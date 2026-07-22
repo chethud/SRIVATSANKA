@@ -80,6 +80,7 @@ def extract_name(text: str) -> str:
     t = text.strip()
     for pat in (
         r"(?:i'?m|i am|my name is|this is|call me|it's|its)\s+([A-Za-z][A-Za-z\s'.-]{0,40})",
+        r"^(?:hi|hello|hey|hii)[,!\s]+(?:i'?m|i am|this is)?\s*([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30})?)",
         r"^([A-Za-z][A-Za-z\s'.-]{1,40}),?\s+(?:here|speaking)",
     ):
         m = re.search(pat, t, re.I)
@@ -87,7 +88,12 @@ def extract_name(text: str) -> str:
             name = m.group(1).strip().strip(".,").title()
             if name.lower() not in GREETING_ONLY and len(name) >= 2:
                 return name[:80]
-    words = t.split()
+    words = [w.strip(".,!") for w in t.split() if w.strip(".,!")]
+    # "Priya Sharma" / single first name
+    if 1 <= len(words) <= 3 and all(w.isalpha() or "'" in w for w in words):
+        joined = " ".join(words)
+        if joined.lower() not in GREETING_ONLY and not is_greeting_only(joined):
+            return joined.title()[:80]
     if len(words) == 1 and len(t) >= 2 and t.lower() not in GREETING_ONLY:
         return t[:80]
     return ""
@@ -102,6 +108,8 @@ def natural_field_ack(next_prompt: str) -> str:
             "Noted —",
             "Sure thing.",
             "Thanks!",
+            "Awesome.",
+            "Okay, great.",
         )
     )
     return f"{lead} {next_prompt}"
@@ -113,5 +121,6 @@ def natural_continue_hint() -> str:
             "Ask me anything, or just say when you're ready to share the date and venue.",
             "Happy to answer questions — or tell me when you'd like to continue.",
             "Feel free to ask more, or we can move on to date & location whenever you're ready.",
+            "Any questions, or shall we note the date and venue next?",
         )
     )

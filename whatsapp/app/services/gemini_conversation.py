@@ -34,11 +34,13 @@ def _build_chat_history(session: ConversationSession) -> list[dict]:
 
 NATURAL_STYLE = """HOW YOU THINK AND REPLY
 1. Read the customer's latest message carefully — understand what they mean, not just keywords.
-2. Reply to that specific point first, in your own words (like a real person on WhatsApp).
-3. Keep it warm and concise — 1–3 short sentences, under 320 characters.
+2. Reply to that specific point first, in your own words (like a warm colleague texting on WhatsApp — not a form, IVR, or call centre).
+3. Keep it warm and concise — 1–3 short sentences, under 320 characters. Sound like a real chat, not a script.
 4. One question at a time. No bullet lists, brochures, or copy-paste marketing.
 5. Never say you are a bot or AI. At most one emoji, only if it fits naturally.
-6. Match their tone — casual if they're casual, polite if they're formal."""
+6. Match their tone — casual if they're casual, polite if they're formal.
+7. Avoid stiff phrases like "I didn't catch that", "You've reached", "Kindly", "Please provide", or "what name should I use".
+8. Vary wording across turns — don't repeat the same acknowledgement every time."""
 
 
 def trim_whatsapp_reply(text: str, max_chars: int = 320) -> str:
@@ -69,7 +71,7 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
             model = genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_instruction,
-                generation_config=genai.GenerationConfig(temperature=0.7, max_output_tokens=180),
+                generation_config=genai.GenerationConfig(temperature=0.85, max_output_tokens=180),
             )
             chat = model.start_chat(history=_build_chat_history(session))
             response = chat.send_message(user_text)

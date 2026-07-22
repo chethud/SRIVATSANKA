@@ -1,6 +1,7 @@
 """Structured WhatsApp enquiry flow before cuisine selection."""
 
 import logging
+import random
 
 from app.data.company_knowledge import (
     COMPANY,
@@ -30,23 +31,53 @@ from app.services.whatsapp_client import normalize_phone
 logger = logging.getLogger(__name__)
 
 DETAIL_STEPS: list[tuple[str, str]] = [
-    ("event_date", "What date is the occasion?"),
-    ("event_location", "Which area in Bengaluru is the venue?"),
-    ("preferred_callback", "When works best for a quick call from our team?"),
+    ("event_date", "When’s the occasion?"),
+    ("event_location", "Which part of Bengaluru is the venue in?"),
+    ("preferred_callback", "When’s a good time for our team to give you a quick call?"),
 ]
 
-SKIP_NAMES = {"hi", "hello", "hey", "hii", "namaste", "vanakkam", "start", "help"}
+SKIP_NAMES = {"hi", "hello", "hey", "hii", "hiii", "namaste", "vanakkam", "start", "help", "yes", "ok", "okay"}
 
 
 def _welcome_message() -> str:
-    return (
-        f"Hi! You've reached *{COMPANY['brand_name']}* 🌿 "
-        "We do pure-veg events across Bengaluru. What should I call you?"
+    return random.choice(
+        (
+            f"Hey! 👋 Thanks for messaging *{COMPANY['brand_name']}*. "
+            "We handle pure-veg celebrations across Bengaluru — who am I speaking with?",
+            f"Hi there! Welcome to *{COMPANY['brand_name']}* 🌿 "
+            "Happy to help plan your event. What’s your name?",
+            f"Hello from *{COMPANY['brand_name']}*! "
+            "Pure-veg events in Bengaluru — may I know your name?",
+        )
+    )
+
+
+def _ask_name_again(text: str) -> str:
+    if is_greeting_only(text) or text.lower().strip().rstrip("!.,") in SKIP_NAMES:
+        return random.choice(
+            (
+                "No worries 🙂 Just your name is perfect.",
+                "All good! Who should I say this is from?",
+                "Happy to help — what’s your name?",
+            )
+        )
+    return random.choice(
+        (
+            "Could I get your name so I know who I’m chatting with?",
+            "Mind sharing your name? Helps me keep things personal.",
+            "One quick one — what’s your name?",
+        )
     )
 
 
 def _company_intro_message(name: str) -> str:
-    return f"Lovely to meet you, *{name}*! What occasion are you planning?"
+    return random.choice(
+        (
+            f"Lovely to meet you, *{name}*! What occasion are you planning?",
+            f"Nice to meet you, *{name}* 🌿 Is it a wedding, house warming, birthday, or something else?",
+            f"Great connecting, *{name}*! Tell me a bit — what’s the occasion?",
+        )
+    )
 
 
 def _event_showcase_message(event_type: str, *, with_images: bool) -> str:
@@ -83,7 +114,13 @@ def _start_detail_collection(session: ConversationSession, user_text: str) -> Ag
     session.guided_step = GuidedStep.COLLECT_DETAILS
     first_prompt = _next_detail_prompt(session)
     name = session.fields.customer_name or "there"
-    reply = f"Sure, *{name}* — let's get the basics. {first_prompt}"
+    reply = random.choice(
+        (
+            f"Sure, *{name}* — a couple of quick details. {first_prompt}",
+            f"Perfect, *{name}*. {first_prompt}",
+            f"Sounds good, *{name}*! {first_prompt}",
+        )
+    )
     record_exchange(session, user_text, reply)
     return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -111,15 +148,22 @@ async def process_guided_flow(
                 reply = _event_showcase_message(event_type, with_images=False)
             else:
                 session.guided_step = GuidedStep.AWAIT_EVENT_TYPE
-                reply = f"Hi *{name}*! Great to hear from you. What occasion are you planning?"
+                reply = random.choice(
+                    (
+                        f"Hi *{name}*! Great to hear from you. What occasion are you planning?",
+                        f"Hey *{name}* 👋 How can we help — wedding, house warming, or something else?",
+                    )
+                )
         elif is_greeting_only(text):
             session.guided_step = GuidedStep.AWAIT_NAME
             reply = _welcome_message()
         else:
             session.guided_step = GuidedStep.AWAIT_NAME
-            reply = (
-                f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 "
-                "May I know your name? (I'll help with your enquiry right after.)"
+            reply = random.choice(
+                (
+                    f"Hi! Welcome to *{COMPANY['brand_name']}* 🌿 Who am I speaking with?",
+                    f"Hey! Thanks for reaching out to *{COMPANY['brand_name']}*. What’s your name?",
+                )
             )
 
         record_exchange(session, text, reply)
@@ -127,8 +171,8 @@ async def process_guided_flow(
 
     if step == GuidedStep.AWAIT_NAME:
         name = extract_name(text) or (text[:80] if len(text) >= 2 else "")
-        if not name or name.lower() in SKIP_NAMES:
-            reply = "Sorry, I didn't catch that — what name should I use?"
+        if not name or name.lower() in SKIP_NAMES or is_greeting_only(text):
+            reply = _ask_name_again(text)
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -140,7 +184,12 @@ async def process_guided_flow(
 
     if step == GuidedStep.AWAIT_EVENT_TYPE:
         if customer_wants_to_proceed(text) or len(text.strip()) < 3:
-            reply = "Which occasion is it? (e.g. wedding, house warming, birthday, corporate)"
+            reply = random.choice(
+                (
+                    "Which occasion is it — wedding, house warming, birthday, corporate…?",
+                    "What are you celebrating? (wedding, house warming, birthday, etc.)",
+                )
+            )
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -180,8 +229,12 @@ async def process_guided_flow(
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
             if not _store_detail_field(session, key, text):
-                retry = dict(DETAIL_STEPS)[key]
-                reply = f"I didn't quite get that — {retry.lower()}"
+                reply = random.choice(
+                    (
+                        f"Hmm, didn’t quite get that — {prompt.lower()}",
+                        f"Could you share that again? {prompt}",
+                    )
+                )
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -194,7 +247,7 @@ async def process_guided_flow(
 
         if not _details_complete(session):
             prompt = _next_detail_prompt(session)
-            reply = prompt or "Could you share the remaining details?"
+            reply = prompt or "Could you share the remaining details when you have a moment?"
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -208,8 +261,11 @@ async def process_guided_flow(
             parse_callback_time(session.fields.preferred_callback or "in 2 hours"),
             session.fields.preferred_callback,
         )
-        reply = (
-            f"Perfect, *{name}* — we'll call you around *{callback_when.split(' (')[0]}*."
+        reply = random.choice(
+            (
+                f"Perfect, *{name}* — we’ll call you around *{callback_when.split(' (')[0]}*. Looking forward to it!",
+                f"Thanks *{name}*! Our team will ring you around *{callback_when.split(' (')[0]}*. Talk soon 🌿",
+            )
         )
         record_exchange(session, text, reply)
         return AgentTurnResult(

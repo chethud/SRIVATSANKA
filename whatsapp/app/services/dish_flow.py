@@ -1,3 +1,4 @@
+import random
 import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,22 +28,35 @@ def _parse_numbers(text: str) -> list[str]:
 
 
 def _format_session_prompt() -> str:
-    lines = [
-        "Which meal services do you need? You can reply with numbers or names (e.g. *1,3* or *breakfast, dinner*):",
-        "",
-    ]
+    lead = random.choice(
+        (
+            "Almost there — which meals are you thinking of? Numbers or names both work:",
+            "Before we wrap up, which meal services do you need? Reply with numbers or names:",
+            "Quick one — which of these meals should we plan for?",
+        )
+    )
+    lines = [lead, ""]
     for key, label in MEAL_SESSION_OPTIONS:
         lines.append(f"{key}. {label}")
-    lines.append("\nOr say *skip* if you'd rather discuss this on the call.")
+    lines.append("\nOr just say *skip* if you’d rather decide on the call.")
     return "\n".join(lines)
 
 
 def _format_confirmation(session: ConversationSession) -> str:
     f = session.fields
-    meals = ", ".join(d.dish_name for d in session.selected_dishes) if session.selected_dishes else "We'll suggest options on the call"
-    return (
-        f"All set, *{f.customer_name}*! ✅ Our team will call you around {f.preferred_callback}.\n"
-        f"Meals noted: {meals}. Send *new* anytime to plan another occasion."
+    name = f.customer_name or "there"
+    meals = (
+        ", ".join(d.dish_name for d in session.selected_dishes)
+        if session.selected_dishes
+        else "we’ll suggest options on the call"
+    )
+    return random.choice(
+        (
+            f"Wonderful, *{name}*! ✅ We’ve noted *{meals}*. "
+            f"Our team will call around {f.preferred_callback}. Looking forward to it — send *new* anytime.",
+            f"All set, *{name}*! Meals: *{meals}*. "
+            f"We’ll ring you around {f.preferred_callback}. Talk soon 🌿",
+        )
     )
 
 
@@ -96,8 +110,8 @@ async def handle_dish_flow(
     labels = _resolve_session_selections(user_text)
     if labels is None:
         reply = (
-            "I didn't catch that. Reply with numbers or names "
-            "(e.g. *1,3* or *breakfast, dinner*), or say *skip*."
+            "Hmm, didn’t quite get that — try numbers or names "
+            "(e.g. *1,3* or *breakfast, dinner*), or just say *skip*."
         )
         session.history.append({"role": "assistant", "content": reply})
         return AgentTurnResult(

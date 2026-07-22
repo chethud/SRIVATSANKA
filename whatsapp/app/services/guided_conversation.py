@@ -37,23 +37,23 @@ def _fallback_answer(
     hint = natural_continue_hint()
 
     if sharing_photos or customer_wants_photos(user_text):
-        return f"Here are some photos from our events 👇 {hint}"
+        return f"Sharing a few photos from our events 👇 {hint}"
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We're *{COMPANY['brand_name']}* — pure veg events in Bengaluru since {COMPANY['established']}. "
+            f"We’re *{COMPANY['brand_name']}* — pure veg celebrations in Bengaluru since {COMPANY['established']}. "
             f"{hint}"
         )
 
     if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio", "wedding")):
-        return f"We've handled hundreds of occasions in Bengaluru. {hook} {hint}"
+        return f"We’ve done hundreds of occasions around Bengaluru. {hook} {hint}"
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
-        return f"Pricing depends on menu and guest count — our team walks you through it on a call. {hint}"
+        return f"Pricing really depends on the menu and guest count — easiest to walk through on a quick call. {hint}"
 
     if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "service")):
         dishes = ", ".join(POPULAR_DISHES[:3])
-        return f"We're 100% vegetarian — favourites include {dishes}, and plenty more. {hint}"
+        return f"We’re fully vegetarian — people love {dishes}, and there’s plenty more. {hint}"
 
     return f"Happy to help, *{name}*! {hint}"
 

@@ -20,12 +20,13 @@ Official site: {WEBSITE_URL}
 
 HOW YOU THINK AND REPLY
 1. Read the customer's message fully — understand intent, tone, and what they actually need.
-2. Respond to that first, naturally, like a real person texting on WhatsApp.
+2. Respond to that first, naturally, like a real person texting on WhatsApp — not a form or script.
 3. Keep replies concise: 1–3 short sentences, under 320 characters in "reply".
 4. One question at a time. No bullet lists or brochure language unless they ask.
 5. Never say you are a bot or AI. Match their tone — casual or formal.
 6. Light emoji at most once, only if it fits.
 7. Answer company / service questions using the website knowledge above. If unsure, share {WEBSITE_URL}.
+8. Avoid stiff phrases ("Kindly", "Please provide", "I didn't catch that"). Vary acknowledgements.
 
 INFORMATION TO COLLECT (all required before is_complete=true)
 1. customer_name
@@ -103,7 +104,7 @@ def _call_gemini(session: ConversationSession, user_text: str) -> str:
         system_instruction=AGENT_SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            temperature=0.7,
+            temperature=0.85,
             max_output_tokens=220,
         ),
     )
@@ -133,8 +134,8 @@ class AIAgent:
         if session.completed:
             return AgentTurnResult(
                 reply=(
-                    "Your enquiry is with our team ✅ We'll call you at the time you chose. "
-                    "Send *new* anytime to plan another celebration."
+                    "All good — your enquiry is with our team ✅ "
+                    "We’ll call at the time you chose. Send *new* anytime for another celebration."
                 ),
                 fields=session.fields,
                 is_complete=True,
