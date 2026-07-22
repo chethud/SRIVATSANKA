@@ -12,6 +12,7 @@ import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention
 import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../utils/enquiryStatus';
 import { MONTH_FILTERS, matchesMonthFilter } from '../utils/monthFilter';
 import { buildSerialNumberMap } from '../utils/serialNumbers';
+import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
 
 const EVENT_TYPES = ['Wedding', 'House Warming', 'Baby Shower', 'Reception', 'Corporate Lunch', 'Naming Ceremony', 'Other'];
 
@@ -115,6 +116,10 @@ export default function EnquiriesPage() {
   }, [enquiries, search, statusFilter, monthFilter, attentionOnly]);
 
   const detail = enquiries.find((e) => e.id === selected);
+  const cuisinePreferences = useMemo(
+    () => (detail?.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
+    [detail],
+  );
 
   useEffect(() => {
     if (deepLinkId || deepLinkPhone) return;
@@ -331,11 +336,11 @@ export default function EnquiriesPage() {
                   <div><dt className="text-[var(--muted)]">Callback</dt><dd>{callbackDisplay(detail)}</dd></div>
                   <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
                 </dl>
-                {detail.dishes?.length > 0 && (
+                {cuisinePreferences.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <p className="font-medium mb-2">Menu</p>
+                    <p className="font-medium mb-2">Cuisine preferences</p>
                     <ul className="text-sm space-y-1">
-                      {detail.dishes.map((d, i) => (
+                      {cuisinePreferences.map((d, i) => (
                         <li key={i}>• {d.dishName} {d.customizations && <span className="text-[var(--muted)]">({d.customizations})</span>}</li>
                       ))}
                     </ul>
