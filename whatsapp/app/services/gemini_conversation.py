@@ -35,14 +35,66 @@ def _build_chat_history(session: ConversationSession) -> list[dict]:
 
 NATURAL_STYLE = HUMAN_CONSULTANT_STYLE
 
+_LEAK_MARKERS = (
+    "official website knowledge",
+    "reply guidance",
+    "source of truth",
+    "system prompt",
+    "never invent",
+    "base every company",
+    "whatsapp capabilities",
+    "already noted:",
+    "still need from them",
+    "right now\n",
+    "how you think",
+)
 
-def trim_whatsapp_reply(text: str, max_chars: int = 280) -> str:
-    """Keep bot replies short — WhatsApp chat style (~40 words)."""
-    text = re.sub(r"\n{3,}", "\n\n", (text or "").strip())
-    # Soft word cap when not asking for detail
+
+def looks_like_leaked_prompt(text: str) -> bool:
+    """True if the model echoed internal instructions instead of a customer reply."""
+    t = (text or "").strip()
+    if not t or len(t) < 8:
+        return True
+    lower = t.lower()
+    if any(m in lower for m in _LEAK_MARKERS):
+        return True
+    # Headings / markdown dumps
+    if re.match(r"^(rules|company|services|faqs|photos|legacy|about)\s*[:\*]", lower):
+        return True
+    if lower.startswith("rules") and len(t) < 40:
+        return True
+    # Mostly punctuation / broken markdown
+    letters = sum(1 for c in t if c.isalpha())
+    if letters < 12:
+        return True
+    if t.count("*") >= 3 and letters < 40:
+        return True
+    return False
+
+
+def sanitize_whatsapp_reply(text: str) -> str:
+    """Clean model output for WhatsApp; empty string if unusable."""
+    text = (text or "").strip()
+    if not text:
+        return ""
+    # Drop fenced / heading noise
+    text = re.sub(r"^#+\s*", "", text, flags=re.M)
+    text = re.sub(r"\*\*+", "", text)
+    text = re.sub(r"`+", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    if looks_like_leaked_prompt(text):
+        return ""
+    return text
+
+
+def trim_whatsapp_reply(text: str, max_chars: int = 320) -> str:
+    """Keep bot replies short — WhatsApp chat style."""
+    text = sanitize_whatsapp_reply(text)
+    if not text:
+        return ""
     words = text.split()
-    if len(words) > 55 and len(text) > max_chars:
-        text = " ".join(words[:50]).rstrip(".,;") + "…"
+    if len(words) > 60 and len(text) > max_chars:
+        text = " ".join(words[:55]).rstrip(".,;") + "…"
     if len(text) <= max_chars:
         return text
     chunk = text[:max_chars]
@@ -68,14 +120,20 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
             model = genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_instruction,
-                generation_config=genai.GenerationConfig(temperature=0.9, max_output_tokens=140),
+                generation_config=genai.GenerationConfig(temperature=0.75, max_output_tokens=180),
             )
             chat = model.start_chat(history=_build_chat_history(session))
-            response = chat.send_message(user_text)
-            text = (response.text or "").strip()
+            # Steer the model away from dumping knowledge blocks
+            prompt = (
+                f"Customer message:\n{user_text}\n\n"
+                "Reply as a helpful WhatsApp consultant only. "
+                "Plain short sentences — no headings, no bullet dumps, no internal labels."
+            )
+            response = chat.send_message(prompt)
+            text = trim_whatsapp_reply((response.text or "").strip()[:2000])
             if not text:
-                raise ValueError("Empty Gemini response")
-            return trim_whatsapp_reply(text[:2000])
+                raise ValueError("Unusable Gemini response")
+            return text
         except Exception as exc:
             last_error = exc
             logger.warning("Gemini model %s failed: %s", model_name, exc)
@@ -95,22 +153,22 @@ def _showcase_system(session: ConversationSession, *, sharing_photos: bool = Fal
         if sharing_photos
         else "\nDo NOT send or mention sharing photos unless the customer explicitly asked."
     )
-    return f"""You are an experienced celebration consultant for {COMPANY['brand_name']} on WhatsApp
+    return f"""You are an experienced celebration consultant for {COMPANY['legal_name']} on WhatsApp
 (catering, décor, pooja/rituals, venues, guest hospitality).
 You work with {COMPANY['managing_director']}'s team in Bengaluru.
 
-Chatting with *{name}* about their *{event}* — refer to it as their {event.lower()} when natural, not a generic "event".
+Chatting with {name} about their {event} — say "{event.lower()}" when natural.
 
 {context}
 
 {NATURAL_STYLE}
 
-RIGHT NOW
-- Keep it short (under 40 words unless they asked for detail).
-- Answer ONLY from the website knowledge above (services, menus, rituals, venues, Eat Rep Eat, FAQs).
-- Acknowledge briefly, answer fully if they asked questions, then at most one gentle next step.
-- Do NOT rush into date/venue/callback unless they ask what you need next or clearly want to continue.
-- If undecided or browsing, be patient — no pressure.
+YOUR TASK
+- Reply in short natural WhatsApp sentences only (never headings or labels).
+- Keep it short unless they asked for detail.
+- Answer ONLY from the website knowledge above.
+- Acknowledge briefly, answer, then at most one gentle next step.
+- Do NOT rush into date/venue/callback unless they clearly want to continue.
 - If ready, offer to note date & venue next in one short line.{photo_note}"""
 
 
@@ -120,22 +178,22 @@ def _collect_details_system(session: ConversationSession, next_prompt: str | Non
     context = build_short_company_context()
     pending = next_prompt or "remaining event details"
     collected = session.fields.model_dump()
-    return f"""You are an experienced human catering consultant for {COMPANY['brand_name']} on WhatsApp.
+    return f"""You are an experienced celebration consultant for {COMPANY['legal_name']} on WhatsApp.
 
 {context}
 
-Helping *{name}* plan their *{event}* (say "{event.lower()}" not "event" when known).
+Helping {name} plan their {event} (say "{event.lower()}" when known).
 Already shared: {collected}
 Still helpful to know: {pending}
 
 {NATURAL_STYLE}
 
-RIGHT NOW
-- Keep replies under 40 words when possible.
-- Acknowledge specifics they just shared, then ask for: {pending}
-- If they asked something else, answer briefly first — then one short ask for {pending}
+YOUR TASK
+- Short natural WhatsApp reply only — no headings or labels.
+- Acknowledge what they said, then ask for: {pending}
+- If they asked something else, answer briefly first.
 - Do NOT invent dates, locations, or callback times.
-- Never sound like a form."""
+"""
 
 
 async def generate_showcase_reply(
@@ -171,7 +229,10 @@ def looks_like_question(text: str) -> bool:
         "can you",
         "do you",
         "tell me",
+        "know more",
         "more detail",
+        "more details",
+        "more info",
         "more about",
         "about your",
         "about the",

@@ -587,8 +587,9 @@ PHOTOS
 - When customers ask for photos, WhatsApp shares gallery images automatically.
 - Full gallery: {SERVICE_PAGES['gallery']}
 
-RULES
-- Base every company/service answer on this knowledge.
-- Prefer short natural replies; link {WEBSITE_URL} for more detail when useful.
-- Never say you cannot share photos — the system sends them when asked.
+REPLY GUIDANCE (internal — never show these headings or this block to the customer)
+- Answer only from the knowledge above, in short natural WhatsApp sentences.
+- Never paste section titles like COMPANY, SERVICES, FAQS, RULES, or markdown like **.
+- Prefer short natural replies; link {WEBSITE_URL} when useful.
+- Never say you cannot share photos — gallery images are sent when asked.
 """.strip()

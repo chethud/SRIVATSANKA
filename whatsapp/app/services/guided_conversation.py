@@ -1,11 +1,11 @@
 """Conversational replies during guided WhatsApp enquiry (Gemini + website knowledge)."""
 
 import logging
+import random
 
 from app.data.company_knowledge import (
     COMPANY,
     POPULAR_DISHES,
-    WEBSITE_URL,
     match_service_key,
     service_answer,
     short_services_reply,
@@ -15,6 +15,7 @@ from app.services.gemini_conversation import (
     generate_details_phase_reply,
     generate_showcase_reply,
     is_gemini_configured,
+    looks_like_leaked_prompt,
     looks_like_question,
     trim_whatsapp_reply,
 )
@@ -30,6 +31,41 @@ def customer_is_asking(text: str) -> bool:
     return looks_like_question(text)
 
 
+def _wants_more_info(text: str) -> bool:
+    t = text.lower().strip()
+    cues = (
+        "know more",
+        "more detail",
+        "more details",
+        "tell me more",
+        "more info",
+        "more information",
+        "explain",
+        "what all",
+        "what do you include",
+        "what do you offer",
+        "details",
+    )
+    return any(c in t for c in cues)
+
+
+def _more_info_reply(session: ConversationSession) -> str:
+    occasion = (session.fields.event_type or "celebration").lower()
+    if occasion == "general":
+        occasion = "celebration"
+    return random.choice(
+        (
+            f"For your {occasion}, we handle catering, décor, pooja/ritual setup, venue help, "
+            f"and guest hospitality — all with traditional pure-veg food. "
+            f"Want photos, or shall we note the date?",
+            f"Happy to share — {COMPANY['legal_name']} covers catering, décor, rituals, venues, "
+            f"and hospitality for your {occasion}. What would you like to know first?",
+            f"Of course. We do end-to-end {occasion} support: food, décor, pooja setup, and venues. "
+            f"Any particular part you're curious about?",
+        )
+    )
+
+
 def _fallback_answer(
     session: ConversationSession,
     user_text: str,
@@ -43,7 +79,10 @@ def _fallback_answer(
     hint = natural_continue_hint(event_type=session.fields.event_type)
 
     if sharing_photos or customer_wants_photos(user_text):
-        return f"Sure — sharing a few photos from our site 👇 {hint}"
+        return f"Sure — sharing a few photos from our site 👇"
+
+    if _wants_more_info(user_text):
+        return _more_info_reply(session)
 
     service_key = match_service_key(user_text)
     if service_key:
@@ -51,14 +90,14 @@ def _fallback_answer(
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We're *{COMPANY['legal_name']}* — catering & celebration services in Bengaluru "
-            f"since {COMPANY['established']}. More at {WEBSITE_URL}"
+            f"We're {COMPANY['legal_name']} — catering & celebration services in Bengaluru "
+            f"since {COMPANY['established']}. Happy to tell you more."
         )
 
     if any(w in t for w in ("eat rep", "eat repeat", "restaurant", "dining")):
         return (
-            f"That's *Eat Rep Eat* — our vegetarian experience center at N R Colony. "
-            f"Hours {COMPANY['eat_rep_eat_hours']}. {COMPANY['eat_rep_eat_url']}"
+            f"That's Eat Rep Eat — our vegetarian experience center at N R Colony. "
+            f"Open {COMPANY['eat_rep_eat_hours']}."
         )
 
     if any(w in t for w in ("how many", "work", "done", "experience", "portfolio", "1000")):
@@ -75,12 +114,12 @@ def _fallback_answer(
         return f"Fully vegetarian — {dishes}, plus live counters. {hint}"
 
     if any(w in t for w in ("contact", "phone", "number", "email", "address", "location of")):
-        return f"Call {COMPANY['phone']} or email {COMPANY['email']}. We're at {COMPANY['address']}."
+        return f"You can call {COMPANY['phone']} or email {COMPANY['email']}."
 
     if "service" in t or "offer" in t or "what do you" in t:
         return short_services_reply()
 
-    return f"Happy to help, *{name}*! {hint}"
+    return f"Happy to help, {name}! {hint}"
 
 
 async def _gemini_or_fallback(
@@ -90,6 +129,10 @@ async def _gemini_or_fallback(
     next_detail_prompt: str | None = None,
     sharing_photos: bool = False,
 ) -> str:
+    # Prefer a solid website-based reply for "know more" style asks
+    if _wants_more_info(user_text) and not sharing_photos:
+        return _more_info_reply(session)
+
     if not is_gemini_configured():
         logger.warning("GEMINI_API_KEY not set — using website knowledge reply for: %s", user_text[:80])
         return _fallback_answer(session, user_text, sharing_photos=sharing_photos)
@@ -103,7 +146,11 @@ async def _gemini_or_fallback(
                 user_text,
                 sharing_photos=sharing_photos or customer_wants_photos(user_text),
             )
-        return trim_whatsapp_reply(reply)
+        reply = trim_whatsapp_reply(reply)
+        if not reply or looks_like_leaked_prompt(reply):
+            logger.warning("Rejected bad Gemini reply for: %s", user_text[:80])
+            return _fallback_answer(session, user_text, sharing_photos=sharing_photos)
+        return reply
     except Exception:
         logger.exception("Gemini conversation failed for message: %s", user_text[:80])
         return _fallback_answer(session, user_text, sharing_photos=sharing_photos)
