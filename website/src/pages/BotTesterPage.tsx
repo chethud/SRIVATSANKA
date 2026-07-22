@@ -468,7 +468,9 @@ export default function BotTesterPage() {
                               ? 'bg-[#dcf8c6] text-[#111]'
                               : isOwner
                                 ? 'bg-[var(--primary-light)] border border-[var(--primary)]/20 text-[var(--foreground)]'
-                                : 'bg-[var(--card)] border border-[var(--border)]'
+                                : msg.body.includes('Not delivered to WhatsApp')
+                                  ? 'bg-[var(--danger-bg)] border border-[var(--danger)]/30 text-[var(--foreground)]'
+                                  : 'bg-[var(--card)] border border-[var(--border)]'
                           }`}
                         >
                           {msg.body}

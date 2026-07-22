@@ -80,10 +80,23 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
 
     result, _saved = await handle_conversation(from_number, text, db)
     for attachment in result.media:
-        await send_whatsapp_image(from_number, attachment.url, caption=attachment.caption)
+        img_ok = await send_whatsapp_image(from_number, attachment.url, caption=attachment.caption)
+        if not img_ok:
+            logger.error("Bot image not delivered to %s", from_number)
+
     sent, send_err = await send_whatsapp_message(from_number, result.reply)
     if not sent:
         logger.error("Bot reply not delivered to %s: %s", from_number, send_err)
+        # Still log so the dashboard shows what the bot intended, with a clear failure note.
+        fail_note = (send_err or "WhatsApp send failed").strip()
+        if len(fail_note) > 280:
+            fail_note = fail_note[:277] + "…"
+        body = f"{result.reply}\n\n⚠️ Not delivered to WhatsApp — {fail_note}"
+        try:
+            await log_bot_message(db, from_number, body, result.media)
+        except Exception:
+            logger.exception("Failed to log undelivered bot message for %s", from_number)
+        return {"status": "send_failed", "error": send_err}
 
     try:
         await log_bot_message(db, from_number, result.reply, result.media)
