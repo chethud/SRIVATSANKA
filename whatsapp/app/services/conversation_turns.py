@@ -1,9 +1,26 @@
 """Shared helpers for natural WhatsApp conversation turns."""
 
-import random
 import re
 
+from app.services.human_style import (
+    continue_hint,
+    natural_field_ack,
+    soft_ack,
+)
 from app.services.session_store import ConversationSession
+
+# Re-export for existing imports
+__all__ = [
+    "GREETING_ONLY",
+    "READY_PHRASES",
+    "record_exchange",
+    "is_greeting_only",
+    "customer_wants_to_proceed",
+    "extract_name",
+    "natural_field_ack",
+    "natural_continue_hint",
+    "soft_ack",
+]
 
 GREETING_ONLY = frozenset(
     {"hi", "hello", "hey", "hii", "hiii", "namaste", "vanakkam", "start", "help", "good morning", "good evening"}
@@ -89,7 +106,6 @@ def extract_name(text: str) -> str:
             if name.lower() not in GREETING_ONLY and len(name) >= 2:
                 return name[:80]
     words = [w.strip(".,!") for w in t.split() if w.strip(".,!")]
-    # "Priya Sharma" / single first name
     if 1 <= len(words) <= 3 and all(w.isalpha() or "'" in w for w in words):
         joined = " ".join(words)
         if joined.lower() not in GREETING_ONLY and not is_greeting_only(joined):
@@ -99,28 +115,5 @@ def extract_name(text: str) -> str:
     return ""
 
 
-def natural_field_ack(next_prompt: str) -> str:
-    """Vary confirmations so replies feel human, not scripted."""
-    lead = random.choice(
-        (
-            "Got it 👍",
-            "Perfect, thanks.",
-            "Noted —",
-            "Sure thing.",
-            "Thanks!",
-            "Awesome.",
-            "Okay, great.",
-        )
-    )
-    return f"{lead} {next_prompt}"
-
-
-def natural_continue_hint() -> str:
-    return random.choice(
-        (
-            "Ask me anything, or just say when you're ready to share the date and venue.",
-            "Happy to answer questions — or tell me when you'd like to continue.",
-            "Feel free to ask more, or we can move on to date & location whenever you're ready.",
-            "Any questions, or shall we note the date and venue next?",
-        )
-    )
+def natural_continue_hint(*, event_type: str | None = None) -> str:
+    return continue_hint(event_type=event_type)

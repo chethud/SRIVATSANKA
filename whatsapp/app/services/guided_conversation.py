@@ -31,29 +31,33 @@ def _fallback_answer(
 ) -> str:
     name = session.fields.customer_name or "there"
     event = session.fields.event_type or "celebrations"
+    occasion = event if event != "General" else "celebration"
     details = EVENT_TYPE_DETAILS.get(event, EVENT_TYPE_DETAILS["General"])
     hook = details.get("short_reply") or "Happy to help!"
     t = user_text.lower()
-    hint = natural_continue_hint()
+    hint = natural_continue_hint(event_type=session.fields.event_type)
 
     if sharing_photos or customer_wants_photos(user_text):
-        return f"Sharing a few photos from our events 👇 {hint}"
+        return f"Of course — sharing a few photos from similar celebrations 👇 {hint}"
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We’re *{COMPANY['brand_name']}* — pure veg celebrations in Bengaluru since {COMPANY['established']}. "
-            f"{hint}"
+            f"We're *{COMPANY['brand_name']}* — pure veg celebrations in Bengaluru since {COMPANY['established']}. "
+            f"Happy to tell you more. {hint}"
         )
 
-    if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio", "wedding")):
-        return f"We’ve done hundreds of occasions around Bengaluru. {hook} {hint}"
+    if any(w in t for w in ("how many", "work", "done", "events", "experience", "portfolio")):
+        return f"We've been part of hundreds of celebrations around Bengaluru. {hook} {hint}"
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate")):
-        return f"Pricing really depends on the menu and guest count — easiest to walk through on a quick call. {hint}"
+        return (
+            f"Pricing depends on the menu and guest count for your {occasion.lower()} — "
+            f"easiest to walk through on a quick call. {hint}"
+        )
 
     if any(w in t for w in ("menu", "dish", "food", "cuisine", "veg", "service")):
         dishes = ", ".join(POPULAR_DISHES[:3])
-        return f"We’re fully vegetarian — people love {dishes}, and there’s plenty more. {hint}"
+        return f"We're fully vegetarian — favourites include {dishes}, and there's plenty more. {hint}"
 
     return f"Happy to help, *{name}*! {hint}"
 

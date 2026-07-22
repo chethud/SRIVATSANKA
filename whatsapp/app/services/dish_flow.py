@@ -31,31 +31,36 @@ def _format_session_prompt() -> str:
     lead = random.choice(
         (
             "Almost there — which meals are you thinking of? Numbers or names both work:",
-            "Before we wrap up, which meal services do you need? Reply with numbers or names:",
-            "Quick one — which of these meals should we plan for?",
+            "Before we wrap up, which meal services would you like us to plan for?",
+            "Quick one — which of these meals should we keep in mind?",
         )
     )
     lines = [lead, ""]
     for key, label in MEAL_SESSION_OPTIONS:
         lines.append(f"{key}. {label}")
-    lines.append("\nOr just say *skip* if you’d rather decide on the call.")
+    lines.append("\nOr just say *skip* if you'd rather decide on the call — no problem at all.")
     return "\n".join(lines)
 
 
 def _format_confirmation(session: ConversationSession) -> str:
     f = session.fields
     name = f.customer_name or "there"
+    occasion = (f.event_type or "celebration").lower()
+    if occasion == "general":
+        occasion = "celebration"
     meals = (
         ", ".join(d.dish_name for d in session.selected_dishes)
         if session.selected_dishes
-        else "we’ll suggest options on the call"
+        else "we'll suggest options on the call"
     )
     return random.choice(
         (
-            f"Wonderful, *{name}*! ✅ We’ve noted *{meals}*. "
+            f"Wonderful, *{name}*! ✅ We've noted *{meals}* for your {occasion}. "
             f"Our team will call around {f.preferred_callback}. Looking forward to it — send *new* anytime.",
             f"All set, *{name}*! Meals: *{meals}*. "
-            f"We’ll ring you around {f.preferred_callback}. Talk soon 🌿",
+            f"We'll ring you around {f.preferred_callback} about your {occasion}. Talk soon 🌿",
+            f"Thank you, *{name}*. Your {occasion} enquiry is with us — meals noted as *{meals}*. "
+            f"We'll call around {f.preferred_callback}.",
         )
     )
 
