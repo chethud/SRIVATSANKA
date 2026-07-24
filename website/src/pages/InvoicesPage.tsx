@@ -127,10 +127,10 @@ export default function InvoicesPage() {
         }}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-stretch">
-        <div className="flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-start">
+        <div className="flex flex-col min-w-0">
           {!preview ? (
-            <Card className="p-4 sm:p-6 lg:p-8 flex-1">
+            <Card className="p-4 sm:p-6 lg:p-8">
               <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                 <FileText size={20} className="text-[var(--order-accent)]" />
                 Upload expense invoice
@@ -148,7 +148,7 @@ export default function InvoicesPage() {
               </Button>
             </Card>
           ) : (
-            <Card className="p-4 sm:p-6 flex-1">
+            <Card className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-1">Review recognized details</h3>
               <p className="text-sm text-[var(--muted)] mb-4">
                 File: <span className="font-medium text-[var(--foreground)]">{preview.fileName}</span>
@@ -259,13 +259,13 @@ export default function InvoicesPage() {
           )}
         </div>
 
-        <Card className="p-4 sm:p-6 lg:p-8 flex flex-col h-full">
-          <h3 className="text-lg font-semibold mb-2">Split payments pending</h3>
-          <p className="text-sm text-[var(--muted)] mb-6">
+        <Card className="p-4 sm:p-6 lg:p-8 flex flex-col min-w-0 max-h-[22rem]">
+          <h3 className="text-lg font-semibold mb-2 shrink-0">Split payments pending</h3>
+          <p className="text-sm text-[var(--muted)] mb-4 shrink-0">
             Orders with a remaining balance after a partial payment
             {partialCount > 0 ? ` · ${partialCount} open` : ''}
           </p>
-          <div className="flex-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 -mr-1">
             <PartialPaymentsPanel
               embedded
               enquiries={enquiries}

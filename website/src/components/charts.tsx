@@ -460,7 +460,7 @@ export function ProfitRadialSnapshot({ profit, revenue, expenses }: { profit: nu
   const expenseRatio = revenue > 0 ? Math.min(100, (expenses / revenue) * 100) : 0;
 
   return (
-    <div className="flex flex-col items-stretch gap-5">
+    <div className="flex flex-col gap-5">
       <div className="relative w-40 h-40 mx-auto">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="54" fill="none" stroke="var(--chart-grid)" strokeWidth="8" />

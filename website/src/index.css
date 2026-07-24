@@ -133,6 +133,18 @@ body {
   overflow-x: hidden;
 }
 
+/*
+ * Default CSS grid stretches all cells to the tallest row sibling, which leaves
+ * empty blank space inside shorter cards. Prefer content-sized height instead.
+ * Use Tailwind `items-stretch` / `items-center` when equal heights are intentional.
+ */
+@layer base {
+  .grid {
+    align-items: start;
+  }
+}
+
+
 .attention-unread {
   background: var(--primary-light);
   border-color: var(--attention-border) !important;
@@ -534,6 +546,7 @@ body {
   grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 0.875rem;
   margin-bottom: 1.5rem;
+  align-items: start;
 }
 
 @media (min-width: 640px) {

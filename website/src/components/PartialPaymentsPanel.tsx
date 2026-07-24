@@ -250,7 +250,10 @@ export function PartialPaymentsPanel({
 
   return (
     <GlassCard title="Partial payments" action={<span className="text-xs text-[var(--muted)]">{partials.length} open</span>}>
-      {body}
+      <div className="max-h-[18rem] overflow-y-auto overscroll-contain pr-1 -mr-1">
+        {list}
+      </div>
+      {modal}
     </GlassCard>
   );
 }
