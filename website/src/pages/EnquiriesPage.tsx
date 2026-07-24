@@ -80,6 +80,14 @@ export default function EnquiriesPage() {
   const serialNumbers = useMemo(() => buildSerialNumberMap(enquiries), [enquiries]);
 
   useEffect(() => {
+    if (!selected) return;
+    if (typeof window === 'undefined' || window.matchMedia('(min-width: 768px)').matches) return;
+    requestAnimationFrame(() => {
+      document.getElementById('enquiry-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [selected]);
+
+  useEffect(() => {
     if (deepLinkId && enquiries.some((e) => e.id === deepLinkId)) {
       setSelected(deepLinkId);
       return;
@@ -255,15 +263,82 @@ export default function EnquiriesPage() {
       {filtered.length === 0 ? (
         <EmptyState message={attentionOnly ? 'No new enquiries waiting — all caught up.' : 'No enquiries match your filters.'} />
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+          {/* Mobile / tablet: stacked cards so status & details aren’t clipped */}
+          <div className="xl:col-span-2 space-y-3 md:hidden">
+            {filtered.map((e) => {
+              const unread = isUnviewedEnquiry(e);
+              const serial = serialNumbers.get(e.id);
+              const active = selected === e.id;
+              return (
+                <div
+                  key={e.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setSelected(e.id);
+                    handleRowHover(e);
+                  }}
+                  onKeyDown={(ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                      ev.preventDefault();
+                      setSelected(e.id);
+                      handleRowHover(e);
+                    }
+                  }}
+                  className={`w-full text-left rounded-xl border p-4 shadow-sm transition-colors cursor-pointer ${
+                    unread
+                      ? 'attention-unread-row border-[var(--attention-border)]'
+                      : active
+                        ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                        : 'border-[var(--border)] bg-[var(--card)]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
+                        <span className="font-semibold text-[var(--foreground)] break-words">{e.customerName}</span>
+                        {unread && <AttentionBadge />}
+                      </div>
+                      <p className="text-xs text-[var(--muted)] mt-1 break-all">{e.phoneNumber}</p>
+                      <p className="text-sm mt-2 text-[var(--foreground)]">{e.eventType}</p>
+                      {unread && (
+                        <p className="text-xs text-[var(--primary)] mt-1">
+                          Callback: {formatDateTime(e.preferredCallbackAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-[var(--border)]" onClick={(ev) => ev.stopPropagation()}>
+                    <label className="text-[10px] uppercase tracking-wide text-[var(--muted)] font-semibold">Status</label>
+                    <select
+                      value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
+                      onChange={(ev) => changeStatus(e.id, ev.target.value)}
+                      className="form-select mt-1 w-full text-sm px-3 py-2.5 rounded-lg min-h-[2.5rem]"
+                    >
+                      {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
+                        <option key={s.id} value={s.id}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-[var(--primary)] mt-3 font-medium">
+                    {active ? 'Details below ↓' : 'Tap for full details'}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="xl:col-span-2 hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm overflow-x-auto">
+            <table className="w-full text-sm min-w-[36rem]">
               <thead className="bg-[var(--background)]">
                 <tr>
                   <th className="text-left p-4 w-12">#</th>
                   <th className="text-left p-4">Customer</th>
                   <th className="text-left p-4">Event</th>
-                  <th className="text-left p-4">Status</th>
+                  <th className="text-left p-4 min-w-[9rem]">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,24 +355,24 @@ export default function EnquiriesPage() {
                     }`}
                   >
                     <td className="p-4 text-[var(--muted)] font-medium tabular-nums">{serial}</td>
-                    <td className="p-4">
+                    <td className="p-4 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{e.customerName}</span>
+                        <span className="font-medium break-words">{e.customerName}</span>
                         {unread && <AttentionBadge />}
                       </div>
-                      <div className="text-[var(--muted)] text-xs">{e.phoneNumber}</div>
+                      <div className="text-[var(--muted)] text-xs break-all">{e.phoneNumber}</div>
                       {unread && (
                         <div className="text-xs text-[var(--primary)] mt-1">
                           Callback: {formatDateTime(e.preferredCallbackAt)}
                         </div>
                       )}
                     </td>
-                    <td className="p-4">{e.eventType}</td>
+                    <td className="p-4 whitespace-nowrap">{e.eventType}</td>
                     <td className="p-4" onClick={(ev) => ev.stopPropagation()}>
                       <select
                         value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
                         onChange={(ev) => changeStatus(e.id, ev.target.value)}
-                        className="form-select text-xs px-2 py-1 rounded-lg"
+                        className="form-select text-xs px-2 py-1.5 rounded-lg min-w-[8.5rem] max-w-full"
                       >
                         {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
                           <option key={s.id} value={s.id}>{s.label}</option>
@@ -311,37 +386,79 @@ export default function EnquiriesPage() {
             </table>
           </div>
 
-          <Card className="p-6 h-fit sticky top-4">
+          <Card
+            id="enquiry-detail"
+            className={`p-4 sm:p-6 h-fit xl:sticky xl:top-4 ${detail ? '' : 'hidden md:block'}`}
+          >
             {detail ? (
               <>
+                <div className="flex items-center justify-between gap-2 mb-1 md:hidden">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Enquiry details</p>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] min-h-[2.5rem] px-2"
+                  >
+                    Close
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 flex-wrap mb-4">
                   <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">
                     #{serialNumbers.get(detail.id)}
                   </span>
-                  <h3 className="font-semibold text-lg">{detail.customerName}</h3>
+                  <h3 className="font-semibold text-lg break-words">{detail.customerName}</h3>
                   {isUnviewedEnquiry(detail) && <AttentionBadge />}
                 </div>
-                <dl className="space-y-2 text-sm">
-                  <div><dt className="text-[var(--muted)]">Phone</dt><dd>{detail.phoneNumber}</dd></div>
+                <dl className="space-y-3 text-sm">
+                  <div>
+                    <dt className="text-[var(--muted)]">Phone</dt>
+                    <dd className="break-all font-medium">{detail.phoneNumber}</dd>
+                  </div>
                   <Link
                     to={`/bot-tester?phone=${encodeURIComponent(detail.phoneNumber)}`}
-                    className="inline-flex items-center gap-1.5 text-sm text-[var(--primary)] hover:underline mt-2"
+                    className="inline-flex items-center gap-1.5 text-sm text-[var(--primary)] hover:underline min-h-[2.5rem]"
                   >
                     <MessageCircle size={14} />
                     Open WhatsApp chat
                   </Link>
-                  <div><dt className="text-[var(--muted)]">Event</dt><dd>{detail.eventType}</dd></div>
-                  <div><dt className="text-[var(--muted)]">Date</dt><dd>{formatDate(detail.eventDate)}</dd></div>
-                  <div><dt className="text-[var(--muted)]">Location</dt><dd>{detail.eventLocation}</dd></div>
-                  <div><dt className="text-[var(--muted)]">Callback</dt><dd>{callbackDisplay(detail)}</dd></div>
+                  <div>
+                    <dt className="text-[var(--muted)]">Event</dt>
+                    <dd>{detail.eventType}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">Date</dt>
+                    <dd>{formatDate(detail.eventDate)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">Location</dt>
+                    <dd className="break-words">{detail.eventLocation}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">Callback</dt>
+                    <dd className="break-words">{callbackDisplay(detail)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)] mb-1">Status</dt>
+                    <dd>
+                      <select
+                        value={detail.status === 'CLOSED' ? 'NOT_CONVERTED' : detail.status}
+                        onChange={(ev) => changeStatus(detail.id, ev.target.value)}
+                        className="form-select w-full text-sm px-3 py-2.5 rounded-lg min-h-[2.5rem]"
+                      >
+                        {statusOptionsForDropdown(detail.status === 'CLOSED' ? 'NOT_CONVERTED' : detail.status).map((s) => (
+                          <option key={s.id} value={s.id}>{s.label}</option>
+                        ))}
+                      </select>
+                    </dd>
+                  </div>
                   <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
                 </dl>
                 {cuisinePreferences.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
+                  <div className="mt-4 pt-4 border-t border-[var(--border)]">
                     <p className="font-medium mb-2">Cuisine preferences</p>
                     <ul className="text-sm space-y-1">
                       {cuisinePreferences.map((d, i) => (
-                        <li key={i}>• {d.dishName} {d.customizations && <span className="text-[var(--muted)]">({d.customizations})</span>}</li>
+                        <li key={i} className="break-words">• {d.dishName} {d.customizations && <span className="text-[var(--muted)]">({d.customizations})</span>}</li>
                       ))}
                     </ul>
                   </div>

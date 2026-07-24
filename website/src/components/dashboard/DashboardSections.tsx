@@ -177,41 +177,61 @@ export function DashboardEnquiriesPanel({
       {filtered.length === 0 ? (
         <p className="text-sm text-[var(--muted)] py-8 text-center">No enquiries in this filter.</p>
       ) : (
-        <div className="overflow-auto max-h-[min(70vh,640px)] -mx-1 rounded-xl border border-[var(--border)]">
-          <table className="data-table w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--background)]">
-                <th className="px-4 py-3 text-left">Customer</th>
-                <th className="px-4 py-3 text-left">Event</th>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((e) => (
-                <tr key={e.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{e.customerName}</div>
-                    <div className="text-xs text-[var(--muted)]">{e.phoneNumber}</div>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{e.eventType}</td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{formatDate(e.eventDate)}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
-                      onChange={(ev) => void changeStatus(e.id, ev.target.value)}
-                      className="form-select text-xs px-2 py-1 rounded-lg"
-                    >
-                      {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
-                        <option key={s.id} value={s.id}>{s.label}</option>
-                      ))}
-                    </select>
-                  </td>
+        <>
+          <div className="space-y-3 md:hidden">
+            {filtered.map((e) => (
+              <div key={e.id} className="rounded-xl border border-[var(--border)] p-3 bg-[var(--background)]">
+                <p className="font-medium break-words">{e.customerName}</p>
+                <p className="text-xs text-[var(--muted)] break-all">{e.phoneNumber}</p>
+                <p className="text-sm mt-1">{e.eventType} · {formatDate(e.eventDate)}</p>
+                <select
+                  value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
+                  onChange={(ev) => void changeStatus(e.id, ev.target.value)}
+                  className="form-select mt-2 w-full text-sm px-3 py-2.5 rounded-lg min-h-[2.5rem]"
+                >
+                  {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto max-h-[min(70vh,640px)] -mx-1 rounded-xl border border-[var(--border)]">
+            <table className="data-table w-full text-sm min-w-[36rem]">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--background)]">
+                  <th className="px-4 py-3 text-left">Customer</th>
+                  <th className="px-4 py-3 text-left">Event</th>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left min-w-[9rem]">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((e) => (
+                  <tr key={e.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]">
+                    <td className="px-4 py-3 min-w-0">
+                      <div className="font-medium break-words">{e.customerName}</div>
+                      <div className="text-xs text-[var(--muted)] break-all">{e.phoneNumber}</div>
+                    </td>
+                    <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">{e.eventType}</td>
+                    <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">{formatDate(e.eventDate)}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status}
+                        onChange={(ev) => void changeStatus(e.id, ev.target.value)}
+                        className="form-select text-xs px-2 py-1.5 rounded-lg min-w-[8.5rem]"
+                      >
+                        {statusOptionsForDropdown(e.status === 'CLOSED' ? 'NOT_CONVERTED' : e.status).map((s) => (
+                          <option key={s.id} value={s.id}>{s.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </GlassCard>
   );
