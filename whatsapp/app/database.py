@@ -90,6 +90,10 @@ async def _migrate_sqlite_columns() -> None:
                 ecols = {c["name"] for c in insp.get_columns("Enquiry")}
                 if "ownerViewedAt" not in ecols:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN ownerViewedAt DATETIME")
+                if "deliveredAt" not in ecols:
+                    alters.append("ALTER TABLE Enquiry ADD COLUMN deliveredAt DATETIME")
+                if "paymentReceived" not in ecols:
+                    alters.append("ALTER TABLE Enquiry ADD COLUMN paymentReceived BOOLEAN DEFAULT 0")
             if "EnquiryDish" in tables:
                 cols = {c["name"] for c in insp.get_columns("EnquiryDish")}
                 if "quantity" not in cols:
@@ -270,6 +274,26 @@ async def _migrate_notification_enquiry_id() -> None:
         await conn.run_sync(run)
 
 
+async def _migrate_enquiry_payment_columns() -> None:
+    """Add deliveredAt / paymentReceived for Postgres (and any non-SQLite)."""
+    import sqlalchemy as sa
+
+    async with engine.begin() as conn:
+        def run(connection) -> None:
+            insp = sa.inspect(connection)
+            if "Enquiry" not in insp.get_table_names():
+                return
+            cols = {c["name"] for c in insp.get_columns("Enquiry")}
+            if "deliveredAt" not in cols:
+                connection.execute(sa.text('ALTER TABLE "Enquiry" ADD COLUMN "deliveredAt" TIMESTAMP'))
+            if "paymentReceived" not in cols:
+                connection.execute(
+                    sa.text('ALTER TABLE "Enquiry" ADD COLUMN "paymentReceived" BOOLEAN DEFAULT FALSE')
+                )
+
+        await conn.run_sync(run)
+
+
 async def init_db() -> None:
     import app.models  # noqa: F401 — register every table before create_all
 
@@ -279,6 +303,7 @@ async def init_db() -> None:
     await _migrate_sqlite_columns() if is_sqlite_database(settings.database_url) else None
     if not is_sqlite_database(settings.database_url):
         await _migrate_notification_enquiry_id()
+        await _migrate_enquiry_payment_columns()
     await _migrate_dish_category_to_labels()
 
     from app.data.seed_dishes import seed_dishes

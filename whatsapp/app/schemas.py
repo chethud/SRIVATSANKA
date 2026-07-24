@@ -141,6 +141,10 @@ class EnquiryUpdateIn(BaseModel):
     notes: str | None = None
 
 
+class EnquiryPaymentIn(BaseModel):
+    received: bool = True
+
+
 class EnquiryOut(BaseModel):
     id: str
     customerName: str
@@ -153,6 +157,8 @@ class EnquiryOut(BaseModel):
     status: str
     ownerViewedAt: datetime | None = None
     notes: str | None = None
+    deliveredAt: datetime | None = None
+    paymentReceived: bool = False
     createdAt: datetime
     dishes: list[EnquiryDishOut] = Field(default_factory=list)
 

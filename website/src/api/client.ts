@@ -142,6 +142,8 @@ export interface Enquiry {
   status: string;
   ownerViewedAt?: string | null;
   notes?: string | null;
+  deliveredAt?: string | null;
+  paymentReceived?: boolean;
   createdAt: string;
   dishes: EnquiryDish[];
 }
@@ -198,6 +200,10 @@ export interface ChartMoneyItem {
   amount: number;
   date?: string | null;
   purpose?: string | null;
+  id?: string | null;
+  fileName?: string | null;
+  enquiryId?: string | null;
+  source?: string | null;
 }
 
 export interface MonthlyChartPoint {
@@ -216,10 +222,12 @@ export interface Analytics {
   order_expenses: number;
   net_profit: number;
   converted_orders: number;
+  paid_orders?: number;
   by_status?: Record<string, number>;
   by_event_type?: Record<string, number>;
   expense_items?: ChartMoneyItem[];
   profit_items?: ChartMoneyItem[];
+  revenue_items?: ChartMoneyItem[];
   monthly?: MonthlyChartPoint[];
 }
 
@@ -387,6 +395,34 @@ export async function updateEnquiryStatus(id: string, status: string): Promise<E
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   });
+}
+
+export async function markEnquiryDelivered(id: string): Promise<Enquiry> {
+  return apiFetch<Enquiry>(`/api/enquiries/${id}/delivered`, { method: 'POST' });
+}
+
+export async function confirmEnquiryPayment(id: string, received = true): Promise<Enquiry> {
+  return apiFetch<Enquiry>(`/api/enquiries/${id}/payment`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ received }),
+  });
+}
+
+export async function downloadUploadFile(uploadId: string, fileName: string): Promise<void> {
+  const res = await fetchWithAuth(`/api/uploads/${uploadId}/file`);
+  if (!res.ok) {
+    throw new Error(await apiErrorMessage(res, `/api/uploads/${uploadId}/file`));
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'document';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function markEnquiryViewed(id: string): Promise<Enquiry> {

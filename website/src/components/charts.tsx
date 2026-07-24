@@ -18,7 +18,6 @@ import {
 } from 'recharts';
 import type { Analytics } from '../api/client';
 import { formatCurrency } from '../api/client';
-import { ENQUIRY_STATUS_LABELS } from '../utils/enquiryStatus';
 
 const GREEN = '#006837';
 const GREEN_LIGHT = '#8cc63f';
@@ -120,26 +119,32 @@ export function ProfitBreakdownPie({ analytics }: { analytics: Analytics }) {
 }
 
 export function EnquiryStatusChart({ analytics }: { analytics: Analytics }) {
-  const data = Object.entries(analytics.by_status ?? {}).map(([k, v]) => ({
-    name: ENQUIRY_STATUS_LABELS[k] || k,
-    count: v,
-  }));
+  const byStatus = analytics.by_status ?? {};
+  const converted = byStatus.CONVERTED ?? 0;
+  const unconverted = Object.entries(byStatus).reduce((sum, [status, count]) => {
+    if (status === 'CONVERTED') return sum;
+    return sum + count;
+  }, 0);
 
-  if (data.length === 0) {
+  if (converted === 0 && unconverted === 0) {
     return <p className="text-sm text-[var(--muted)] text-center py-12">No enquiries yet.</p>;
   }
 
-  const colors = [BLUE, GREEN, GREEN_LIGHT, '#9e9e9e'];
+  const chartData = [
+    { name: 'Converted', count: converted },
+    { name: 'Unconverted', count: unconverted },
+  ];
+  const colors = [GREEN, '#9e9e9e'];
 
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
+      <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8f5e9" horizontal={false} />
         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-        <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12 }} />
+        <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
         <Tooltip />
         <Bar dataKey="count" name="Enquiries" radius={[0, 6, 6, 0]}>
-          {data.map((_, i) => (
+          {chartData.map((_, i) => (
             <Cell key={i} fill={colors[i % colors.length]} />
           ))}
         </Bar>
@@ -315,7 +320,19 @@ export function EventsByTypePieChart({ analytics }: { analytics: Analytics }) {
   );
 }
 
-export function NetProfitGauge({ profit, revenue, expenses }: { profit: number; revenue: number; expenses: number }) {
+export function NetProfitGauge({
+  profit,
+  revenue,
+  expenses,
+  onRevenueClick,
+  onExpensesClick,
+}: {
+  profit: number;
+  revenue: number;
+  expenses: number;
+  onRevenueClick?: () => void;
+  onExpensesClick?: () => void;
+}) {
   const pct = revenue > 0 ? Math.min(100, Math.max(0, (profit / revenue) * 100)) : 0;
   const positive = profit >= 0;
 
@@ -328,14 +345,30 @@ export function NetProfitGauge({ profit, revenue, expenses }: { profit: number; 
         />
       </div>
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="p-2 rounded-lg bg-[var(--success-bg)]">
+        <button
+          type="button"
+          onClick={onRevenueClick}
+          disabled={!onRevenueClick}
+          className={`p-2 rounded-lg bg-[var(--success-bg)] text-left sm:text-center transition ${
+            onRevenueClick ? 'hover:ring-2 hover:ring-[var(--primary)]/30 cursor-pointer' : ''
+          }`}
+        >
           <p className="text-[var(--muted)]">Revenue</p>
           <p className="font-semibold text-[var(--success-text)]">{formatCurrency(revenue)}</p>
-        </div>
-        <div className="p-2 rounded-lg bg-amber-50">
+          {onRevenueClick && <p className="text-[10px] text-[var(--muted)] mt-0.5">View history</p>}
+        </button>
+        <button
+          type="button"
+          onClick={onExpensesClick}
+          disabled={!onExpensesClick}
+          className={`p-2 rounded-lg bg-amber-50 text-left sm:text-center transition ${
+            onExpensesClick ? 'hover:ring-2 hover:ring-amber-400/40 cursor-pointer' : ''
+          }`}
+        >
           <p className="text-[var(--muted)]">Expenses</p>
           <p className="font-semibold text-amber-900">{formatCurrency(expenses)}</p>
-        </div>
+          {onExpensesClick && <p className="text-[10px] text-[var(--muted)] mt-0.5">View history</p>}
+        </button>
         <div className={`p-2 rounded-lg ${positive ? 'bg-[var(--success-bg)]' : 'bg-[var(--danger-bg)]'}`}>
           <p className="text-[var(--muted)]">Net</p>
           <p className={`font-semibold ${positive ? 'text-[var(--success-text)]' : 'text-[var(--danger)]'}`}>{formatCurrency(profit)}</p>

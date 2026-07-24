@@ -23,6 +23,8 @@ import {
   RevenueExpenseInteractiveChart,
   RevenueForecastChart,
 } from '../components/charts';
+import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
+import { PaymentReceivedModal } from '../components/PaymentReceivedModal';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, LoadingScreen } from '../components/ui';
 import { formatCurrency } from '../api/client';
@@ -43,9 +45,10 @@ import {
 } from '../utils/dashboardData';
 
 export default function DashboardPage() {
-  const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics, refresh } = useAppData();
+  const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics, refresh, patchEnquiry } = useAppData();
   const [chartMode, setChartMode] = useState<ChartPeriod>('monthly');
   const [tab, setTab] = useState<DashboardTab>('overview');
+  const [history, setHistory] = useState<'revenue' | 'expense' | null>(null);
 
   const converted = useMemo(() => getConvertedOrders(enquiries), [enquiries]);
   const monthly = analytics?.monthly ?? [];
@@ -62,9 +65,28 @@ export default function DashboardPage() {
   const profit = analytics?.net_profit ?? 0;
   const revenue = analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
+  const expenseItems = analytics?.expense_items ?? [];
+  const revenueItems = analytics?.revenue_items ?? analytics?.profit_items ?? [];
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-6">
+      <PaymentReceivedModal
+        orders={enquiries}
+        dishes={dishes}
+        onResolved={async (updated) => {
+          patchEnquiry(updated);
+          await refresh();
+        }}
+      />
+
+      {history && (
+        <MoneyHistoryModal
+          kind={history}
+          items={history === 'revenue' ? revenueItems : expenseItems}
+          onClose={() => setHistory(null)}
+        />
+      )}
+
       <motion.header initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
@@ -118,6 +140,7 @@ export default function DashboardPage() {
           trend={calcTrend(lastM?.profit ?? profit, prevM?.profit ?? 0)}
           sparkline={sparklineFromMonthly(analytics, 'profit')}
           sparkId="profit"
+          onClick={() => setHistory('revenue')}
         />
         <DashboardKpiCard
           label="Bill expenses"
@@ -130,6 +153,7 @@ export default function DashboardPage() {
           sparkline={sparklineFromMonthly(analytics, 'expenses')}
           sparkId="exp"
           gradient={2}
+          onClick={() => setHistory('expense')}
         />
       </div>
 

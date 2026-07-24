@@ -52,6 +52,9 @@ class Enquiry(Base):
     ownerViewedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reminderSent: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Delivery + client payment gate revenue on the dashboard
+    deliveredAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    paymentReceived: Mapped[bool] = mapped_column(Boolean, default=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

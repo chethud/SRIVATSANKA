@@ -8,6 +8,7 @@ import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
   formatDate,
   formatDateTime,
+  markEnquiryDelivered,
   updateEnquiry,
 } from '../../api/client';
 import { AmPmTimeInput } from '../AmPmTimeInput';
@@ -76,6 +77,7 @@ export function OrderDetailView({
   const [saving, setSaving] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [deliveryBusy, setDeliveryBusy] = useState(false);
 
   async function handleDownloadExcel(copyType: 'kitchen' | 'billing') {
     setExcelBusy(true);
@@ -215,6 +217,18 @@ export function OrderDetailView({
     setEditingExtras(true);
   }
 
+  async function handleMarkDelivered() {
+    setDeliveryBusy(true);
+    try {
+      const updated = await markEnquiryDelivered(order.id);
+      onOrderUpdated(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not mark delivered');
+    } finally {
+      setDeliveryBusy(false);
+    }
+  }
+
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
       <Link to="/orders" className="order-view-back">
@@ -230,7 +244,23 @@ export function OrderDetailView({
           <p className="order-hero-meta">{formatOrderId(order.id)}</p>
           {order.eventType && <p className="order-hero-event">{order.eventType}</p>}
         </div>
-        <span className="order-status-badge">{statusLabel(order.status)}</span>
+        <div className="flex flex-col items-end gap-2">
+          <span className="order-status-badge">{statusLabel(order.status)}</span>
+          {order.paymentReceived ? (
+            <span className="text-xs font-medium text-[var(--success-text)]">Payment received</span>
+          ) : order.deliveredAt ? (
+            <span className="text-xs font-medium text-amber-800">Delivered · awaiting payment</span>
+          ) : (
+            <button
+              type="button"
+              disabled={deliveryBusy}
+              onClick={() => void handleMarkDelivered()}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60"
+            >
+              {deliveryBusy ? 'Saving…' : 'Mark as delivered'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="order-stat-grid">

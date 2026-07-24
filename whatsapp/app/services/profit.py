@@ -13,6 +13,11 @@ def line_price(item: EnquiryDish, menu_prices: dict[str, float]) -> float:
     return unit * max(1, item.quantity or 1)
 
 
+def order_amount(enquiry: Enquiry, menu_prices: dict[str, float]) -> float:
+    line_sum = sum(line_price(d, menu_prices) for d in enquiry.dish_items)
+    return line_sum * max(1, enquiry.guestCount)
+
+
 def _month_key(dt: datetime) -> str:
     return dt.strftime("%b %Y")
 
@@ -35,15 +40,26 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
         .where(Enquiry.status == EnquiryStatus.CONVERTED)
     )
     converted = list(result.scalars().all())
+    # Revenue only after owner confirms payment was received
+    paid_orders = [e for e in converted if bool(getattr(e, "paymentReceived", False))]
 
     order_revenue = 0.0
     monthly_rev: dict[str, float] = defaultdict(float)
-    for e in converted:
-        line_sum = sum(line_price(d, menu_prices) for d in e.dish_items)
-        rev = line_sum * max(1, e.guestCount)
+    revenue_items: list[dict] = []
+    for e in paid_orders:
+        rev = order_amount(e, menu_prices)
         order_revenue += rev
         mk = _month_key(e.eventDate)
         monthly_rev[mk] += rev
+        if rev > 0:
+            paid_dt = getattr(e, "deliveredAt", None) or e.eventDate
+            revenue_items.append({
+                "label": f"{e.customerName} – {e.eventType}",
+                "amount": rev,
+                "date": paid_dt.strftime("%d %b %Y"),
+                "enquiryId": e.id,
+                "source": "order",
+            })
 
     uploads_result = await db.execute(
         select(InvoiceUpload).order_by(InvoiceUpload.createdAt.desc())
@@ -67,17 +83,32 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
             uploaded_revenue += amt
             monthly_profit_upload[mk] += amt
             if amt > 0:
-                profit_items.append({"label": label, "amount": amt, "date": date_str})
+                item = {
+                    "label": label,
+                    "amount": amt,
+                    "date": date_str,
+                    "id": u.id,
+                    "fileName": u.fileName,
+                    "source": "upload",
+                }
+                profit_items.append(item)
+                revenue_items.append(item)
         elif u.docType == "expense":
             order_expenses += amt
             monthly_exp[mk] += amt
             desc = (u.notes or "").strip() or (u.fileName or "Expense")
             expense_items.append({
+                "id": u.id,
                 "label": desc[:80],
                 "amount": amt,
                 "date": date_str,
                 "purpose": (u.purpose or "").strip() or None,
+                "fileName": u.fileName,
+                "source": "upload",
             })
+
+    # Newest revenue first
+    revenue_items.sort(key=lambda x: x.get("date") or "", reverse=True)
     profit_items = profit_items[:8]
 
     all_months = sorted(
@@ -90,7 +121,7 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
         exp = monthly_exp[m]
         monthly.append({"month": m, "revenue": rev, "expenses": exp, "profit": rev - exp})
 
-    if not monthly and (order_revenue or order_expenses):
+    if not monthly and (order_revenue or order_expenses or uploaded_revenue):
         now = _month_key(datetime.now())
         monthly = [{
             "month": now,
@@ -112,9 +143,11 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
         "order_expenses": order_expenses,
         "net_profit": net_profit,
         "converted_orders": len(converted),
+        "paid_orders": len(paid_orders),
         "by_status": by_status,
         "by_event_type": by_event,
         "expense_items": expense_items,
         "profit_items": profit_items,
+        "revenue_items": revenue_items,
         "monthly": monthly,
     }

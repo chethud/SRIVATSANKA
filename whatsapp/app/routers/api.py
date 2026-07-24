@@ -20,6 +20,7 @@ from app.schemas import (
     EnquiryCreateIn,
     EnquiryDishOut,
     EnquiryOut,
+    EnquiryPaymentIn,
     EnquiryUpdateIn,
     NotificationOut,
     NotificationReadIn,
@@ -45,6 +46,8 @@ def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
         status=e.status.value if hasattr(e.status, "value") else str(e.status),
         ownerViewedAt=e.ownerViewedAt,
         notes=e.notes,
+        deliveredAt=getattr(e, "deliveredAt", None),
+        paymentReceived=bool(getattr(e, "paymentReceived", False)),
         createdAt=e.createdAt,
         dishes=[
             EnquiryDishOut(
@@ -258,6 +261,54 @@ async def update_enquiry(
         raise HTTPException(status_code=404, detail="Enquiry not found")
     if payload.notes is not None:
         enquiry.notes = payload.notes
+    await db.commit()
+    await db.refresh(enquiry)
+    return _enquiry_to_out(enquiry)
+
+
+@router.post("/enquiries/{enquiry_id}/delivered", response_model=EnquiryOut)
+async def mark_enquiry_delivered(
+    enquiry_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EnquiryOut:
+    """Mark a converted order as delivered — dashboard will ask about payment."""
+    result = await db.execute(
+        select(Enquiry)
+        .options(selectinload(Enquiry.dish_items))
+        .where(Enquiry.id == enquiry_id)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if enquiry.status != EnquiryStatus.CONVERTED:
+        raise HTTPException(status_code=400, detail="Only converted orders can be marked delivered")
+    if enquiry.deliveredAt is None:
+        enquiry.deliveredAt = datetime.now()
+        await db.commit()
+        await db.refresh(enquiry)
+    return _enquiry_to_out(enquiry)
+
+
+@router.patch("/enquiries/{enquiry_id}/payment", response_model=EnquiryOut)
+async def confirm_enquiry_payment(
+    enquiry_id: str,
+    payload: EnquiryPaymentIn,
+    db: AsyncSession = Depends(get_db),
+) -> EnquiryOut:
+    """Confirm client payment — amount then counts toward dashboard revenue."""
+    result = await db.execute(
+        select(Enquiry)
+        .options(selectinload(Enquiry.dish_items))
+        .where(Enquiry.id == enquiry_id)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if enquiry.status != EnquiryStatus.CONVERTED:
+        raise HTTPException(status_code=400, detail="Only converted orders can confirm payment")
+    enquiry.paymentReceived = bool(payload.received)
+    if payload.received and enquiry.deliveredAt is None:
+        enquiry.deliveredAt = datetime.now()
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)

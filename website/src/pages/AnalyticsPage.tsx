@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingDown, X } from 'lucide-react';
+import { TrendingDown } from 'lucide-react';
 import { PageHeader, StatCard, Card } from '../components/Layout';
+import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, LoadingScreen } from '../components/ui';
 import { formatCurrency } from '../api/client';
@@ -17,7 +18,7 @@ import {
 
 export default function AnalyticsPage() {
   const { loading, error, analytics } = useAppData();
-  const [showAllExpenses, setShowAllExpenses] = useState(false);
+  const [history, setHistory] = useState<'revenue' | 'expense' | null>(null);
 
   if (loading && !analytics) return <LoadingScreen />;
 
@@ -25,7 +26,7 @@ export default function AnalyticsPage() {
   const revenue = analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
   const expenseItems = analytics?.expense_items ?? [];
-  const expenseTotal = expenseItems.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+  const revenueItems = analytics?.revenue_items ?? analytics?.profit_items ?? [];
 
   return (
     <>
@@ -40,104 +41,44 @@ export default function AnalyticsPage() {
               {formatCurrency(profit)}
             </p>
             <p className="text-sm text-[var(--muted)] mt-2">
-              Order revenue + expense bills confirmed on the{' '}
-              <Link to="/invoices" className="text-[var(--primary)] hover:underline">Invoices</Link> page.
+              Confirmed order payments + expense bills on{' '}
+              <Link to="/invoices" className="text-[var(--primary)] hover:underline">Expenses Invoice</Link>.
+              Click Revenue or Expenses below for history.
             </p>
           </div>
         </div>
-        <NetProfitGauge profit={profit} revenue={revenue} expenses={expenses} />
+        <NetProfitGauge
+          profit={profit}
+          revenue={revenue}
+          expenses={expenses}
+          onRevenueClick={() => setHistory('revenue')}
+          onExpensesClick={() => setHistory('expense')}
+        />
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total revenue" value={formatCurrency(revenue)} />
+        <StatCard label="Total revenue" value={formatCurrency(revenue)} onClick={() => setHistory('revenue')} />
         <StatCard label="Order revenue" value={formatCurrency(analytics?.order_revenue ?? 0)} />
-        <StatCard label="Bill expenses" value={formatCurrency(expenses)} subtext="From uploaded bills" />
+        <StatCard
+          label="Bill expenses"
+          value={formatCurrency(expenses)}
+          subtext="From uploaded bills"
+          onClick={() => setHistory('expense')}
+        />
         <StatCard
           label="Expense items"
           value={String(expenseItems.length)}
           subtext="From invoice uploads"
-          onClick={() => setShowAllExpenses(true)}
+          onClick={() => setHistory('expense')}
         />
       </div>
 
-      {showAllExpenses && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="expense-list-title"
-          onClick={() => setShowAllExpenses(false)}
-        >
-          <div className="w-full max-w-2xl max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-          <Card className="flex flex-col p-0 overflow-hidden shadow-xl h-full max-h-[85vh]">
-            <div className="flex items-start justify-between gap-4 p-6 border-b border-[var(--border)]">
-              <div>
-                <h2 id="expense-list-title" className="text-lg font-semibold">
-                  All expense bills
-                </h2>
-                <p className="text-sm text-[var(--muted)] mt-1">
-                  {expenseItems.length} item{expenseItems.length === 1 ? '' : 's'} · {formatCurrency(expenseTotal)} total
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAllExpenses(false)}
-                className="p-2 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)]"
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="overflow-auto flex-1 p-4">
-              {expenseItems.length === 0 ? (
-                <p className="text-sm text-[var(--muted)] text-center py-8">
-                  No expense bills yet.{' '}
-                  <Link to="/invoices" className="text-[var(--primary)] hover:underline" onClick={() => setShowAllExpenses(false)}>
-                    Upload on Invoices
-                  </Link>
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-[var(--muted)] uppercase tracking-wide border-b border-[var(--border)]">
-                      <th className="pb-2 pr-3 font-medium">Date</th>
-                      <th className="pb-2 pr-3 font-medium">Description</th>
-                      <th className="pb-2 pr-3 font-medium">Purpose</th>
-                      <th className="pb-2 text-right font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenseItems.map((item, i) => (
-                      <tr key={`${item.label}-${item.date}-${i}`} className="border-b border-[var(--border)]/60 last:border-0">
-                        <td className="py-3 pr-3 text-[var(--muted)] whitespace-nowrap">{item.date ?? '—'}</td>
-                        <td className="py-3 pr-3 font-medium">{item.label}</td>
-                        <td className="py-3 pr-3 text-[var(--muted)]">{item.purpose || '—'}</td>
-                        <td className="py-3 text-right tabular-nums font-semibold text-amber-900">{formatCurrency(item.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            <div className="p-4 border-t border-[var(--border)] flex flex-wrap gap-3 justify-end">
-              <Link
-                to="/invoices"
-                className="text-sm text-[var(--primary)] hover:underline"
-                onClick={() => setShowAllExpenses(false)}
-              >
-                Upload another bill
-              </Link>
-              <button
-                type="button"
-                onClick={() => setShowAllExpenses(false)}
-                className="px-4 py-2 text-sm font-medium rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]"
-              >
-                Close
-              </button>
-            </div>
-          </Card>
-          </div>
-        </div>
+      {history && (
+        <MoneyHistoryModal
+          kind={history}
+          items={history === 'revenue' ? revenueItems : expenseItems}
+          onClose={() => setHistory(null)}
+        />
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
@@ -164,15 +105,15 @@ export default function AnalyticsPage() {
         </Card>
         <Card className="p-6">
           <h3 className="font-semibold mb-1">Revenue from orders</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Converted event orders</p>
+          <p className="text-xs text-[var(--muted)] mb-4">Paid converted event orders</p>
           {analytics && <ProfitBreakdownPie analytics={analytics} />}
         </Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card className="p-6">
-          <h3 className="font-semibold mb-1">Enquiries by status</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Pipeline overview</p>
+          <h3 className="font-semibold mb-1">Enquiries by outcome</h3>
+          <p className="text-xs text-[var(--muted)] mb-4">Converted vs unconverted</p>
           {analytics && <EnquiryStatusChart analytics={analytics} />}
         </Card>
         <Card className="p-6">
