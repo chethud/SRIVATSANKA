@@ -321,8 +321,8 @@ export function OrderExtrasTable({
   return (
     <div className={`mt-8 ${className}`}>
       <p className="copy-grid-meta font-bold mb-2">Extras</p>
-      <div className="border border-[var(--border-strong)] overflow-hidden">
-        <table className="w-full border-collapse text-left">
+      <div className="border border-[var(--border-strong)] overflow-x-auto">
+        <table className="w-full border-collapse text-left min-w-[32rem]">
           <thead>
             <tr className="bg-[var(--table-header-bg)] border-b border-[var(--border-strong)]">
               <th className="p-3 font-bold border-r border-[var(--border)] w-[22%]">Item</th>

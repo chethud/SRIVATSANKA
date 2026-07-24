@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TrendingDown } from 'lucide-react';
 import { PageHeader, StatCard, Card } from '../components/Layout';
 import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
@@ -18,7 +18,8 @@ import {
 
 export default function AnalyticsPage() {
   const { loading, error, analytics, refresh } = useAppData();
-  const [history, setHistory] = useState<'revenue' | 'expense' | null>(null);
+  const navigate = useNavigate();
+  const [history, setHistory] = useState<'revenue' | null>(null);
 
   if (loading && !analytics) return <LoadingScreen />;
 
@@ -45,7 +46,7 @@ export default function AnalyticsPage() {
             <p className="text-sm text-[var(--muted)] mt-2">
               Revenue from confirmed order payments minus expense bills on{' '}
               <Link to="/invoices" className="text-[var(--primary)] hover:underline">Expenses Invoice</Link>.
-              Click Revenue or Expenses below for history.
+              Click Revenue for payment history, or Expenses to open the invoice list.
             </p>
           </div>
         </div>
@@ -54,7 +55,7 @@ export default function AnalyticsPage() {
           revenue={revenue}
           expenses={expenses}
           onRevenueClick={() => setHistory('revenue')}
-          onExpensesClick={() => setHistory('expense')}
+          onExpensesClick={() => navigate('/invoices')}
         />
       </Card>
 
@@ -69,20 +70,20 @@ export default function AnalyticsPage() {
           label="Bill expenses"
           value={formatCurrency(expenses)}
           subtext="From uploaded bills"
-          onClick={() => setHistory('expense')}
+          onClick={() => navigate('/invoices')}
         />
         <StatCard
           label="Expense items"
           value={String(expenseItems.length)}
           subtext="From invoice uploads"
-          onClick={() => setHistory('expense')}
+          onClick={() => navigate('/invoices')}
         />
       </div>
 
       {history && (
         <MoneyHistoryModal
-          kind={history}
-          items={history === 'revenue' ? revenueItems : expenseItems}
+          kind="revenue"
+          items={revenueItems}
           onClose={() => setHistory(null)}
           onChanged={() => refresh()}
         />

@@ -36,6 +36,8 @@ export default function App() {
         <Route path="workers" element={<WorkersPage />} />
         <Route path="workers/:workerId" element={<WorkerDetailPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
+        <Route path="invoices/:uploadId" element={<InvoicesPage />} />
+        <Route path="expenses" element={<Navigate to="/invoices" replace />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="bot-tester" element={<BotTesterPage />} />
         <Route path="settings" element={<SettingsPage />} />

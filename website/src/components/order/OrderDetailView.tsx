@@ -271,7 +271,7 @@ export function OrderDetailView({
               <button
                 type="button"
                 onClick={() => setShowPaymentPopup(true)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]"
+                className="px-3 py-2.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] min-h-[2.5rem]"
               >
                 Record payment
               </button>
@@ -281,7 +281,7 @@ export function OrderDetailView({
               type="button"
               disabled={deliveryBusy}
               onClick={() => void handleMarkDelivered()}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60"
+              className="px-3 py-2.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 min-h-[2.5rem]"
             >
               {deliveryBusy ? 'Saving…' : 'Mark as delivered'}
             </button>

@@ -28,11 +28,72 @@ Extract from the document and return ONLY valid JSON (no markdown):
   "purpose": "vegetables"
 }
 Rules:
-- amount: grand total as number only, no currency symbols
-- expense_date: YYYY-MM-DD from the bill date, or null
-- description: vendor / bill title
-- purpose: category (vegetables, transport, gas, supplies, wages, packaging, etc.)
+- amount: the money ACTUALLY PAID on this document (number only, no currency symbols).
+  Prefer in this order when present: "Paid Amount", "Amount Paid", "Advance Paid",
+  "Payment Received", "Paid", then only if none of those exist use Payable / Grand Total / Net Cost.
+  Do NOT use Due Amount, Balance, or Pay Later as amount.
+  Example: Total 12000, Paid Amount 5000, Due 7000 → amount must be 5000.
+- expense_date: YYYY-MM-DD from the bill/booking date, or null
+- description: vendor / hotel / shop / bill title
+- purpose: category (vegetables, transport, gas, supplies, wages, packaging, accommodation, booking, etc.)
 """
+
+
+def _parse_money(raw: str) -> float | None:
+    try:
+        return float(str(raw).replace(",", "").replace("₹", "").replace("/-", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _labeled_amount(text: str, labels: tuple[str, ...]) -> float | None:
+    """Find the first amount that follows any of the given labels in bill text."""
+    if not text:
+        return None
+    lowered = text.lower()
+    for label in labels:
+        idx = 0
+        while True:
+            pos = lowered.find(label, idx)
+            if pos < 0:
+                break
+            after = text[pos + len(label) : pos + len(label) + 40]
+            match = re.search(r"[:\s]*([0-9][0-9,]*(?:\.[0-9]+)?)", after)
+            if match:
+                amount = _parse_money(match.group(1))
+                if amount is not None:
+                    return amount
+            idx = pos + len(label)
+    return None
+
+
+def _expense_amount_from_text(text: str) -> float | None:
+    """Prefer paid/advance over payable/total so partial payments are recorded correctly."""
+    paid = _labeled_amount(
+        text,
+        (
+            "paid amount",
+            "amount paid",
+            "advance paid",
+            "advance amount",
+            "payment received",
+            "amount received",
+        ),
+    )
+    if paid is not None:
+        return paid
+    return _labeled_amount(
+        text,
+        (
+            "payable amount",
+            "grand total",
+            "total amount",
+            "net cost",
+            "net amount",
+            "invoice total",
+            "bill amount",
+        ),
+    )
 
 
 def _gemini_key_configured() -> bool:
@@ -88,12 +149,7 @@ def _normalize_result(parsed: dict, *, expense_only: bool) -> dict:
     if doc_type not in ("expense", "profit"):
         doc_type = "expense"
 
-    amount = parsed.get("amount")
-    if amount is not None:
-        try:
-            amount = float(str(amount).replace(",", "").replace("₹", "").strip())
-        except (TypeError, ValueError):
-            amount = None
+    amount = _parse_money(parsed.get("amount")) if parsed.get("amount") is not None else None
 
     description = (
         str(parsed.get("description") or parsed.get("vendor") or parsed.get("notes") or "")
@@ -185,6 +241,16 @@ def _failure(message: str) -> dict:
     }
 
 
+def _apply_text_amount_override(result: dict, bill_text: str) -> dict:
+    """When bill text has a clear Paid Amount, prefer that over AI grand-total mistakes."""
+    text_amount = _expense_amount_from_text(bill_text)
+    if text_amount is not None:
+        result = {**result, "amount": text_amount}
+        if result.get("description") or result.get("purpose"):
+            result["recognized"] = True
+    return result
+
+
 def _recognize_sync(file_path: Path, *, expense_only: bool = False) -> dict:
     if not _gemini_key_configured():
         return _failure(
@@ -197,6 +263,7 @@ def _recognize_sync(file_path: Path, *, expense_only: bool = False) -> dict:
     ext = file_path.suffix.lower()
     mime = MIME_BY_EXT.get(ext, "application/octet-stream")
     prompt = EXPENSE_PROMPT if expense_only else EXPENSE_PROMPT
+    pdf_text = _extract_pdf_text(file_path) if ext == ".pdf" else ""
 
     models_to_try = _resolve_gemini_models(genai)
     last_error = ""
@@ -208,7 +275,6 @@ def _recognize_sync(file_path: Path, *, expense_only: bool = False) -> dict:
             parts: list = []
 
             if ext == ".pdf":
-                pdf_text = _extract_pdf_text(file_path)
                 if pdf_text:
                     parts.append(
                         f"Bill text extracted from PDF:\n{pdf_text[:8000]}\n\n{prompt}"
@@ -227,7 +293,10 @@ def _recognize_sync(file_path: Path, *, expense_only: bool = False) -> dict:
                 last_error = "Empty response from Gemini"
                 continue
             parsed = _parse_json_block(raw)
-            return _normalize_result(parsed, expense_only=expense_only)
+            result = _normalize_result(parsed, expense_only=expense_only)
+            if pdf_text:
+                result = _apply_text_amount_override(result, pdf_text)
+            return result
         except json.JSONDecodeError:
             logger.warning("Bill JSON parse failed for %s: %s", model_name, raw[:300] if "raw" in dir() else "")
             last_error = "Could not parse bill — try a clearer photo"
@@ -239,6 +308,20 @@ def _recognize_sync(file_path: Path, *, expense_only: bool = False) -> dict:
                     "Invalid GEMINI_API_KEY — create a key at https://aistudio.google.com/apikey "
                     "(starts with AIza…), update whatsapp/.env, restart uvicorn."
                 )
+
+    # Text PDFs can still yield a paid amount even if Gemini fails
+    if pdf_text:
+        text_amount = _expense_amount_from_text(pdf_text)
+        if text_amount is not None:
+            return {
+                "doc_type": "expense",
+                "amount": text_amount,
+                "description": None,
+                "expense_date": None,
+                "purpose": None,
+                "notes": None,
+                "recognized": False,
+            }
 
     hint = last_error[:200] if last_error else "Recognition failed"
     return _failure(f"Could not read bill: {hint}. Try JPG/PNG or check GEMINI_API_KEY.")

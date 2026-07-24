@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageSquare, ShoppingBag, TrendingUp, Wallet } from 'lucide-react';
 import { DashboardKpiCard } from '../components/DashboardKpiCard';
@@ -48,9 +48,10 @@ import { isPartialPaymentOrder } from '../utils/orderBilling';
 
 export default function DashboardPage() {
   const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics, refresh, patchEnquiry } = useAppData();
+  const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<ChartPeriod>('monthly');
   const [tab, setTab] = useState<DashboardTab>('overview');
-  const [history, setHistory] = useState<'revenue' | 'expense' | null>(null);
+  const [history, setHistory] = useState<'revenue' | null>(null);
 
   const converted = useMemo(() => getConvertedOrders(enquiries), [enquiries]);
   const partialCount = useMemo(() => enquiries.filter(isPartialPaymentOrder).length, [enquiries]);
@@ -68,7 +69,6 @@ export default function DashboardPage() {
   const profit = analytics?.net_profit ?? 0;
   const revenue = analytics?.order_revenue ?? analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
-  const expenseItems = analytics?.expense_items ?? [];
   const revenueItems = (analytics?.revenue_items ?? []).filter(
     (i) => !i.source || i.source === 'order',
   );
@@ -85,8 +85,8 @@ export default function DashboardPage() {
 
       {history && (
         <MoneyHistoryModal
-          kind={history}
-          items={history === 'revenue' ? revenueItems : expenseItems}
+          kind="revenue"
+          items={revenueItems}
           onClose={() => setHistory(null)}
           onChanged={() => refresh()}
         />
@@ -167,7 +167,7 @@ export default function DashboardPage() {
           sparkline={sparklineFromMonthly(analytics, 'expenses')}
           sparkId="exp"
           gradient={2}
-          onClick={() => setHistory('expense')}
+          onClick={() => navigate('/invoices')}
         />
       </div>
 

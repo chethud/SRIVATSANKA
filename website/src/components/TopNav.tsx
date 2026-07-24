@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Layers, Moon, Plus, Search, Sun } from 'lucide-react';
+import { Bell, Layers, Menu, Moon, Plus, Search, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
+import { useLayout } from '../context/LayoutContext';
 import { usePageSearchSlot } from '../context/PageSearchContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Notification } from '../api/client';
@@ -20,6 +21,7 @@ export function TopNav() {
   const { notifications, stats, enquiries, markNotificationsRead } = useAppData();
   const { theme, toggleTheme } = useTheme();
   const { triggerCreate } = useCreateAction();
+  const { isMobileNav, mobileNavOpen, toggleMobileNav } = useLayout();
   const { config: pageSearch } = usePageSearchSlot();
   const location = useLocation();
   const navigate = useNavigate();
@@ -93,25 +95,38 @@ export function TopNav() {
   }
 
   return (
-    <header className="topnav sticky top-0 z-30 mb-5">
+    <header className="topnav sticky top-0 z-30 mb-4 sm:mb-5">
       <div className="topnav__bar">
-        {pageSearch ? (
-          <div className="topnav__search">
-            <Search size={16} className="topnav__search-icon" aria-hidden />
-            <input
-              type="search"
-              value={pageSearch.value}
-              onChange={(e) => pageSearch.onChange(e.target.value)}
-              placeholder={pageSearch.placeholder}
-              className="topnav__search-input"
-              aria-label={pageSearch.placeholder}
-            />
-          </div>
-        ) : (
-          <div className="topnav__title-wrap">
-            {pageTitle ? <p className="topnav__title">{pageTitle}</p> : <span />}
-          </div>
-        )}
+        <div className="topnav__leading">
+          {isMobileNav && (
+            <button
+              type="button"
+              onClick={toggleMobileNav}
+              className="topnav__icon-btn topnav__menu-btn"
+              aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileNavOpen}
+            >
+              <Menu size={18} />
+            </button>
+          )}
+          {pageSearch ? (
+            <div className="topnav__search">
+              <Search size={16} className="topnav__search-icon" aria-hidden />
+              <input
+                type="search"
+                value={pageSearch.value}
+                onChange={(e) => pageSearch.onChange(e.target.value)}
+                placeholder={pageSearch.placeholder}
+                className="topnav__search-input"
+                aria-label={pageSearch.placeholder}
+              />
+            </div>
+          ) : (
+            <div className="topnav__title-wrap">
+              {pageTitle ? <p className="topnav__title">{pageTitle}</p> : <span />}
+            </div>
+          )}
+        </div>
 
         <div className="topnav__actions">
           {secondaryAction && (

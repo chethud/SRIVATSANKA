@@ -11,7 +11,9 @@ export function getTopNavTitle(pathname: string): string | null {
   if (path === '/vendors') return 'Vendors';
   if (path === '/workers') return 'Workers';
   if (path.startsWith('/workers/')) return 'Worker profile';
-  if (path === '/invoices') return 'Expenses Invoice';
+  if (path === '/invoices' || path === '/expenses' || path.startsWith('/invoices/')) {
+    return 'Expenses Invoice';
+  }
   if (path === '/settings') return 'Settings';
   if (path === '/bot-tester' || path.startsWith('/bot-tester/')) return 'WhatsApp Chats';
   return null;

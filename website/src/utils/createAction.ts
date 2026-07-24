@@ -7,6 +7,7 @@ export function getCreateActionForPath(pathname: string): CreateActionType | nul
   if (pathname.startsWith('/vendors')) return 'vendor';
   if (pathname.startsWith('/workers')) return 'worker';
   if (pathname.startsWith('/dishes')) return 'dish';
+  if (pathname.startsWith('/invoices') || pathname.startsWith('/expenses')) return 'invoice';
   return null;
 }
 
@@ -26,6 +27,8 @@ export function getCreateButtonLabel(pathname: string): string {
       return 'New worker';
     case 'dish':
       return 'New menu item';
+    case 'invoice':
+      return 'Upload bill';
     default:
       return 'Create';
   }

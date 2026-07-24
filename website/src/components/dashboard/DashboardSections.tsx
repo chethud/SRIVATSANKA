@@ -31,12 +31,12 @@ export function GlassCard({
       className={`rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow ${className}`}
     >
       {(title || action) && (
-        <div className="flex items-center justify-between px-5 pt-5 pb-0">
-          {title && <h3 className="text-sm font-semibold text-[var(--foreground)]">{title}</h3>}
-          {action}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 pt-4 sm:pt-5 pb-0">
+          {title && <h3 className="text-sm font-semibold text-[var(--foreground)] min-w-0">{title}</h3>}
+          {action && <div className="min-w-0 shrink-0">{action}</div>}
         </div>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </motion.div>
   );
 }
