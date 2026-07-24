@@ -13,6 +13,18 @@ import { Card } from './Layout';
 
 type HistoryKind = 'revenue' | 'expense';
 
+function previewMediaType(contentType: string, fileName: string): string {
+  const type = (contentType || '').toLowerCase().split(';')[0].trim();
+  if (type.startsWith('image/') || type.includes('pdf')) return type;
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  return type || 'application/octet-stream';
+}
+
 export function MoneyHistoryModal({
   kind,
   items,
@@ -61,8 +73,9 @@ export function MoneyHistoryModal({
     if (!item.id) return;
     setBusyId(item.id);
     try {
-      const { url, contentType } = await fetchUploadBlobUrl(item.id);
-      setPreview({ url, name: item.fileName || 'Document', type: contentType });
+      const { url, contentType, fileName } = await fetchUploadBlobUrl(item.id);
+      const name = fileName || item.fileName || 'Document';
+      setPreview({ url, name, type: previewMediaType(contentType, name) });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not open document');
     } finally {

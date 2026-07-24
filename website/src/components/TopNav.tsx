@@ -55,6 +55,33 @@ export function TopNav() {
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [notifOpen]);
 
+  useEffect(() => {
+    if (!notifOpen) return;
+
+    const { overflow, paddingRight } = document.body.style;
+    const scrollbarGap = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    if (scrollbarGap > 0) {
+      document.body.style.paddingRight = `${scrollbarGap}px`;
+    }
+
+    function stopPageScroll(e: WheelEvent | TouchEvent) {
+      const panel = notifRef.current?.querySelector('.topnav__panel');
+      if (panel && panel.contains(e.target as Node)) return;
+      e.preventDefault();
+    }
+
+    document.addEventListener('wheel', stopPageScroll, { passive: false });
+    document.addEventListener('touchmove', stopPageScroll, { passive: false });
+
+    return () => {
+      document.body.style.overflow = overflow;
+      document.body.style.paddingRight = paddingRight;
+      document.removeEventListener('wheel', stopPageScroll);
+      document.removeEventListener('touchmove', stopPageScroll);
+    };
+  }, [notifOpen]);
+
   function handleCreate(action: typeof pageAction | typeof secondaryAction) {
     setNotifOpen(false);
     if (!action) return;

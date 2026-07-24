@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -256,9 +256,30 @@ def _parse_expense_date(value: str | None) -> datetime | None:
     return None
 
 
+_MEDIA_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
+
+
+def _pending_meta_path(pending_id: str) -> Path:
+    return UPLOAD_DIR / "pending" / f"{pending_id}.meta.json"
+
+
+def _find_pending_media(pending_id: str) -> Path | None:
+    """Return the uploaded bill file — never the .meta.json sidecar."""
+    pending_dir = UPLOAD_DIR / "pending"
+    if not pending_dir.exists():
+        return None
+    for path in pending_dir.glob(f"{pending_id}.*"):
+        name = path.name.lower()
+        if name.endswith(".meta.json"):
+            continue
+        if path.suffix.lower() in _MEDIA_EXTS:
+            return path
+    return None
+
+
 def _save_uploaded_file(file: UploadFile, *, subdir: str = "") -> tuple[str, Path]:
     ext = Path(file.filename or "file").suffix.lower() or ".jpg"
-    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"):
+    if ext not in _MEDIA_EXTS:
         raise HTTPException(400, "Upload an image (JPG/PNG) or PDF")
     pending_id = uuid4().hex
     folder = UPLOAD_DIR / subdir if subdir else UPLOAD_DIR
@@ -290,7 +311,7 @@ async def recognize_expense_invoice(file: UploadFile = File(...)) -> InvoiceReco
     pending_id, dest = _save_uploaded_file(file, subdir="pending")
     import json
 
-    meta_path = dest.with_suffix(".meta.json")
+    meta_path = _pending_meta_path(pending_id)
     meta_path.write_text(
         json.dumps({"fileName": file.filename or dest.name, "pendingId": pending_id}),
         encoding="utf-8",
@@ -315,15 +336,26 @@ async def confirm_expense_invoice(
     db: AsyncSession = Depends(get_db),
 ) -> InvoiceUploadOut:
     """Save invoice after owner confirms or corrects recognized details."""
-    pending_dir = UPLOAD_DIR / "pending"
-    matches = list(pending_dir.glob(f"{payload.pendingId}.*")) if pending_dir.exists() else []
-    if not matches:
+    src = _find_pending_media(payload.pendingId)
+    if not src:
         raise HTTPException(404, "Upload session expired — please upload the bill again")
-    src = matches[0]
-    ext = src.suffix
+
+    meta_path = _pending_meta_path(payload.pendingId)
+    display_name = src.name
+    if meta_path.exists():
+        try:
+            import json
+
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            display_name = meta.get("fileName") or display_name
+        except Exception:
+            pass
+
+    ext = src.suffix.lower()
     final_name = f"expense_{uuid4().hex[:8]}{ext}"
     dest = UPLOAD_DIR / final_name
     shutil.move(str(src), str(dest))
+    meta_path.unlink(missing_ok=True)
 
     amount = payload.amount
     if amount is not None:
@@ -331,18 +363,6 @@ async def confirm_expense_invoice(
             amount = max(0.0, float(amount))
         except (TypeError, ValueError):
             amount = None
-
-    display_name = src.name
-    meta_path = src.with_suffix(".meta.json")
-    if meta_path.exists():
-        try:
-            import json
-
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            display_name = meta.get("fileName") or display_name
-            meta_path.unlink(missing_ok=True)
-        except Exception:
-            pass
 
     upload = InvoiceUpload(
         enquiryId=None,
@@ -373,6 +393,7 @@ async def cancel_pending_invoice(pending_id: str) -> dict:
     if pending_dir.exists():
         for path in pending_dir.glob(f"{pending_id}.*"):
             path.unlink(missing_ok=True)
+        _pending_meta_path(pending_id).unlink(missing_ok=True)
     return {"ok": True}
 
 
@@ -410,6 +431,69 @@ def _guess_media_type(file_name: str) -> str:
     return "application/octet-stream"
 
 
+def _sniff_media_type(data: bytes) -> str | None:
+    if data[:4] == b"%PDF":
+        return "application/pdf"
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    return None
+
+
+def _looks_like_meta_json(data: bytes | None, file_name: str | None, file_path: str | None) -> bool:
+    name = (file_name or "").lower()
+    path = (file_path or "").lower()
+    if name.endswith(".meta.json") or path.endswith(".meta.json"):
+        return True
+    if not data:
+        return False
+    sample = bytes(data[:200]).lstrip()
+    return sample.startswith(b"{") and b"pendingId" in sample
+
+
+def _recover_bill_from_meta(upload: InvoiceUpload, data: bytes | None) -> tuple[bytes, str] | None:
+    """If a .meta.json sidecar was saved by mistake, recover the real bill when possible."""
+    import json
+
+    pending_id = None
+    original_name = None
+    if data:
+        try:
+            meta = json.loads(bytes(data).decode("utf-8"))
+            pending_id = meta.get("pendingId")
+            original_name = meta.get("fileName")
+        except Exception:
+            pass
+
+    if not pending_id:
+        for candidate in (upload.fileName, upload.filePath):
+            stem = Path(candidate or "").name
+            if stem.endswith(".meta.json"):
+                pending_id = stem[: -len(".meta.json")]
+                break
+
+    if not pending_id:
+        return None
+
+    media = _find_pending_media(pending_id)
+    if media and media.exists():
+        return media.read_bytes(), original_name or media.name
+
+    # Already-moved expense_* file next to a wrongly saved .json/.meta.json path
+    path = Path(upload.filePath) if upload.filePath else None
+    if path:
+        for sibling in path.parent.glob(f"*{pending_id[:8]}*"):
+            if sibling.suffix.lower() in _MEDIA_EXTS and sibling.exists():
+                return sibling.read_bytes(), original_name or sibling.name
+
+    return None
+
+
 @router.get("/uploads/{upload_id}/file")
 async def download_upload(upload_id: str, db: AsyncSession = Depends(get_db)):
     """Serve uploaded bill from DB bytes (preferred) or disk path."""
@@ -417,24 +501,70 @@ async def download_upload(upload_id: str, db: AsyncSession = Depends(get_db)):
     if not upload:
         raise HTTPException(404, "File not found")
 
-    media = _guess_media_type(upload.fileName)
-    headers = {"Content-Disposition": f'inline; filename="{upload.fileName}"'}
-
     data = getattr(upload, "fileData", None)
-    if data:
-        return Response(content=bytes(data), media_type=media, headers=headers)
+    data_bytes = bytes(data) if data else None
+    path = Path(upload.filePath) if upload.filePath else None
+    if data_bytes is None and path and path.exists():
+        data_bytes = path.read_bytes()
 
-    path = Path(upload.filePath)
-    if path.exists():
-        # Backfill DB from disk for older uploads
+    file_name = upload.fileName or (path.name if path else "document")
+
+    if _looks_like_meta_json(data_bytes, upload.fileName, upload.filePath):
+        recovered = _recover_bill_from_meta(upload, data_bytes)
+        if recovered:
+            data_bytes, file_name = recovered
+            # Persist repair so View keeps working
+            try:
+                ext = Path(file_name).suffix.lower() or ".bin"
+                if ext not in _MEDIA_EXTS:
+                    sniffed = _sniff_media_type(data_bytes)
+                    ext = {
+                        "application/pdf": ".pdf",
+                        "image/jpeg": ".jpg",
+                        "image/png": ".png",
+                        "image/webp": ".webp",
+                        "image/gif": ".gif",
+                    }.get(sniffed or "", ".bin")
+                repaired = UPLOAD_DIR / f"expense_{uuid4().hex[:8]}{ext}"
+                repaired.write_bytes(data_bytes)
+                if path and path.exists() and (
+                    path.suffix.lower() == ".json" or path.name.lower().endswith(".meta.json")
+                ):
+                    path.unlink(missing_ok=True)
+                upload.fileName = file_name
+                upload.filePath = str(repaired)
+                upload.fileData = data_bytes
+                await db.commit()
+                path = repaired
+            except Exception:
+                await db.rollback()
+        else:
+            raise HTTPException(
+                404,
+                "Original bill file missing — only metadata was saved. Please re-upload this bill.",
+            )
+
+    if not data_bytes:
+        raise HTTPException(404, "File missing — re-upload this bill")
+
+    media = (
+        _sniff_media_type(data_bytes)
+        or _guess_media_type(file_name)
+        or _guess_media_type(str(path) if path else "")
+        or "application/octet-stream"
+    )
+    safe_name = file_name.replace('"', "")
+    headers = {"Content-Disposition": f'inline; filename="{safe_name}"'}
+
+    # Backfill DB from resolved bytes for older uploads
+    if not getattr(upload, "fileData", None):
         try:
-            upload.fileData = path.read_bytes()
+            upload.fileData = data_bytes
             await db.commit()
         except Exception:
             await db.rollback()
-        return FileResponse(path, filename=upload.fileName, media_type=media, headers=headers)
 
-    raise HTTPException(404, "File missing — re-upload this bill")
+    return Response(content=data_bytes, media_type=media, headers=headers)
 
 
 @router.delete("/uploads/{upload_id}")

@@ -457,15 +457,21 @@ export async function downloadUploadFile(uploadId: string, fileName: string): Pr
   URL.revokeObjectURL(url);
 }
 
-export async function fetchUploadBlobUrl(uploadId: string): Promise<{ url: string; contentType: string }> {
+export async function fetchUploadBlobUrl(
+  uploadId: string,
+): Promise<{ url: string; contentType: string; fileName?: string }> {
   const res = await fetchWithAuth(`/api/uploads/${uploadId}/file`);
   if (!res.ok) {
     throw new Error(await apiErrorMessage(res, `/api/uploads/${uploadId}/file`));
   }
   const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') || '';
+  const match = /filename="([^"]+)"/i.exec(disposition) || /filename=([^;]+)/i.exec(disposition);
+  const fileName = match?.[1]?.trim();
   return {
     url: URL.createObjectURL(blob),
     contentType: blob.type || res.headers.get('content-type') || 'application/octet-stream',
+    fileName,
   };
 }
 

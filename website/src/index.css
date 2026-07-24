@@ -2149,6 +2149,7 @@ select:focus {
   width: 18rem;
   max-height: 18rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--card);
