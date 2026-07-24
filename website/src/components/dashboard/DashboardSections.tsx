@@ -1,18 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import {
-  Bell, Calendar, HardHat, Sparkles, Truck,
+  Bell, Calendar, HardHat, Sparkles,
 } from 'lucide-react';
 import { formatDate, updateEnquiryStatus } from '../../api/client';
-import type { Enquiry, Notification, Vendor, Worker } from '../../api/client';
+import type { Enquiry, Notification, Worker } from '../../api/client';
 import type { ChartPeriod } from '../../utils/dashboardData';
 import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../../utils/enquiryStatus';
-
-const fade = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-};
 
 export function GlassCard({
   children,
@@ -26,8 +20,7 @@ export function GlassCard({
   action?: React.ReactNode;
 }) {
   return (
-    <motion.div
-      {...fade}
+    <div
       className={`rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow ${className}`}
     >
       {(title || action) && (
@@ -37,7 +30,7 @@ export function GlassCard({
         </div>
       )}
       <div className="p-4 sm:p-5">{children}</div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -307,26 +300,6 @@ export function TopDishesList({ dishes }: { dishes: { name: string; qty: number 
           <div className="h-2 rounded-full bg-[var(--background-alt)] overflow-hidden">
             <div className="h-full rounded-full bg-[var(--primary)] transition-all" style={{ width: `${(d.qty / max) * 100}%` }} />
           </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function VendorPaymentsSummary({ vendors }: { vendors: Vendor[] }) {
-  const list = vendors.slice(0, 5);
-  if (list.length === 0) {
-    return <p className="text-sm text-[var(--muted)]">Add vendors to track supplier relationships.</p>;
-  }
-  return (
-    <ul className="space-y-2">
-      {list.map((v) => (
-        <li key={v.id} className="flex items-center justify-between py-2 border-b border-[var(--border)] last:border-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <Truck size={16} className="text-[var(--primary)] shrink-0" />
-            <span className="text-sm font-medium truncate">{v.businessName || v.name}</span>
-          </div>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--primary-light)] text-[var(--primary)]">{v.category}</span>
         </li>
       ))}
     </ul>

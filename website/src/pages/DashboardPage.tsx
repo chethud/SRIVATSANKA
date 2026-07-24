@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { MessageSquare, ShoppingBag, TrendingUp, Wallet } from 'lucide-react';
 import { DashboardKpiCard } from '../components/DashboardKpiCard';
 import {
@@ -9,12 +8,10 @@ import {
   DashboardEnquiriesPanel,
   DashboardTabBar,
   GlassCard,
-  NotificationsWidget,
   RecentOrdersTable,
   TodaysEventsWidget,
   TopDishesList,
   UpcomingEventsList,
-  VendorPaymentsSummary,
   WorkerAttendanceOverview,
   type DashboardTab,
 } from '../components/dashboard/DashboardSections';
@@ -40,14 +37,13 @@ import {
   getRecentOrders,
   getTopDishes,
   getTodaysEvents,
-  getUnreadNotifications,
   getUpcomingEvents,
   getWorkerOverview,
 } from '../utils/dashboardData';
 import { isPartialPaymentOrder } from '../utils/orderBilling';
 
 export default function DashboardPage() {
-  const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics, refresh, patchEnquiry } = useAppData();
+  const { loading, error, stats, enquiries, workers, analytics, refresh, patchEnquiry } = useAppData();
   const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<ChartPeriod>('monthly');
   const [tab, setTab] = useState<DashboardTab>('overview');
@@ -92,7 +88,7 @@ export default function DashboardPage() {
         />
       )}
 
-      <motion.header initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <header className="mb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
           <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA EVENTS</p>
@@ -103,7 +99,7 @@ export default function DashboardPage() {
           newEnquiries={stats?.new_enquiries ?? 0}
           partialCount={partialCount}
         />
-      </motion.header>
+      </header>
 
       <ErrorBanner message={error} />
 
@@ -210,25 +206,14 @@ export default function DashboardPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <GlassCard title="Top selling dishes">
           <TopDishesList dishes={getTopDishes(enquiries)} />
-        </GlassCard>
-        <GlassCard title="Vendor payments" action={<Link to="/vendors" className="text-xs text-[var(--primary)]">Vendors</Link>}>
-          <VendorPaymentsSummary vendors={vendors} />
-          <p className="text-xs text-[var(--muted)] mt-3">{vendors.length} suppliers registered</p>
         </GlassCard>
         <GlassCard title="Worker overview" action={<Link to="/workers" className="text-xs text-[var(--primary)]">Workers</Link>}>
           <WorkerAttendanceOverview workers={workerOverview.workers} byRole={workerOverview.byRole} />
         </GlassCard>
-        <GlassCard title="Notifications" action={<span className="text-xs text-[var(--muted)]">{stats?.unread_notifications ?? 0} unread</span>}>
-          <NotificationsWidget items={getUnreadNotifications(notifications)} />
-        </GlassCard>
       </div>
-
-      <p className="text-center text-xs text-[var(--muted)] pb-4">
-        {dishes.length} menu items · {vendors.length} vendors tracked
-      </p>
         </>
       )}
     </div>

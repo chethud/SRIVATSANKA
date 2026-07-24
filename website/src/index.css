@@ -1957,12 +1957,14 @@ select:focus {
 .app-sidebar--closed {
   transform: translateX(-105%);
   pointer-events: none;
+  transition: transform 0.2s ease;
 }
 
 .app-sidebar--open {
   transform: translateX(0);
   pointer-events: auto;
   box-shadow: var(--shadow-lg);
+  transition: transform 0.2s ease;
 }
 
 .wa-mobile-menu-btn {

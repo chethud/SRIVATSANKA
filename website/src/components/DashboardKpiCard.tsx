@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { AnimatedCounter } from './AnimatedCounter';
@@ -39,10 +38,7 @@ export function DashboardKpiCard({
   const interactive = Boolean(onClick);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -3, transition: { duration: 0.18 } }}
+    <div
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       onClick={onClick}
@@ -108,6 +104,6 @@ export function DashboardKpiCard({
           </span>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

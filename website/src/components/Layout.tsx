@@ -1,5 +1,4 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
@@ -90,13 +89,11 @@ function DashboardLayoutInner() {
         />
       )}
 
-      <motion.aside
-        layout={!isMobileNav}
+      <aside
         className={`app-sidebar fixed left-0 top-0 h-dvh flex flex-col z-40 border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] shadow-[var(--shadow-sm)] ${
           isMobileNav ? (mobileNavOpen ? 'app-sidebar--open' : 'app-sidebar--closed') : ''
         }`}
         style={{ width: asideWidth }}
-        transition={isMobileNav ? { type: 'tween', duration: 0.2 } : { type: 'spring', stiffness: 380, damping: 32 }}
         aria-hidden={isMobileNav && !mobileNavOpen}
       >
         <div className="shrink-0 flex items-center justify-between border-b border-[var(--sidebar-border)] px-2 min-h-[3.5rem]">
@@ -184,17 +181,15 @@ function DashboardLayoutInner() {
             </button>
           )}
         </div>
-      </motion.aside>
+      </aside>
 
-      <motion.main
-        layout={!isWhatsAppChat && !isMobileNav}
+      <main
         className={`flex-1 flex flex-col min-w-0 ${
           isWhatsAppChat
             ? 'h-dvh max-h-dvh p-0 overflow-hidden'
             : 'min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 lg:px-8'
         }`}
         style={{ marginLeft: isMobileNav ? 0 : sidebarWidth }}
-        transition={isWhatsAppChat || isMobileNav ? undefined : { type: 'spring', stiffness: 380, damping: 32 }}
       >
         {!isWhatsAppChat && (
           <div className="topnav-root">
@@ -221,7 +216,7 @@ function DashboardLayoutInner() {
           <Outlet />
         </div>
         {!isWhatsAppChat && <AIChatWidget />}
-      </motion.main>
+      </main>
     </div>
   );
 }

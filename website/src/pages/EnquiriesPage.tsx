@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { useAppData } from '../context/AppDataContext';
@@ -72,20 +72,7 @@ export default function EnquiriesPage() {
   useCreateActionListener('enquiry', () => setShowForm(true));
   usePageSearch('Search name, event, phone...', search, setSearch);
 
-  const unviewedEnquiries = useMemo(
-    () => sortEnquiriesForAttention(enquiries.filter(isUnviewedEnquiry)),
-    [enquiries],
-  );
-
   const serialNumbers = useMemo(() => buildSerialNumberMap(enquiries), [enquiries]);
-
-  useEffect(() => {
-    if (!selected) return;
-    if (typeof window === 'undefined' || window.matchMedia('(min-width: 768px)').matches) return;
-    requestAnimationFrame(() => {
-      document.getElementById('enquiry-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, [selected]);
 
   useEffect(() => {
     if (deepLinkId && enquiries.some((e) => e.id === deepLinkId)) {
@@ -128,12 +115,6 @@ export default function EnquiriesPage() {
     () => (detail?.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
     [detail],
   );
-
-  useEffect(() => {
-    if (deepLinkId || deepLinkPhone) return;
-    if (selected || unviewedEnquiries.length === 0) return;
-    setSelected(unviewedEnquiries[0].id);
-  }, [unviewedEnquiries, selected, deepLinkId, deepLinkPhone]);
 
   function handleRowHover(enquiry: (typeof enquiries)[0]) {
     if (!isUnviewedEnquiry(enquiry) || markedSeenRef.current.has(enquiry.id)) return;
@@ -263,13 +244,12 @@ export default function EnquiriesPage() {
       {filtered.length === 0 ? (
         <EmptyState message={attentionOnly ? 'No new enquiries waiting — all caught up.' : 'No enquiries match your filters.'} />
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          {/* Mobile / tablet: stacked cards so status & details aren’t clipped */}
-          <div className="xl:col-span-2 space-y-3 md:hidden">
+        <>
+          {/* Mobile / tablet: stacked cards */}
+          <div className="space-y-3 md:hidden">
             {filtered.map((e) => {
               const unread = isUnviewedEnquiry(e);
               const serial = serialNumbers.get(e.id);
-              const active = selected === e.id;
               return (
                 <div
                   key={e.id}
@@ -289,26 +269,22 @@ export default function EnquiriesPage() {
                   className={`w-full text-left rounded-xl border p-4 shadow-sm transition-colors cursor-pointer ${
                     unread
                       ? 'attention-unread-row border-[var(--attention-border)]'
-                      : active
-                        ? 'border-[var(--primary)] bg-[var(--primary-light)]'
-                        : 'border-[var(--border)] bg-[var(--card)]'
+                      : 'border-[var(--border)] bg-[var(--card)]'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
-                        <span className="font-semibold text-[var(--foreground)] break-words">{e.customerName}</span>
-                        {unread && <AttentionBadge />}
-                      </div>
-                      <p className="text-xs text-[var(--muted)] mt-1 break-all">{e.phoneNumber}</p>
-                      <p className="text-sm mt-2 text-[var(--foreground)]">{e.eventType}</p>
-                      {unread && (
-                        <p className="text-xs text-[var(--primary)] mt-1">
-                          Callback: {formatDateTime(e.preferredCallbackAt)}
-                        </p>
-                      )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
+                      <span className="font-semibold text-[var(--foreground)] break-words">{e.customerName}</span>
+                      {unread && <AttentionBadge />}
                     </div>
+                    <p className="text-xs text-[var(--muted)] mt-1 break-all">{e.phoneNumber}</p>
+                    <p className="text-sm mt-2 text-[var(--foreground)]">{e.eventType}</p>
+                    {unread && (
+                      <p className="text-xs text-[var(--primary)] mt-1">
+                        Callback: {formatDateTime(e.preferredCallbackAt)}
+                      </p>
+                    )}
                   </div>
                   <div className="mt-3 pt-3 border-t border-[var(--border)]" onClick={(ev) => ev.stopPropagation()}>
                     <label className="text-[10px] uppercase tracking-wide text-[var(--muted)] font-semibold">Status</label>
@@ -322,16 +298,14 @@ export default function EnquiriesPage() {
                       ))}
                     </select>
                   </div>
-                  <p className="text-xs text-[var(--primary)] mt-3 font-medium">
-                    {active ? 'Details below ↓' : 'Tap for full details'}
-                  </p>
+                  <p className="text-xs text-[var(--primary)] mt-3 font-medium">Tap for full details</p>
                 </div>
               );
             })}
           </div>
 
           {/* Desktop table */}
-          <div className="xl:col-span-2 hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm overflow-x-auto">
+          <div className="hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm overflow-x-auto">
             <table className="w-full text-sm min-w-[36rem]">
               <thead className="bg-[var(--background)]">
                 <tr>
@@ -348,10 +322,13 @@ export default function EnquiriesPage() {
                   return (
                   <tr
                     key={e.id}
-                    onClick={() => setSelected(e.id)}
+                    onClick={() => {
+                      setSelected(e.id);
+                      handleRowHover(e);
+                    }}
                     onMouseEnter={() => handleRowHover(e)}
                     className={`border-t border-[var(--border)] cursor-pointer hover:bg-[var(--background)] ${
-                      unread ? 'attention-unread-row' : selected === e.id ? 'bg-[var(--primary-light)]' : ''
+                      unread ? 'attention-unread-row' : ''
                     }`}
                   >
                     <td className="p-4 text-[var(--muted)] font-medium tabular-nums">{serial}</td>
@@ -386,89 +363,111 @@ export default function EnquiriesPage() {
             </table>
           </div>
 
-          <Card
-            id="enquiry-detail"
-            className={`p-4 sm:p-6 h-fit xl:sticky xl:top-4 ${detail ? '' : 'hidden md:block'}`}
-          >
-            {detail ? (
-              <>
-                <div className="flex items-center justify-between gap-2 mb-1 md:hidden">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Enquiry details</p>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(null)}
-                    className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] min-h-[2.5rem] px-2"
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap mb-4">
-                  <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">
-                    #{serialNumbers.get(detail.id)}
-                  </span>
-                  <h3 className="font-semibold text-lg break-words">{detail.customerName}</h3>
-                  {isUnviewedEnquiry(detail) && <AttentionBadge />}
-                </div>
-                <dl className="space-y-3 text-sm">
-                  <div>
-                    <dt className="text-[var(--muted)]">Phone</dt>
-                    <dd className="break-all font-medium">{detail.phoneNumber}</dd>
+          {detail && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="enquiry-detail-title"
+              onClick={() => setSelected(null)}
+            >
+              <div className="w-full max-w-lg max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <Card className="flex flex-col overflow-hidden shadow-xl max-h-[90vh]">
+                  <div className="flex items-start justify-between gap-3 p-4 sm:p-5 border-b border-[var(--border)]">
+                    <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">
+                        #{serialNumbers.get(detail.id)}
+                      </span>
+                      <h2 id="enquiry-detail-title" className="font-semibold text-lg break-words">
+                        {detail.customerName}
+                      </h2>
+                      {isUnviewedEnquiry(detail) && <AttentionBadge />}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(null)}
+                      className="p-2 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)] shrink-0"
+                      aria-label="Close"
+                    >
+                      <X size={20} />
+                    </button>
                   </div>
-                  <Link
-                    to={`/bot-tester?phone=${encodeURIComponent(detail.phoneNumber)}`}
-                    className="inline-flex items-center gap-1.5 text-sm text-[var(--primary)] hover:underline min-h-[2.5rem]"
-                  >
-                    <MessageCircle size={14} />
-                    Open WhatsApp chat
-                  </Link>
-                  <div>
-                    <dt className="text-[var(--muted)]">Event</dt>
-                    <dd>{detail.eventType}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)]">Date</dt>
-                    <dd>{formatDate(detail.eventDate)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)]">Location</dt>
-                    <dd className="break-words">{detail.eventLocation}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)]">Callback</dt>
-                    <dd className="break-words">{callbackDisplay(detail)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[var(--muted)] mb-1">Status</dt>
-                    <dd>
-                      <select
-                        value={detail.status === 'CLOSED' ? 'NOT_CONVERTED' : detail.status}
-                        onChange={(ev) => changeStatus(detail.id, ev.target.value)}
-                        className="form-select w-full text-sm px-3 py-2.5 rounded-lg min-h-[2.5rem]"
+
+                  <div className="overflow-y-auto p-4 sm:p-5">
+                    <dl className="space-y-3 text-sm">
+                      <div>
+                        <dt className="text-[var(--muted)]">Phone</dt>
+                        <dd className="break-all font-medium">{detail.phoneNumber}</dd>
+                      </div>
+                      <Link
+                        to={`/bot-tester?phone=${encodeURIComponent(detail.phoneNumber)}`}
+                        className="inline-flex items-center gap-1.5 text-sm text-[var(--primary)] hover:underline min-h-[2.5rem]"
+                        onClick={() => setSelected(null)}
                       >
-                        {statusOptionsForDropdown(detail.status === 'CLOSED' ? 'NOT_CONVERTED' : detail.status).map((s) => (
-                          <option key={s.id} value={s.id}>{s.label}</option>
-                        ))}
-                      </select>
-                    </dd>
+                        <MessageCircle size={14} />
+                        Open WhatsApp chat
+                      </Link>
+                      <div>
+                        <dt className="text-[var(--muted)]">Event</dt>
+                        <dd>{detail.eventType}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[var(--muted)]">Date</dt>
+                        <dd>{formatDate(detail.eventDate)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[var(--muted)]">Location</dt>
+                        <dd className="break-words">{detail.eventLocation}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[var(--muted)]">Callback</dt>
+                        <dd className="break-words">{callbackDisplay(detail)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[var(--muted)] mb-1">Status</dt>
+                        <dd>
+                          <select
+                            value={detail.status === 'CLOSED' ? 'NOT_CONVERTED' : detail.status}
+                            onChange={(ev) => changeStatus(detail.id, ev.target.value)}
+                            className="form-select w-full text-sm px-3 py-2.5 rounded-lg min-h-[2.5rem]"
+                          >
+                            {statusOptionsForDropdown(detail.status === 'CLOSED' ? 'NOT_CONVERTED' : detail.status).map((s) => (
+                              <option key={s.id} value={s.id}>{s.label}</option>
+                            ))}
+                          </select>
+                        </dd>
+                      </div>
+                      <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
+                    </dl>
+                    {cuisinePreferences.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                        <p className="font-medium mb-2">Cuisine preferences</p>
+                        <ul className="text-sm space-y-1">
+                          {cuisinePreferences.map((d, i) => (
+                            <li key={i} className="break-words">
+                              • {d.dishName}{' '}
+                              {d.customizations && <span className="text-[var(--muted)]">({d.customizations})</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
-                </dl>
-                {cuisinePreferences.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-[var(--border)]">
-                    <p className="font-medium mb-2">Cuisine preferences</p>
-                    <ul className="text-sm space-y-1">
-                      {cuisinePreferences.map((d, i) => (
-                        <li key={i} className="break-words">• {d.dishName} {d.customizations && <span className="text-[var(--muted)]">({d.customizations})</span>}</li>
-                      ))}
-                    </ul>
+
+                  <div className="p-4 sm:p-5 border-t border-[var(--border)] flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setSelected(null)}
+                      className="px-4 py-2.5 text-sm font-medium rounded-xl bg-[var(--primary)] text-white min-h-[2.5rem]"
+                    >
+                      Close
+                    </button>
                   </div>
-                )}
-              </>
-            ) : (
-              <p className="text-[var(--muted)] text-sm">Click a row to view details</p>
-            )}
-          </Card>
-        </div>
+                </Card>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </>
   );
