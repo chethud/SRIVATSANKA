@@ -34,7 +34,7 @@ const navItems: {
   { to: '/dishes', label: 'Menu', icon: UtensilsCrossed },
   { to: '/vendors', label: 'Vendors', icon: Users },
   { to: '/workers', label: 'Workers', icon: HardHat },
-  { to: '/invoices', label: 'Invoices', icon: FileText },
+  { to: '/invoices', label: 'Expenses Invoice', icon: FileText },
   { to: '/bot-tester', label: 'WhatsApp Chats', icon: WhatsAppIcon },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

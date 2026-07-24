@@ -97,7 +97,7 @@ export default function InvoicesPage() {
   return (
     <>
       <PageHeader
-        title="Invoices"
+        title="Expenses Invoice"
         description="Upload an expense bill — AI reads the details, you confirm before saving."
       />
 
