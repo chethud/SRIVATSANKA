@@ -116,7 +116,7 @@ export default function DashboardPage() {
       ) : (
         <>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         <DashboardKpiCard
           label="New enquiries"
           value={String(stats?.new_enquiries ?? 0)}
@@ -167,7 +167,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <GlassCard
           className="xl:col-span-2"
           title="Revenue vs expense"
@@ -186,7 +186,7 @@ export default function DashboardPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <GlassCard className="lg:col-span-2" title="Revenue forecast" action={<span className="text-xs text-[var(--muted)]">Projected</span>}>
           <RevenueForecastChart data={forecastData} />
         </GlassCard>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
 
       <AiInsightsPanel insights={insights} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <GlassCard title="Recent orders" action={<Link to="/orders" className="text-xs font-semibold text-[var(--primary)]">View all</Link>}>
           <RecentOrdersTable orders={getRecentOrders(enquiries)} />
         </GlassCard>
@@ -206,7 +206,7 @@ export default function DashboardPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
         <GlassCard title="Top selling dishes">
           <TopDishesList dishes={getTopDishes(enquiries)} />
         </GlassCard>

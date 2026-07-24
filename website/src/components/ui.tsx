@@ -13,14 +13,14 @@ export function LoadingScreen({ text = 'Loading dashboard...' }: { text?: string
   return (
     <div className="max-w-[1440px] mx-auto space-y-6 animate-fade-in">
       <div className="skeleton h-10 w-64" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="skeleton h-36 rounded-[var(--radius-xl)]" />
         ))}
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <div className="skeleton h-96 xl:col-span-2 rounded-[var(--radius-xl)]" />
-        <div className="skeleton h-96 rounded-[var(--radius-xl)]" />
+        <div className="skeleton h-48 rounded-[var(--radius-xl)]" />
       </div>
       <p className="text-center text-sm text-[var(--muted)]">{text}</p>
     </div>

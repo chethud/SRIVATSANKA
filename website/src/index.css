@@ -134,14 +134,11 @@ body {
 }
 
 /*
- * Default CSS grid stretches all cells to the tallest row sibling, which leaves
- * empty blank space inside shorter cards. Prefer content-sized height instead.
- * Use Tailwind `items-stretch` / `items-center` when equal heights are intentional.
+ * Default CSS grid stretches cells to the tallest sibling (blank space in short cards).
+ * Prefer content-height. Skips grids that already set items-* (center/stretch/end/etc.).
  */
-@layer base {
-  .grid {
-    align-items: start;
-  }
+div.grid:not([class*='items-']) {
+  align-items: start;
 }
 
 

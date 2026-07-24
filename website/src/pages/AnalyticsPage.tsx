@@ -59,7 +59,7 @@ export default function AnalyticsPage() {
         />
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 items-start">
         <StatCard
           label="Revenue"
           value={formatCurrency(revenue)}
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
         />
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6 items-start">
         <Card className="p-6">
           <h3 className="font-semibold mb-1">Revenue vs expenses</h3>
           <p className="text-xs text-[var(--muted)] mb-4">Compare income sources and bill expenses</p>
@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6 items-start">
         <Card className="p-6">
           <h3 className="font-semibold mb-1 flex items-center gap-2">
             <TrendingDown size={18} className="text-[var(--chart-amber)]" />
@@ -118,7 +118,7 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         <Card className="p-6">
           <h3 className="font-semibold mb-1">Enquiries by outcome</h3>
           <p className="text-xs text-[var(--muted)] mb-4">Converted vs unconverted</p>

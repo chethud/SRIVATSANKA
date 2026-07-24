@@ -270,7 +270,7 @@ export default function DishesPage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
           {Object.entries(grouped).map(([category, items]) => (
             <Card key={category} className="p-5">
               <h3 className="font-semibold text-[var(--primary-dark)] mb-3">{category}</h3>

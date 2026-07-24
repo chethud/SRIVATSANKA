@@ -269,7 +269,7 @@ export function StatCard({
             }
           : undefined
       }
-      className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 sm:p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow min-w-0 overflow-hidden ${
+      className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 sm:p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow min-w-0 overflow-hidden h-auto self-start ${
         interactive ? 'cursor-pointer hover:border-[var(--primary)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30' : ''
       }`}
     >
@@ -306,7 +306,7 @@ export function Button({ children, type = 'button', onClick, className = '', dis
 
 export function Card({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <div id={id} className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-sm)] min-w-0 ${className}`}>
+    <div id={id} className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-sm)] min-w-0 h-auto self-start ${className}`}>
       {children}
     </div>
   );

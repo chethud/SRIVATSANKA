@@ -160,7 +160,7 @@ export default function InvoicesPage() {
                 )}
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 items-start">
                 <div>
                   <label className="text-xs text-[var(--muted)] mb-1 block">Date on bill</label>
                   <input

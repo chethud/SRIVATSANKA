@@ -127,7 +127,7 @@ export default function WorkerDetailPage() {
         description={`${worker.role} · ${worker.phoneNumber}`}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 items-start">
         {[
           { icon: User, label: 'Role', value: worker.role },
           { icon: Phone, label: 'Phone', value: worker.phoneNumber },
