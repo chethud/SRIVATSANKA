@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { CheckCircle2, FileText, Upload, XCircle } from 'lucide-react';
 import { PageHeader, Card, Button } from '../components/Layout';
+import { PartialPaymentsPanel } from '../components/PartialPaymentsPanel';
 import { useAppData } from '../context/AppDataContext';
 import {
   cancelPendingInvoice,
@@ -9,6 +10,7 @@ import {
   recognizeExpenseInvoice,
   type InvoiceRecognizePreview,
 } from '../api/client';
+import { isPartialPaymentOrder } from '../utils/orderBilling';
 
 type ReviewForm = {
   description: string;
@@ -27,7 +29,7 @@ function previewToForm(p: InvoiceRecognizePreview): ReviewForm {
 }
 
 export default function InvoicesPage() {
-  const { refresh } = useAppData();
+  const { refresh, enquiries, patchEnquiry } = useAppData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [recognizing, setRecognizing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,6 +38,7 @@ export default function InvoicesPage() {
   const [needsEdit, setNeedsEdit] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
   const [error, setError] = useState('');
+  const partialCount = enquiries.filter(isPartialPaymentOrder).length;
 
   function resetFlow() {
     if (preview?.pendingId) {
@@ -98,7 +101,7 @@ export default function InvoicesPage() {
     <>
       <PageHeader
         title="Expenses Invoice"
-        description="Upload an expense bill — AI reads the details, you confirm before saving."
+        description="Upload expense bills, and clear split-payment balances still due from customers."
       />
 
       <input
@@ -243,6 +246,25 @@ export default function InvoicesPage() {
           <p>{savedMsg}</p>
         </div>
       )}
+
+      <div className="mt-10">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">Split payments pending</h2>
+            <p className="text-sm text-[var(--muted)]">
+              Orders with a remaining balance after a partial payment
+              {partialCount > 0 ? ` · ${partialCount} open` : ''}
+            </p>
+          </div>
+        </div>
+        <PartialPaymentsPanel
+          enquiries={enquiries}
+          onUpdated={async (updated) => {
+            patchEnquiry(updated);
+            await refresh();
+          }}
+        />
+      </div>
     </>
   );
 }
