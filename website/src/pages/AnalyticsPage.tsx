@@ -17,16 +17,18 @@ import {
 } from '../components/charts';
 
 export default function AnalyticsPage() {
-  const { loading, error, analytics } = useAppData();
+  const { loading, error, analytics, refresh } = useAppData();
   const [history, setHistory] = useState<'revenue' | 'expense' | null>(null);
 
   if (loading && !analytics) return <LoadingScreen />;
 
   const profit = analytics?.net_profit ?? 0;
-  const revenue = analytics?.total_revenue ?? 0;
+  const revenue = analytics?.order_revenue ?? analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
   const expenseItems = analytics?.expense_items ?? [];
-  const revenueItems = analytics?.revenue_items ?? analytics?.profit_items ?? [];
+  const revenueItems = (analytics?.revenue_items ?? []).filter(
+    (i) => !i.source || i.source === 'order',
+  );
 
   return (
     <>
@@ -41,7 +43,7 @@ export default function AnalyticsPage() {
               {formatCurrency(profit)}
             </p>
             <p className="text-sm text-[var(--muted)] mt-2">
-              Confirmed order payments + expense bills on{' '}
+              Revenue from confirmed order payments minus expense bills on{' '}
               <Link to="/invoices" className="text-[var(--primary)] hover:underline">Expenses Invoice</Link>.
               Click Revenue or Expenses below for history.
             </p>
@@ -56,9 +58,13 @@ export default function AnalyticsPage() {
         />
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total revenue" value={formatCurrency(revenue)} onClick={() => setHistory('revenue')} />
-        <StatCard label="Order revenue" value={formatCurrency(analytics?.order_revenue ?? 0)} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        <StatCard
+          label="Revenue"
+          value={formatCurrency(revenue)}
+          subtext="From order payments"
+          onClick={() => setHistory('revenue')}
+        />
         <StatCard
           label="Bill expenses"
           value={formatCurrency(expenses)}
@@ -78,6 +84,7 @@ export default function AnalyticsPage() {
           kind={history}
           items={history === 'revenue' ? revenueItems : expenseItems}
           onClose={() => setHistory(null)}
+          onChanged={() => refresh()}
         />
       )}
 
@@ -104,8 +111,8 @@ export default function AnalyticsPage() {
           {analytics && <ExpenseItemsChart analytics={analytics} />}
         </Card>
         <Card className="p-6">
-          <h3 className="font-semibold mb-1">Revenue from orders</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Paid converted event orders</p>
+          <h3 className="font-semibold mb-1">Revenue by order</h3>
+          <p className="text-xs text-[var(--muted)] mb-4">Confirmed payments on converted orders</p>
           {analytics && <ProfitBreakdownPie analytics={analytics} />}
         </Card>
       </div>

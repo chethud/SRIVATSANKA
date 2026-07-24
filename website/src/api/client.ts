@@ -130,6 +130,14 @@ export interface EnquiryDish {
   served: boolean;
 }
 
+export interface EnquiryPayment {
+  id: string;
+  amount: number;
+  payerName?: string | null;
+  notes?: string | null;
+  paidAt: string;
+}
+
 export interface Enquiry {
   id: string;
   customerName: string;
@@ -144,6 +152,11 @@ export interface Enquiry {
   notes?: string | null;
   deliveredAt?: string | null;
   paymentReceived?: boolean;
+  discountAmount?: number;
+  billingTotal?: number;
+  amountPaid?: number;
+  amountDue?: number;
+  payments?: EnquiryPayment[];
   createdAt: string;
   dishes: EnquiryDish[];
 }
@@ -401,11 +414,30 @@ export async function markEnquiryDelivered(id: string): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}/delivered`, { method: 'POST' });
 }
 
-export async function confirmEnquiryPayment(id: string, received = true): Promise<Enquiry> {
+export async function confirmEnquiryPayment(
+  id: string,
+  payload: {
+    received?: boolean;
+    amount?: number | null;
+    payerName?: string | null;
+    discountAmount?: number | null;
+    notes?: string | null;
+  } | boolean = true,
+): Promise<Enquiry> {
+  const body =
+    typeof payload === 'boolean'
+      ? { received: payload }
+      : {
+          received: payload.received ?? true,
+          amount: payload.amount,
+          payerName: payload.payerName,
+          discountAmount: payload.discountAmount,
+          notes: payload.notes,
+        };
   return apiFetch<Enquiry>(`/api/enquiries/${id}/payment`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ received }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -423,6 +455,27 @@ export async function downloadUploadFile(uploadId: string, fileName: string): Pr
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function fetchUploadBlobUrl(uploadId: string): Promise<{ url: string; contentType: string }> {
+  const res = await fetchWithAuth(`/api/uploads/${uploadId}/file`);
+  if (!res.ok) {
+    throw new Error(await apiErrorMessage(res, `/api/uploads/${uploadId}/file`));
+  }
+  const blob = await res.blob();
+  return {
+    url: URL.createObjectURL(blob),
+    contentType: blob.type || res.headers.get('content-type') || 'application/octet-stream',
+  };
+}
+
+export async function deleteUpload(uploadId: string): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/api/uploads/${uploadId}`, { method: 'DELETE' });
+}
+
+/** Remove an order payment from revenue (does not delete the order). */
+export async function removeOrderFromRevenue(enquiryId: string): Promise<Enquiry> {
+  return confirmEnquiryPayment(enquiryId, { received: false });
 }
 
 export async function markEnquiryViewed(id: string): Promise<Enquiry> {

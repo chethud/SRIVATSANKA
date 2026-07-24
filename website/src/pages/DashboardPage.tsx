@@ -25,6 +25,7 @@ import {
 } from '../components/charts';
 import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
 import { PaymentReceivedModal } from '../components/PaymentReceivedModal';
+import { PartialPaymentsPanel } from '../components/PartialPaymentsPanel';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, LoadingScreen } from '../components/ui';
 import { formatCurrency } from '../api/client';
@@ -43,6 +44,7 @@ import {
   getUpcomingEvents,
   getWorkerOverview,
 } from '../utils/dashboardData';
+import { isPartialPaymentOrder } from '../utils/orderBilling';
 
 export default function DashboardPage() {
   const { loading, error, stats, enquiries, dishes, notifications, vendors, workers, analytics, refresh, patchEnquiry } = useAppData();
@@ -51,6 +53,7 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<'revenue' | 'expense' | null>(null);
 
   const converted = useMemo(() => getConvertedOrders(enquiries), [enquiries]);
+  const partialCount = useMemo(() => enquiries.filter(isPartialPaymentOrder).length, [enquiries]);
   const monthly = analytics?.monthly ?? [];
   const lastM = monthly[monthly.length - 1];
   const prevM = monthly[monthly.length - 2];
@@ -63,16 +66,17 @@ export default function DashboardPage() {
   if (loading && !stats) return <LoadingScreen />;
 
   const profit = analytics?.net_profit ?? 0;
-  const revenue = analytics?.total_revenue ?? 0;
+  const revenue = analytics?.order_revenue ?? analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
   const expenseItems = analytics?.expense_items ?? [];
-  const revenueItems = analytics?.revenue_items ?? analytics?.profit_items ?? [];
+  const revenueItems = (analytics?.revenue_items ?? []).filter(
+    (i) => !i.source || i.source === 'order',
+  );
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-6">
       <PaymentReceivedModal
         orders={enquiries}
-        dishes={dishes}
         onResolved={async (updated) => {
           patchEnquiry(updated);
           await refresh();
@@ -84,6 +88,7 @@ export default function DashboardPage() {
           kind={history}
           items={history === 'revenue' ? revenueItems : expenseItems}
           onClose={() => setHistory(null)}
+          onChanged={() => refresh()}
         />
       )}
 
@@ -96,6 +101,7 @@ export default function DashboardPage() {
           tab={tab}
           onChange={setTab}
           newEnquiries={stats?.new_enquiries ?? 0}
+          partialCount={partialCount}
         />
       </motion.header>
 
@@ -103,6 +109,14 @@ export default function DashboardPage() {
 
       {tab === 'enquiries' ? (
         <DashboardEnquiriesPanel enquiries={enquiries} onRefresh={refresh} />
+      ) : tab === 'partial-payments' ? (
+        <PartialPaymentsPanel
+          enquiries={enquiries}
+          onUpdated={async (updated) => {
+            patchEnquiry(updated);
+            await refresh();
+          }}
+        />
       ) : (
         <>
 

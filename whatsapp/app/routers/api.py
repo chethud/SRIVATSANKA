@@ -10,7 +10,7 @@ from app.data.seed_demo_data import seed_demo_data
 from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
 from app.datetime_util import as_naive_utc
-from app.models import Dish, Enquiry, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
+from app.models import Dish, Enquiry, EnquiryPayment, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
 from app.quantity_units import normalize_quantity, normalize_quantity_unit
 from app.schemas import (
     AIAssistantRequest,
@@ -21,6 +21,7 @@ from app.schemas import (
     EnquiryDishOut,
     EnquiryOut,
     EnquiryPaymentIn,
+    EnquiryPaymentOut,
     EnquiryUpdateIn,
     NotificationOut,
     NotificationReadIn,
@@ -28,12 +29,39 @@ from app.schemas import (
     UpdateEnquiryStatus,
 )
 from app.services.dashboard_assistant import answer_dashboard_query
+from app.services.order_billing import billing_total_from_notes
+from app.services.profit import order_amount
 from app.services.whatsapp_client import is_whatsapp_configured
 
 router = APIRouter(prefix="/api", tags=["api"])
 
 
-def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
+def _enquiry_billing_figures(e: Enquiry, menu_prices: dict[str, float] | None = None) -> tuple[float, float, float]:
+    """Return (billing_total, amount_paid, amount_due)."""
+    prices = menu_prices or {}
+    from_notes = billing_total_from_notes(e.notes)
+    if from_notes is not None and from_notes > 0:
+        billing = from_notes
+    else:
+        billing = order_amount(e, prices) if e.dish_items is not None else 0.0
+    discount = max(0.0, float(getattr(e, "discountAmount", 0) or 0))
+    paid = sum(float(p.amount or 0) for p in (getattr(e, "payments", None) or []))
+    due = max(0.0, billing - discount - paid)
+    return billing, paid, due
+
+
+def _enquiry_to_out(e: Enquiry, menu_prices: dict[str, float] | None = None) -> EnquiryOut:
+    billing, paid, due = _enquiry_billing_figures(e, menu_prices)
+    payments = [
+        EnquiryPaymentOut(
+            id=p.id,
+            amount=p.amount,
+            payerName=p.payerName,
+            notes=p.notes,
+            paidAt=p.paidAt,
+        )
+        for p in (getattr(e, "payments", None) or [])
+    ]
     return EnquiryOut(
         id=e.id,
         customerName=e.customerName,
@@ -48,6 +76,11 @@ def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
         notes=e.notes,
         deliveredAt=getattr(e, "deliveredAt", None),
         paymentReceived=bool(getattr(e, "paymentReceived", False)),
+        discountAmount=float(getattr(e, "discountAmount", 0) or 0),
+        billingTotal=billing,
+        amountPaid=paid,
+        amountDue=due,
+        payments=payments,
         createdAt=e.createdAt,
         dishes=[
             EnquiryDishOut(
@@ -62,9 +95,13 @@ def _enquiry_to_out(e: Enquiry) -> EnquiryOut:
                 unitPrice=d.unitPrice,
                 served=getattr(d, "served", False) or False,
             )
-            for d in e.dish_items
+            for d in (e.dish_items or [])
         ],
     )
+
+
+def _enquiry_load_options():
+    return (selectinload(Enquiry.dish_items), selectinload(Enquiry.payments))
 
 
 @router.get("/health")
@@ -195,7 +232,7 @@ async def create_enquiry(
     await db.commit()
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .where(Enquiry.id == enquiry.id)
     )
     row = result.scalar_one()
@@ -206,7 +243,7 @@ async def create_enquiry(
 async def list_enquiries(db: AsyncSession = Depends(get_db)) -> list[EnquiryOut]:
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .order_by(Enquiry.createdAt.desc())
         .limit(100)
     )
@@ -229,7 +266,7 @@ async def update_enquiry_status(
 
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .where(Enquiry.id == enquiry_id)
     )
     enquiry = result.scalar_one_or_none()
@@ -253,7 +290,7 @@ async def update_enquiry(
 ) -> EnquiryOut:
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .where(Enquiry.id == enquiry_id)
     )
     enquiry = result.scalar_one_or_none()
@@ -274,7 +311,7 @@ async def mark_enquiry_delivered(
     """Mark a converted order as delivered — dashboard will ask about payment."""
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .where(Enquiry.id == enquiry_id)
     )
     enquiry = result.scalar_one_or_none()
@@ -295,10 +332,10 @@ async def confirm_enquiry_payment(
     payload: EnquiryPaymentIn,
     db: AsyncSession = Depends(get_db),
 ) -> EnquiryOut:
-    """Confirm client payment — amount then counts toward dashboard revenue."""
+    """Record full/partial payment (optional discount). Revenue uses payment rows."""
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .where(Enquiry.id == enquiry_id)
     )
     enquiry = result.scalar_one_or_none()
@@ -306,12 +343,72 @@ async def confirm_enquiry_payment(
         raise HTTPException(status_code=404, detail="Enquiry not found")
     if enquiry.status != EnquiryStatus.CONVERTED:
         raise HTTPException(status_code=400, detail="Only converted orders can confirm payment")
-    enquiry.paymentReceived = bool(payload.received)
-    if payload.received and enquiry.deliveredAt is None:
-        enquiry.deliveredAt = datetime.now()
+
+    if payload.discountAmount is not None:
+        enquiry.discountAmount = max(0.0, float(payload.discountAmount))
+
+    dishes_result = await db.execute(select(Dish))
+    menu_prices = {d.id: d.price for d in dishes_result.scalars().all()}
+    billing, paid_so_far, _ = _enquiry_billing_figures(enquiry, menu_prices)
+    remaining_before = max(0.0, billing - float(enquiry.discountAmount or 0) - paid_so_far)
+
+    if payload.received is False and payload.amount is None:
+        # Clear all payment progress (remove from revenue)
+        for p in list(enquiry.payments or []):
+            await db.delete(p)
+        enquiry.paymentReceived = False
+        await db.commit()
+        result = await db.execute(
+            select(Enquiry).options(*_enquiry_load_options()).where(Enquiry.id == enquiry_id)
+        )
+        return _enquiry_to_out(result.scalar_one(), menu_prices)
+
+    installment: float | None
+    if payload.amount is not None:
+        try:
+            installment = float(payload.amount)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid payment amount") from exc
+    else:
+        # Full remaining balance (or whole bill if nothing left calculated)
+        installment = remaining_before if remaining_before > 0 else max(0.0, billing - float(enquiry.discountAmount or 0))
+
+    if installment < 0:
+        raise HTTPException(status_code=400, detail="Payment amount cannot be negative")
+
+    # Always write a ledger row when confirming money received
+    if installment <= 0 and remaining_before > 0:
+        installment = remaining_before
+    if installment <= 0 and billing > 0 and paid_so_far <= 0:
+        installment = max(0.0, billing - float(enquiry.discountAmount or 0))
+
+    if installment > 0:
+        payment = EnquiryPayment(
+            enquiryId=enquiry.id,
+            amount=installment,
+            payerName=(payload.payerName or "").strip() or enquiry.customerName,
+            notes=(payload.notes or "").strip() or None,
+            paidAt=datetime.now(),
+        )
+        db.add(payment)
+        if enquiry.deliveredAt is None:
+            enquiry.deliveredAt = datetime.now()
+        await db.flush()
+        # Ensure relationship is up to date in this session
+        await db.refresh(enquiry, attribute_names=["payments"])
+    elif payload.received:
+        raise HTTPException(
+            status_code=400,
+            detail="Payment amount is 0 — set the order-copy totals or enter an amount",
+        )
+
+    billing, paid, due = _enquiry_billing_figures(enquiry, menu_prices)
+    enquiry.paymentReceived = paid > 0 and due <= 0.009
     await db.commit()
-    await db.refresh(enquiry)
-    return _enquiry_to_out(enquiry)
+    result = await db.execute(
+        select(Enquiry).options(*_enquiry_load_options()).where(Enquiry.id == enquiry_id)
+    )
+    return _enquiry_to_out(result.scalar_one(), menu_prices)
 
 
 @router.post("/enquiries/{enquiry_id}/viewed", response_model=EnquiryOut)
@@ -321,7 +418,7 @@ async def mark_enquiry_viewed(
 ) -> EnquiryOut:
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(*_enquiry_load_options())
         .where(Enquiry.id == enquiry_id)
     )
     enquiry = result.scalar_one_or_none()

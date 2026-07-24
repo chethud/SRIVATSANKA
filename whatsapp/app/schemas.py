@@ -142,7 +142,21 @@ class EnquiryUpdateIn(BaseModel):
 
 
 class EnquiryPaymentIn(BaseModel):
+    """Record a full or partial payment (and optional discount)."""
+
     received: bool = True
+    amount: float | None = None
+    payerName: str | None = None
+    discountAmount: float | None = None
+    notes: str | None = None
+
+
+class EnquiryPaymentOut(BaseModel):
+    id: str
+    amount: float
+    payerName: str | None = None
+    notes: str | None = None
+    paidAt: datetime
 
 
 class EnquiryOut(BaseModel):
@@ -159,6 +173,11 @@ class EnquiryOut(BaseModel):
     notes: str | None = None
     deliveredAt: datetime | None = None
     paymentReceived: bool = False
+    discountAmount: float = 0
+    billingTotal: float = 0
+    amountPaid: float = 0
+    amountDue: float = 0
+    payments: list[EnquiryPaymentOut] = Field(default_factory=list)
     createdAt: datetime
     dishes: list[EnquiryDishOut] = Field(default_factory=list)
 
@@ -300,6 +319,10 @@ class ChartMoneyItem(BaseModel):
     amount: float
     date: str | None = None
     purpose: str | None = None
+    id: str | None = None
+    fileName: str | None = None
+    enquiryId: str | None = None
+    source: str | None = None
 
 
 class MonthlyChartPoint(BaseModel):
@@ -318,10 +341,12 @@ class AnalyticsOut(BaseModel):
     order_expenses: float
     net_profit: float
     converted_orders: int
+    paid_orders: int = 0
     by_status: dict[str, int] = {}
     by_event_type: dict[str, int] = {}
     expense_items: list[ChartMoneyItem] = []
     profit_items: list[ChartMoneyItem] = []
+    revenue_items: list[ChartMoneyItem] = []
     monthly: list[MonthlyChartPoint] = []
 
 

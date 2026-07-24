@@ -1,4 +1,5 @@
 import type { Analytics, Dish, Enquiry, Notification, Vendor, Worker } from '../api/client';
+import { orderAmountPaid, orderBillingTotal, orderDiscount } from './orderBilling';
 
 export function calcTrend(current: number, previous: number): { pct: number; up: boolean } {
   if (previous === 0) return { pct: current > 0 ? 100 : 0, up: current >= 0 };
@@ -157,9 +158,12 @@ export function getUnreadNotifications(notifications: Notification[]) {
 }
 
 export function orderRevenueEstimate(enquiry: Enquiry) {
-  const lines = enquiry.dishes ?? [];
-  const perGuest = lines.reduce((s, d) => s + (d.unitPrice ?? 0) * (d.quantity || 1), 0);
-  return perGuest * enquiry.guestCount;
+  const paid = orderAmountPaid(enquiry);
+  if (paid > 0) return paid;
+  if (enquiry.paymentReceived) {
+    return Math.max(0, orderBillingTotal(enquiry) - orderDiscount(enquiry));
+  }
+  return 0;
 }
 
 export function dishCatalogSize(dishes: Dish[]) {

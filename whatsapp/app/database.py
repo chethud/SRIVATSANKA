@@ -94,6 +94,25 @@ async def _migrate_sqlite_columns() -> None:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN deliveredAt DATETIME")
                 if "paymentReceived" not in ecols:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN paymentReceived BOOLEAN DEFAULT 0")
+                if "discountAmount" not in ecols:
+                    alters.append("ALTER TABLE Enquiry ADD COLUMN discountAmount FLOAT DEFAULT 0")
+            if "EnquiryPayment" not in tables:
+                connection.execute(
+                    sa.text(
+                        """
+                        CREATE TABLE IF NOT EXISTS EnquiryPayment (
+                            id VARCHAR PRIMARY KEY,
+                            enquiryId VARCHAR NOT NULL,
+                            amount FLOAT NOT NULL,
+                            payerName VARCHAR,
+                            notes TEXT,
+                            paidAt DATETIME,
+                            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY(enquiryId) REFERENCES Enquiry(id) ON DELETE CASCADE
+                        )
+                        """
+                    )
+                )
             if "EnquiryDish" in tables:
                 cols = {c["name"] for c in insp.get_columns("EnquiryDish")}
                 if "quantity" not in cols:
@@ -125,6 +144,8 @@ async def _migrate_sqlite_columns() -> None:
                     connection.execute(sa.text("ALTER TABLE InvoiceUpload ADD COLUMN purpose VARCHAR"))
                 if "expenseDate" not in icol_names:
                     connection.execute(sa.text("ALTER TABLE InvoiceUpload ADD COLUMN expenseDate DATETIME"))
+                if "fileData" not in icol_names:
+                    connection.execute(sa.text("ALTER TABLE InvoiceUpload ADD COLUMN fileData BLOB"))
                 icols = list(insp.get_columns("InvoiceUpload"))
                 enquiry_col = next((c for c in icols if c["name"] == "enquiryId"), None)
                 if enquiry_col is not None and enquiry_col.get("nullable") is False:
@@ -275,21 +296,57 @@ async def _migrate_notification_enquiry_id() -> None:
 
 
 async def _migrate_enquiry_payment_columns() -> None:
-    """Add deliveredAt / paymentReceived for Postgres (and any non-SQLite)."""
+    """Add deliveredAt / paymentReceived / discountAmount + EnquiryPayment table for Postgres."""
     import sqlalchemy as sa
 
     async with engine.begin() as conn:
         def run(connection) -> None:
             insp = sa.inspect(connection)
-            if "Enquiry" not in insp.get_table_names():
-                return
-            cols = {c["name"] for c in insp.get_columns("Enquiry")}
-            if "deliveredAt" not in cols:
-                connection.execute(sa.text('ALTER TABLE "Enquiry" ADD COLUMN "deliveredAt" TIMESTAMP'))
-            if "paymentReceived" not in cols:
+            tables = insp.get_table_names()
+            if "Enquiry" in tables:
+                cols = {c["name"] for c in insp.get_columns("Enquiry")}
+                if "deliveredAt" not in cols:
+                    connection.execute(sa.text('ALTER TABLE "Enquiry" ADD COLUMN "deliveredAt" TIMESTAMP'))
+                if "paymentReceived" not in cols:
+                    connection.execute(
+                        sa.text('ALTER TABLE "Enquiry" ADD COLUMN "paymentReceived" BOOLEAN DEFAULT FALSE')
+                    )
+                if "discountAmount" not in cols:
+                    connection.execute(
+                        sa.text('ALTER TABLE "Enquiry" ADD COLUMN "discountAmount" DOUBLE PRECISION DEFAULT 0')
+                    )
+            if "EnquiryPayment" not in tables:
                 connection.execute(
-                    sa.text('ALTER TABLE "Enquiry" ADD COLUMN "paymentReceived" BOOLEAN DEFAULT FALSE')
+                    sa.text(
+                        """
+                        CREATE TABLE IF NOT EXISTS "EnquiryPayment" (
+                            id VARCHAR PRIMARY KEY,
+                            "enquiryId" VARCHAR NOT NULL REFERENCES "Enquiry"(id) ON DELETE CASCADE,
+                            amount DOUBLE PRECISION NOT NULL,
+                            "payerName" VARCHAR,
+                            notes TEXT,
+                            "paidAt" TIMESTAMP,
+                            "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
                 )
+
+        await conn.run_sync(run)
+
+
+async def _migrate_invoice_file_data() -> None:
+    """Store bill bytes in DB (Postgres BYTEA)."""
+    import sqlalchemy as sa
+
+    async with engine.begin() as conn:
+        def run(connection) -> None:
+            insp = sa.inspect(connection)
+            if "InvoiceUpload" not in insp.get_table_names():
+                return
+            cols = {c["name"] for c in insp.get_columns("InvoiceUpload")}
+            if "fileData" not in cols:
+                connection.execute(sa.text('ALTER TABLE "InvoiceUpload" ADD COLUMN "fileData" BYTEA'))
 
         await conn.run_sync(run)
 
@@ -304,6 +361,7 @@ async def init_db() -> None:
     if not is_sqlite_database(settings.database_url):
         await _migrate_notification_enquiry_id()
         await _migrate_enquiry_payment_columns()
+        await _migrate_invoice_file_data()
     await _migrate_dish_category_to_labels()
 
     from app.data.seed_dishes import seed_dishes

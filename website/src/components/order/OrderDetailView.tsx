@@ -13,12 +13,14 @@ import {
 } from '../../api/client';
 import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
+import { PaymentReceivedModal } from '../PaymentReceivedModal';
 import { OrderCopyView } from '../OrderCopyView';
 import { OrderDispatchSection } from './OrderDispatchSection';
 import { OrderExtrasSection } from './OrderExtrasSection';
 import { OrderRegionalStyleSection } from './OrderRegionalStyleSection';
 import { OrderVenueMapSection } from './OrderVenueMapSection';
 import { OrderExcelHeader, OrderExcelMenuGrid } from './OrderExcelMenuGrid';
+import { useAppData } from '../../context/AppDataContext';
 import {
   formatOrderId,
   formatMealTimeRange,
@@ -78,6 +80,8 @@ export function OrderDetailView({
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [deliveryBusy, setDeliveryBusy] = useState(false);
+  const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+  const { refresh } = useAppData();
 
   async function handleDownloadExcel(copyType: 'kitchen' | 'billing') {
     setExcelBusy(true);
@@ -231,6 +235,19 @@ export function OrderDetailView({
 
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
+      {showPaymentPopup && (
+        <PaymentReceivedModal
+          orders={[order]}
+          forceOrderId={order.id}
+          onCloseForce={() => setShowPaymentPopup(false)}
+          onResolved={async (updated) => {
+            onOrderUpdated(updated);
+            setShowPaymentPopup(false);
+            await refresh();
+          }}
+        />
+      )}
+
       <Link to="/orders" className="order-view-back">
         <ArrowLeft size={18} />
         Back to orders
@@ -249,7 +266,16 @@ export function OrderDetailView({
           {order.paymentReceived ? (
             <span className="text-xs font-medium text-[var(--success-text)]">Payment received</span>
           ) : order.deliveredAt ? (
-            <span className="text-xs font-medium text-amber-800">Delivered · awaiting payment</span>
+            <div className="flex flex-col items-end gap-1.5">
+              <span className="text-xs font-medium text-amber-800">Delivered · awaiting payment</span>
+              <button
+                type="button"
+                onClick={() => setShowPaymentPopup(true)}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]"
+              >
+                Record payment
+              </button>
+            </div>
           ) : (
             <button
               type="button"

@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -61,7 +61,7 @@ def _enquiry_out(e: Enquiry) -> EnquiryOut:
 async def _get_converted_enquiry(enquiry_id: str, db: AsyncSession) -> Enquiry:
     result = await db.execute(
         select(Enquiry)
-        .options(selectinload(Enquiry.dish_items))
+        .options(selectinload(Enquiry.dish_items), selectinload(Enquiry.payments))
         .where(Enquiry.id == enquiry_id)
     )
     enquiry = result.scalar_one_or_none()
@@ -349,6 +349,7 @@ async def confirm_expense_invoice(
         docType="expense",
         fileName=display_name,
         filePath=str(dest),
+        fileData=dest.read_bytes() if dest.exists() else None,
         amount=amount,
         notes=(payload.description or "").strip() or None,
         purpose=(payload.purpose or "").strip() or None,
@@ -394,12 +395,57 @@ async def upload_expense_invoice(
     )
 
 
+def _guess_media_type(file_name: str) -> str:
+    lower = (file_name or "").lower()
+    if lower.endswith(".pdf"):
+        return "application/pdf"
+    if lower.endswith((".png",)):
+        return "image/png"
+    if lower.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if lower.endswith(".webp"):
+        return "image/webp"
+    if lower.endswith(".gif"):
+        return "image/gif"
+    return "application/octet-stream"
+
+
 @router.get("/uploads/{upload_id}/file")
-async def download_upload(upload_id: str, db: AsyncSession = Depends(get_db)) -> FileResponse:
+async def download_upload(upload_id: str, db: AsyncSession = Depends(get_db)):
+    """Serve uploaded bill from DB bytes (preferred) or disk path."""
     upload = await db.get(InvoiceUpload, upload_id)
     if not upload:
         raise HTTPException(404, "File not found")
+
+    media = _guess_media_type(upload.fileName)
+    headers = {"Content-Disposition": f'inline; filename="{upload.fileName}"'}
+
+    data = getattr(upload, "fileData", None)
+    if data:
+        return Response(content=bytes(data), media_type=media, headers=headers)
+
     path = Path(upload.filePath)
-    if not path.exists():
-        raise HTTPException(404, "File missing on disk")
-    return FileResponse(path, filename=upload.fileName)
+    if path.exists():
+        # Backfill DB from disk for older uploads
+        try:
+            upload.fileData = path.read_bytes()
+            await db.commit()
+        except Exception:
+            await db.rollback()
+        return FileResponse(path, filename=upload.fileName, media_type=media, headers=headers)
+
+    raise HTTPException(404, "File missing — re-upload this bill")
+
+
+@router.delete("/uploads/{upload_id}")
+async def delete_upload(upload_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Remove an expense or profit bill from history and storage."""
+    upload = await db.get(InvoiceUpload, upload_id)
+    if not upload:
+        raise HTTPException(404, "File not found")
+    path = Path(upload.filePath) if upload.filePath else None
+    await db.delete(upload)
+    await db.commit()
+    if path and path.exists():
+        path.unlink(missing_ok=True)
+    return {"ok": True, "id": upload_id}

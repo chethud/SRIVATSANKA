@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, LargeBinary, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -55,11 +55,31 @@ class Enquiry(Base):
     # Delivery + client payment gate revenue on the dashboard
     deliveredAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paymentReceived: Mapped[bool] = mapped_column(Boolean, default=False)
+    discountAmount: Mapped[float] = mapped_column(Float, default=0.0)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updatedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     dish_items: Mapped[list["EnquiryDish"]] = relationship(back_populates="enquiry", cascade="all, delete-orphan")
     uploads: Mapped[list["InvoiceUpload"]] = relationship(back_populates="enquiry", cascade="all, delete-orphan")
+    payments: Mapped[list["EnquiryPayment"]] = relationship(
+        back_populates="enquiry", cascade="all, delete-orphan", order_by="EnquiryPayment.paidAt"
+    )
+
+
+class EnquiryPayment(Base):
+    """Partial / full client payments toward an order."""
+
+    __tablename__ = "EnquiryPayment"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=cuid)
+    enquiryId: Mapped[str] = mapped_column(String, ForeignKey("Enquiry.id", ondelete="CASCADE"), index=True)
+    amount: Mapped[float] = mapped_column(Float)
+    payerName: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paidAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    enquiry: Mapped["Enquiry"] = relationship(back_populates="payments")
 
 
 class Dish(Base):
@@ -102,6 +122,8 @@ class InvoiceUpload(Base):
     docType: Mapped[str] = mapped_column(String)  # expense, profit, invoice, other
     fileName: Mapped[str] = mapped_column(String)
     filePath: Mapped[str] = mapped_column(String)
+    # Persisted file bytes so documents survive disk wipes (e.g. Render)
+    fileData: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     purpose: Mapped[str | None] = mapped_column(String, nullable=True)

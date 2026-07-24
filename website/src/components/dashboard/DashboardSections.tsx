@@ -72,19 +72,21 @@ export function ChartFilter({
   );
 }
 
-export type DashboardTab = 'overview' | 'enquiries';
+export type DashboardTab = 'overview' | 'enquiries' | 'partial-payments';
 
 export function DashboardTabBar({
   tab,
   onChange,
   newEnquiries,
+  partialCount = 0,
 }: {
   tab: DashboardTab;
   onChange: (tab: DashboardTab) => void;
   newEnquiries: number;
+  partialCount?: number;
 }) {
   return (
-    <div className="inline-flex p-1 rounded-xl bg-[var(--background-alt)] border border-[var(--border)]">
+    <div className="inline-flex flex-wrap p-1 rounded-xl bg-[var(--background-alt)] border border-[var(--border)]">
       <button
         type="button"
         onClick={() => onChange('overview')}
@@ -105,6 +107,20 @@ export function DashboardTabBar({
         {newEnquiries > 0 && (
           <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-white/20 tabular-nums">
             {newEnquiries > 99 ? '99+' : newEnquiries}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('partial-payments')}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all inline-flex items-center gap-2 ${
+          tab === 'partial-payments' ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+        }`}
+      >
+        Partial payments
+        {partialCount > 0 && (
+          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-500/90 text-white tabular-nums">
+            {partialCount > 99 ? '99+' : partialCount}
           </span>
         )}
       </button>
@@ -138,7 +154,7 @@ export function DashboardEnquiriesPanel({
       title="Enquiries"
       action={
         <Link to="/enquiries" className="text-xs font-semibold text-[var(--primary)] hover:underline">
-          Full page →
+          Full page ?
         </Link>
       }
     >
@@ -314,7 +330,7 @@ export function WorkerAttendanceOverview({ workers, byRole }: { workers: Worker[
           <li key={w.id} className="flex items-center gap-2 text-sm">
             <HardHat size={14} className="text-[var(--accent)]" />
             <span className="font-medium">{w.name}</span>
-            <span className="text-[var(--muted)] text-xs">· {w.role}</span>
+            <span className="text-[var(--muted)] text-xs">? {w.role}</span>
           </li>
         ))}
       </ul>
@@ -352,7 +368,7 @@ export function AiInsightsPanel({ insights }: { insights: string[] }) {
           <h3 className="text-sm font-semibold">AI Business Assistant</h3>
           <p className="text-xs text-[var(--muted)]">Smart recommendations</p>
         </div>
-        <p className="text-xs text-[var(--muted)] ml-auto">Use the AI chat button ↘</p>
+        <p className="text-xs text-[var(--muted)] ml-auto">Use the AI chat button ?</p>
       </div>
       <ul className="space-y-3">
         {insights.map((text, i) => (
@@ -376,9 +392,10 @@ export function TodaysEventsWidget({ events }: { events: Enquiry[] }) {
       {events.map((e) => (
         <li key={e.id} className="text-sm p-3 rounded-xl bg-[var(--accent-soft)] border border-[var(--border)]">
           <span className="font-semibold">{e.customerName}</span>
-          <span className="text-[var(--muted)]"> — {e.eventType}</span>
+          <span className="text-[var(--muted)]"> ? {e.eventType}</span>
         </li>
       ))}
     </ul>
   );
 }
+

@@ -94,24 +94,37 @@ export function MonthlyTrendChart({ analytics }: { analytics: Analytics }) {
 }
 
 export function ProfitBreakdownPie({ analytics }: { analytics: Analytics }) {
-  const data = [
-    { name: 'Order revenue', value: analytics.order_revenue },
-    { name: 'Uploaded profit', value: analytics.uploaded_revenue },
-  ].filter((d) => d.value > 0);
+  const items = (analytics.revenue_items ?? [])
+    .filter((i) => !i.source || i.source === 'order')
+    .slice(0, 6)
+    .map((i) => ({
+      name: i.label.length > 22 ? `${i.label.slice(0, 20)}…` : i.label,
+      value: i.amount,
+      full: i.label,
+    }));
 
-  if (data.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <p className="text-sm text-[var(--muted)] text-center py-12">
+        Confirm order payments to see revenue breakdown.
+      </p>
+    );
+  }
 
-  const COLORS = [GREEN, GREEN_LIGHT];
+  const COLORS = [GREEN, GREEN_LIGHT, BLUE, AMBER, '#4a7c59', '#2d6a4f'];
 
   return (
     <ResponsiveContainer width="100%" height={240}>
       <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4}>
-          {data.map((_, i) => (
+        <Pie data={items} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4}>
+          {items.map((_, i) => (
             <Cell key={i} fill={COLORS[i % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} />
+        <Tooltip
+          formatter={(v) => formatCurrency(Number(v ?? 0))}
+          labelFormatter={(_, payload) => payload?.[0]?.payload?.full ?? ''}
+        />
         <Legend />
       </PieChart>
     </ResponsiveContainer>
