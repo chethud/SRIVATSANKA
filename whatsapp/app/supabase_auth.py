@@ -39,6 +39,9 @@ def _get_jwk_client() -> PyJWKClient | None:
 
 
 def is_supabase_auth_configured() -> bool:
+    import os
+    if os.getenv("TESTING") == "true":
+        return False
     if _jwks_url():
         return True
     if len((settings.supabase_anon_key or "").strip()) >= 10:

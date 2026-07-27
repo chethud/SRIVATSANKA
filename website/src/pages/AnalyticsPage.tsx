@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { TrendingDown } from 'lucide-react';
-import { PageHeader, StatCard, Card } from '../components/Layout';
+import { PageHeader, Card } from '../components/Layout';
 import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
 import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, LoadingScreen } from '../components/ui';
@@ -13,7 +13,6 @@ import {
   EnquiryStatusChart,
   EventTypeChart,
   ExpenseItemsChart,
-  NetProfitGauge,
 } from '../components/charts';
 
 export default function AnalyticsPage() {
@@ -23,7 +22,6 @@ export default function AnalyticsPage() {
 
   if (loading && !analytics) return <LoadingScreen />;
 
-  const profit = analytics?.net_profit ?? 0;
   const revenue = analytics?.order_revenue ?? analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
   const expenseItems = analytics?.expense_items ?? [];
@@ -33,51 +31,43 @@ export default function AnalyticsPage() {
 
   return (
     <>
-      <PageHeader title="Analytics" description="Charts for revenue, expenses, profit, and enquiries" />
+      <PageHeader title="Analytics" description="Charts for revenue, expenses, and enquiries" />
       <ErrorBanner message={error} />
 
-      <Card className="p-6 mb-8">
-        <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-          <div>
-            <p className="text-sm font-medium text-[var(--muted)]">Net profit</p>
-            <p className={`text-4xl font-bold mt-1 ${profit >= 0 ? 'text-[var(--primary)]' : 'text-[var(--danger)]'}`}>
-              {formatCurrency(profit)}
-            </p>
-            <p className="text-sm text-[var(--muted)] mt-2">
-              Revenue from confirmed order payments minus expense bills on{' '}
-              <Link to="/invoices" className="text-[var(--primary)] hover:underline">Expenses Invoice</Link>.
-              Click Revenue for payment history, or Expenses to open the invoice list.
-            </p>
-          </div>
-        </div>
-        <NetProfitGauge
-          profit={profit}
-          revenue={revenue}
-          expenses={expenses}
-          onRevenueClick={() => setHistory('revenue')}
-          onExpensesClick={() => navigate('/invoices')}
-        />
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 items-start">
+        <Card className="p-6">
+          <p className="text-sm font-medium text-[var(--muted)]">Total Revenue</p>
+          <p className="text-4xl font-bold mt-1 text-[var(--primary)]">
+            {formatCurrency(revenue)}
+          </p>
+          <p className="text-sm text-[var(--muted)] mt-2">
+            Confirmed payments on converted orders. Click below to view payment history.
+          </p>
+          <button
+            type="button"
+            onClick={() => setHistory('revenue')}
+            className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-dark)] rounded-lg shadow-sm transition"
+          >
+            View history
+          </button>
+        </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 items-start">
-        <StatCard
-          label="Revenue"
-          value={formatCurrency(revenue)}
-          subtext="From order payments"
-          onClick={() => setHistory('revenue')}
-        />
-        <StatCard
-          label="Bill expenses"
-          value={formatCurrency(expenses)}
-          subtext="From uploaded bills"
-          onClick={() => navigate('/invoices')}
-        />
-        <StatCard
-          label="Expense items"
-          value={String(expenseItems.length)}
-          subtext="From invoice uploads"
-          onClick={() => navigate('/invoices')}
-        />
+        <Card className="p-6">
+          <p className="text-sm font-medium text-[var(--muted)]">Total Expenses</p>
+          <p className="text-4xl font-bold mt-1 text-amber-950">
+            {formatCurrency(expenses)}
+          </p>
+          <p className="text-sm text-[var(--muted)] mt-2">
+            Extracted from uploaded bills ({expenseItems.length} items). Click below to view bills.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/invoices')}
+            className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-amber-700 hover:bg-amber-800 rounded-lg shadow-sm transition"
+          >
+            View invoices
+          </button>
+        </Card>
       </div>
 
       {history && (
@@ -97,7 +87,7 @@ export default function AnalyticsPage() {
         </Card>
         <Card className="p-6">
           <h3 className="font-semibold mb-1">Monthly trend</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Revenue, expenses, and net profit by month</p>
+          <p className="text-xs text-[var(--muted)] mb-4">Revenue and expenses by month</p>
           {analytics && <MonthlyTrendChart analytics={analytics} />}
         </Card>
       </div>

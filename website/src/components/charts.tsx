@@ -87,7 +87,6 @@ export function MonthlyTrendChart({ analytics }: { analytics: Analytics }) {
         <Legend />
         <Line type="monotone" dataKey="revenue" name="Revenue" stroke={GREEN} strokeWidth={2} dot={{ r: 4 }} />
         <Line type="monotone" dataKey="expenses" name="Expenses" stroke={AMBER} strokeWidth={2} dot={{ r: 4 }} />
-        <Line type="monotone" dataKey="profit" name="Net profit" stroke={BLUE} strokeWidth={2} dot={{ r: 4 }} />
       </LineChart>
     </ResponsiveContainer>
   );

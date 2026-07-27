@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 # whatsapp/ as cwd
+import os
+os.environ["TESTING"] = "true"
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 

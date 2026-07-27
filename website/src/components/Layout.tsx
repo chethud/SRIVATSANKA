@@ -14,7 +14,7 @@ import { LayoutProvider, SIDEBAR_EXPANDED, useLayout } from '../context/LayoutCo
 import { PageSearchProvider } from '../context/PageSearchContext';
 import { BrandLogo } from './BrandLogo';
 import { TopNav } from './TopNav';
-import { AIChatWidget } from './AIChatWidget';
+// import { AIChatWidget } from './AIChatWidget';
 import { WhatsAppIcon } from './WhatsAppIcon';
 
 type AppDataSlice = ReturnType<typeof useAppData>;
@@ -215,7 +215,7 @@ function DashboardLayoutInner() {
         >
           <Outlet />
         </div>
-        {!isWhatsAppChat && <AIChatWidget />}
+        {/* {!isWhatsAppChat && <AIChatWidget />} */}
       </main>
     </div>
   );

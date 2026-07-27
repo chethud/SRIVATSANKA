@@ -7,6 +7,9 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import os
+os.environ["TESTING"] = "true"
+
 ROOT = Path(__file__).resolve().parent.parent
 WEBSITE = ROOT.parent / "website"
 sys.path.insert(0, str(ROOT))

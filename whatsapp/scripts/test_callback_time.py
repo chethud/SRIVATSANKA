@@ -6,6 +6,9 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import os
+os.environ["TESTING"] = "true"
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -59,6 +62,9 @@ def test_parser_cases() -> None:
         ("tommarow @6pm", datetime(2026, 6, 4, 18, 0)),
         ("tomorow 6pm", datetime(2026, 6, 4, 18, 0)),
         ("today @6pm", datetime(2026, 6, 3, 18, 0)),
+        ("Call me today evening after 7", datetime(2026, 6, 3, 19, 0)),
+        ("Tomorrow morning around 11", datetime(2026, 6, 4, 11, 0)),
+        ("Maybe day after around tea time", datetime(2026, 6, 5, 16, 0)),
     ]
 
     for text, expected in cases:
@@ -111,7 +117,7 @@ def test_parser_cases() -> None:
         bad("_callback_text_from_notes", str(extracted))
 
 
-def test_bot_flow_saves_callback() -> None:
+def test_bot_flows() -> None:
     print("\n--- Bot flow integration ---")
     with TestClient(app) as client:
         login = client.post("/api/auth/login", json={"username": "Admin", "password": "Admin@123"})
@@ -121,6 +127,7 @@ def test_bot_flow_saves_callback() -> None:
         token = login.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        # 1. Test standard flow with "tomorrow 4pm"
         phone = f"91{uuid.uuid4().int % 10**10:010d}"
         callback_text = "tomorrow 4pm"
         expected_callback = parse_callback_time(callback_text)
@@ -195,11 +202,90 @@ def test_bot_flow_saves_callback() -> None:
         else:
             bad("notes missing scheduled callback", notes[:200])
 
+        # 2. Test Custom timing inputs and sign-off integration
+        # Case 1: Call me today evening after 7
+        phone1 = f"91{uuid.uuid4().int % 10**10:010d}"
+        steps1 = ["new", "Hi", "Alice", "Wedding", "ok", "15 June 2026", "Whitefield", "Call me today evening after 7"]
+        last_response = None
+        for msg in steps1:
+            r = client.post("/dev/message", headers=headers, json={"from_number": phone1, "text": msg})
+            assert r.status_code == 200
+            last_response = r.json()
+        
+        reply1 = last_response.get("reply") or ""
+        expected_reply1 = "Perfect! We have scheduled a callback for today after 7:00 PM. Our team will reach out to you on this number. 📞"
+        if expected_reply1 in reply1:
+            ok("Alice gets custom response for 'today evening after 7'")
+        else:
+            bad("Alice response mismatch", f"got {reply1!r}")
+
+        r = client.post("/dev/message", headers=headers, json={"from_number": phone1, "text": "skip"})
+        assert r.status_code == 200
+        final_reply1 = r.json().get("reply") or ""
+        
+        v_a = "Thank you so much, Alice! It was a absolute pleasure chatting with you. We’re thrilled at the opportunity to make your wedding truly unforgettable. ✨\n\nHave a wonderful rest of your day, and talk to you soon!"
+        v_b = "Thank you, Alice! We’re honored to be considered for your big day. Our team will connect with you at the scheduled time. 🙏\n\nWishing you a lovely day ahead!"
+        if final_reply1 in (v_a, v_b):
+            ok("Alice gets valid Phase 7 emotional sign-off")
+        else:
+            bad("Alice sign-off mismatch", f"got {final_reply1!r}")
+
+        # Case 2: Tomorrow morning around 11
+        phone2 = f"91{uuid.uuid4().int % 10**10:010d}"
+        steps2 = ["new", "Hi", "Bob", "Birthday", "ok", "15 June 2026", "Whitefield", "Tomorrow morning around 11"]
+        for msg in steps2:
+            r = client.post("/dev/message", headers=headers, json={"from_number": phone2, "text": msg})
+            assert r.status_code == 200
+            last_response = r.json()
+        reply2 = last_response.get("reply") or ""
+        expected_reply2 = "Noted, Bob! We’ll give you a call tomorrow around 11:00 AM. 🗓️"
+        if expected_reply2 in reply2:
+            ok("Bob gets custom response for 'tomorrow morning around 11'")
+        else:
+            bad("Bob response mismatch", f"got {reply2!r}")
+
+        # Case 3: Maybe day after around tea time
+        phone3 = f"91{uuid.uuid4().int % 10**10:010d}"
+        steps3 = ["new", "Hi", "Charlie", "Birthday", "ok", "15 June 2026", "Whitefield", "Maybe day after around tea time"]
+        for msg in steps3:
+            r = client.post("/dev/message", headers=headers, json={"from_number": phone3, "text": msg})
+            assert r.status_code == 200
+            last_response = r.json()
+        reply3 = last_response.get("reply") or ""
+        expected_reply3 = "Sounds great! We’ll give you a call day after tomorrow between 4:00 PM and 5:00 PM. ☕"
+        if expected_reply3 in reply3:
+            ok("Charlie gets custom response for 'maybe day after around tea time'")
+        else:
+            bad("Charlie response mismatch", f"got {reply3!r}")
+
+        r = client.post("/dev/message", headers=headers, json={"from_number": phone3, "text": "skip"})
+        assert r.status_code == 200
+        final_reply3 = r.json().get("reply") or ""
+        v_a_charlie = "Thank you so much, Charlie! It was a absolute pleasure chatting with you. We’re thrilled at the opportunity to make your birthday truly unforgettable. ✨\n\nHave a wonderful rest of your day, and talk to you soon!"
+        v_b_charlie = "Thank you, Charlie! We’re honored to be considered for your big day. Our team will connect with you at the scheduled time. 🙏\n\nWishing you a lovely day ahead!"
+        if final_reply3 in (v_a_charlie, v_b_charlie):
+            ok("Charlie gets valid Phase 7 emotional sign-off (birthday event)")
+        else:
+            bad("Charlie sign-off mismatch", f"got {final_reply3!r}")
+
+        # Case 4: Test General / Fallback to celebration for event type
+        from app.services.session_store import ConversationSession, EnquiryFields
+        mock_sess = ConversationSession(whatsapp_id="123")
+        mock_sess.fields = EnquiryFields(customer_name="Testy", event_type="General", preferred_callback="in 2 hours")
+        from app.services.dish_flow import _format_confirmation
+        conf_res = _format_confirmation(mock_sess)
+        v_a_fallback = "Thank you so much, Testy! It was a absolute pleasure chatting with you. We’re thrilled at the opportunity to make your celebration truly unforgettable. ✨\n\nHave a wonderful rest of your day, and talk to you soon!"
+        v_b_fallback = "Thank you, Testy! We’re honored to be considered for your big day. Our team will connect with you at the scheduled time. 🙏\n\nWishing you a lovely day ahead!"
+        if conf_res in (v_a_fallback, v_b_fallback):
+            ok("Direct _format_confirmation resolves 'General' to 'celebration' and returns correct sign-off")
+        else:
+            bad("Direct _format_confirmation general fallback mismatch", conf_res)
+
 
 def main() -> int:
     print("=== Callback time tests ===\n")
     test_parser_cases()
-    test_bot_flow_saves_callback()
+    test_bot_flows()
     print(f"\n=== Results: {PASS} passed, {FAIL} failed ===")
     return 1 if FAIL else 0
 

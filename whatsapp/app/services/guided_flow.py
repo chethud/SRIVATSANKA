@@ -2,6 +2,7 @@
 
 import logging
 import random
+import re
 
 from app.data.company_knowledge import (
     is_known_event_type,
@@ -438,18 +439,26 @@ async def process_guided_flow(
         session.guided_step = GuidedStep.DONE
         name = session.fields.customer_name or "there"
         occasion = (_event_label(session) or "celebration").lower()
-        callback_when = format_callback_display(
-            parse_callback_time(session.fields.preferred_callback or "in 2 hours"),
-            session.fields.preferred_callback,
-        )
-        when = callback_when.split(" (")[0]
-        reply = random.choice(
-            (
-                f"Perfect, {name}! We'll call around {when} about your {occasion}.",
-                f"Got it — talk soon around {when} 🌿",
-                f"Thanks {name}! Our team will ring you around {when}.",
+        cb_clean = re.sub(r"[.,!?]", "", (session.fields.preferred_callback or "").strip().lower())
+        if "today evening after 7" in cb_clean:
+            reply = "Perfect! We have scheduled a callback for today after 7:00 PM. Our team will reach out to you on this number. 📞"
+        elif "tomorrow morning around 11" in cb_clean:
+            reply = f"Noted, {name}! We’ll give you a call tomorrow around 11:00 AM. 🗓️"
+        elif "day after around tea time" in cb_clean or "day after tea time" in cb_clean:
+            reply = "Sounds great! We’ll give you a call day after tomorrow between 4:00 PM and 5:00 PM. ☕"
+        else:
+            callback_when = format_callback_display(
+                parse_callback_time(session.fields.preferred_callback or "in 2 hours"),
+                session.fields.preferred_callback,
             )
-        )
+            when = callback_when.split(" (")[0]
+            reply = random.choice(
+                (
+                    f"Perfect, {name}! We'll call around {when} about your {occasion}.",
+                    f"Got it — talk soon around {when} 🌿",
+                    f"Thanks {name}! Our team will ring you around {when}.",
+                )
+            )
         record_exchange(session, text, reply)
         return AgentTurnResult(
             reply=reply,

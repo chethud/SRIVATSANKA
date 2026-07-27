@@ -10,7 +10,6 @@ import {
   GlassCard,
   RecentOrdersTable,
   TodaysEventsWidget,
-  TopDishesList,
   UpcomingEventsList,
   WorkerAttendanceOverview,
   type DashboardTab,
@@ -35,7 +34,6 @@ import {
   getAiInsights,
   getConvertedOrders,
   getRecentOrders,
-  getTopDishes,
   getTodaysEvents,
   getUpcomingEvents,
   getWorkerOverview,
@@ -206,10 +204,7 @@ export default function DashboardPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-        <GlassCard title="Top selling dishes">
-          <TopDishesList dishes={getTopDishes(enquiries)} />
-        </GlassCard>
+      <div className="grid grid-cols-1 gap-4 items-start">
         <GlassCard title="Worker overview" action={<Link to="/workers" className="text-xs text-[var(--primary)]">Workers</Link>}>
           <WorkerAttendanceOverview workers={workerOverview.workers} byRole={workerOverview.byRole} />
         </GlassCard>

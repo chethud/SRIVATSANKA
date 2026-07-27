@@ -45,6 +45,8 @@ async def check_callback_reminders() -> None:
 
 
 def start_scheduler() -> None:
-    scheduler.add_job(check_callback_reminders, "interval", minutes=1, id="callback_reminders")
-    scheduler.start()
-    logger.info("Callback reminder scheduler started (WhatsApp alert 15–20 min before callback)")
+    if not scheduler.get_job("callback_reminders"):
+        scheduler.add_job(check_callback_reminders, "interval", minutes=1, id="callback_reminders")
+    if not scheduler.running:
+        scheduler.start()
+        logger.info("Callback reminder scheduler started (WhatsApp alert 15–20 min before callback)")

@@ -2565,3 +2565,22 @@ select:focus {
   aside, .print\:hidden, .fab-root, .topnav-root, .ai-chat { display: none !important; }
   main { margin-left: 0 !important; padding: 0 !important; }
 }
+
+@media (max-width: 480px) {
+  .excel-meta-time-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+  .excel-meta-time-sep {
+    display: none;
+  }
+  .excel-meta-field--time {
+    border-right: none !important;
+    padding-right: 0 !important;
+  }
+  .excel-session-meta--draft .excel-meta-field:first-child {
+    border-right: none !important;
+    padding-right: 0 !important;
+  }
+}

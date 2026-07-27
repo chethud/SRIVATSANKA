@@ -43,26 +43,23 @@ def _format_session_prompt() -> str:
 
 
 def _format_confirmation(session: ConversationSession) -> str:
-    from app.services.callback_time import format_callback_display, parse_callback_time
-
     f = session.fields
     name = f.customer_name or "there"
-    meals = (
-        ", ".join(d.dish_name for d in session.selected_dishes)
-        if session.selected_dishes
-        else "to discuss on the call"
+    event_name = (f.event_type or "celebration").lower()
+    if event_name == "general":
+        event_name = "celebration"
+
+    variant_a = (
+        f"Thank you so much, {name}! It was a absolute pleasure chatting with you. "
+        f"We’re thrilled at the opportunity to make your {event_name} truly unforgettable. ✨\n\n"
+        f"Have a wonderful rest of your day, and talk to you soon!"
     )
-    when = format_callback_display(
-        parse_callback_time(f.preferred_callback or "in 2 hours"),
-        f.preferred_callback,
-    ).split(" (")[0]
-    return random.choice(
-        (
-            f"Perfect, {name}! Noted *{meals}*. We'll call around {when}.",
-            f"All set ✅ Meals: *{meals}*. Talk soon around {when}.",
-            f"Got it, {name}. We'll ring you around {when}.",
-        )
+    variant_b = (
+        f"Thank you, {name}! We’re honored to be considered for your big day. "
+        f"Our team will connect with you at the scheduled time. 🙏\n\n"
+        f"Wishing you a lovely day ahead!"
     )
+    return random.choice((variant_a, variant_b))
 
 
 def _resolve_session_selections(text: str) -> list[str] | None:

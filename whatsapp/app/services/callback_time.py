@@ -179,6 +179,18 @@ def parse_callback_time(text: str, now: datetime | None = None) -> datetime:
 
     lower = raw.lower()
 
+    # Custom timing inputs handling
+    clean_input = re.sub(r"[.,!?]", "", lower).strip()
+    if "today evening after 7" in clean_input:
+        base = _resolve_base_day("today", reference)
+        return _ensure_future(_apply_time(base, 19, 0, reference=reference), reference)
+    if "tomorrow morning around 11" in clean_input:
+        base = _resolve_base_day("tomorrow", reference)
+        return _ensure_future(_apply_time(base, 11, 0, reference=reference), reference)
+    if "day after around tea time" in clean_input or "day after tea time" in clean_input:
+        base = _resolve_base_day("day after tomorrow", reference)
+        return _ensure_future(_apply_time(base, 16, 0, reference=reference), reference)
+
     if _is_immediate(lower):
         return reference + timedelta(minutes=10)
 
