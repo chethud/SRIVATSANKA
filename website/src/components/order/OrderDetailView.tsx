@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, ChefHat, Clock, MapPin, Phone, Pencil, FileText, UtensilsCrossed, Calendar,
-  FileSpreadsheet, Printer, Plus,
+  FileSpreadsheet, Printer,
 } from 'lucide-react';
 import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
@@ -72,7 +72,6 @@ export function OrderDetailView({
   const [pageView, setPageView] = useState<OrderPageView>(initialView);
   const [excelBusy, setExcelBusy] = useState(false);
   const [editingExtras, setEditingExtras] = useState(false);
-  const [activeSession, setActiveSession] = useState('Breakfast');
   const [addingSession, setAddingSession] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [sessionSaving, setSessionSaving] = useState(false);
@@ -99,7 +98,6 @@ export function OrderDetailView({
     if (!name) return;
     const exists = sessionTabs.some((s) => s.id.toLowerCase() === name.toLowerCase());
     if (exists) {
-      setActiveSession(sessionTabs.find((s) => s.id.toLowerCase() === name.toLowerCase())!.id);
       setAddingSession(false);
       setNewSessionName('');
       return;
@@ -111,7 +109,6 @@ export function OrderDetailView({
         notes: serializeOrderNotes({ ...extras, customSessions }),
       });
       onOrderUpdated(updated);
-      setActiveSession(name);
       setAddingSession(false);
       setNewSessionName('');
     } catch {
@@ -142,10 +139,6 @@ export function OrderDetailView({
         ],
       ),
     [extras.customSessions, extras.menuColumns, menuItems, dishes],
-  );
-  const savedSessionIds = useMemo(
-    () => new Set((extras.menuColumns ?? []).map((c) => c.baseSession)),
-    [extras.menuColumns],
   );
   const mealPrefs = useMemo(
     () => (order.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
@@ -178,8 +171,13 @@ export function OrderDetailView({
     const cols = resolveMenuColumns(extras, order, menuItems);
     const withPax = cols.filter((c) => c.pax != null && c.pax > 0);
     if (withPax.length === 0) return 'Set per session when adding menu';
-    return withPax.map((c) => `${c.sessionLabel} ${c.pax}`).join('\n');
+    return withPax.map((c) => `${c.sessionLabel} · ${c.pax}`).join('\n');
   }, [extras, order, menuItems]);
+
+  const dateTimeSummary = useMemo(() => {
+    if (scheduleSummary.datePart) return scheduleSummary.datePart;
+    return formatDateTime(order.eventDate);
+  }, [scheduleSummary.datePart, order.eventDate]);
 
   async function saveExtras() {
     setSaving(true);
@@ -291,7 +289,7 @@ export function OrderDetailView({
 
       <div className="order-stat-grid">
         {[
-          { icon: Clock, label: 'Date & time', value: formatDateTime(order.eventDate) },
+          { icon: Clock, label: 'Date & time', value: dateTimeSummary },
           { icon: UtensilsCrossed, label: 'Session pax', value: sessionPaxSummary },
           { icon: MapPin, label: 'Venue', value: order.eventLocation },
           { icon: Phone, label: 'Contact', value: order.phoneNumber },
@@ -499,73 +497,25 @@ export function OrderDetailView({
           </div>
         </div>
 
-        <div className="order-session-tabs">
-          {sessionTabs.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setActiveSession(s.id)}
-              className={`order-session-tab ${activeSession === s.id ? 'order-session-tab--active' : ''} ${savedSessionIds.has(s.id) ? 'order-session-tab--saved' : ''}`}
-            >
-              {s.label}
-            </button>
-          ))}
-          {!addingSession ? (
-            <button
-              type="button"
-              onClick={() => setAddingSession(true)}
-              className="order-session-tab order-session-tab--add"
-            >
-              <Plus size={14} /> Add session
-            </button>
-          ) : (
-            <div className="order-session-add-form">
-              <input
-                autoFocus
-                value={newSessionName}
-                onChange={(e) => setNewSessionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleAddCustomSession();
-                  if (e.key === 'Escape') {
-                    setAddingSession(false);
-                    setNewSessionName('');
-                  }
-                }}
-                placeholder="e.g. High Tea"
-                className="order-session-add-input"
-                maxLength={40}
-              />
-              <button
-                type="button"
-                onClick={() => void handleAddCustomSession()}
-                disabled={sessionSaving || !newSessionName.trim()}
-                className="order-session-tab order-session-tab--active"
-              >
-                {sessionSaving ? '…' : 'Add'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAddingSession(false);
-                  setNewSessionName('');
-                }}
-                className="order-session-tab"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
+        <p className="order-section-sub">
+          Pick a day, create Lunch / Dinner / other sessions together, then add dishes and times in each block.
+        </p>
 
         <OrderExcelHeader order={order} />
         <OrderExcelMenuGrid
           order={order}
           extras={extras}
           menuItems={menuItems}
-          activeSession={activeSession}
+          sessionTabs={sessionTabs}
           dishes={dishes}
           onOrderUpdated={onOrderUpdated}
           onDishesCatalogUpdated={onDishesCatalogUpdated}
+          onAddCustomSession={handleAddCustomSession}
+          customSessionName={newSessionName}
+          onCustomSessionNameChange={setNewSessionName}
+          addingCustomSession={addingSession}
+          onAddingCustomSessionChange={setAddingSession}
+          customSessionSaving={sessionSaving}
         />
 
         {mealPrefs.length > 0 && (

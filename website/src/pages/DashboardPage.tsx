@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MessageSquare, ShoppingBag, TrendingUp, Wallet } from 'lucide-react';
 import { DashboardKpiCard } from '../components/DashboardKpiCard';
 import {
-  AiInsightsPanel,
   ChartFilter,
   DashboardEnquiriesPanel,
   DashboardTabBar,
@@ -11,7 +10,6 @@ import {
   RecentOrdersTable,
   TodaysEventsWidget,
   UpcomingEventsList,
-  WorkerAttendanceOverview,
   type DashboardTab,
 } from '../components/dashboard/DashboardSections';
 import {
@@ -29,19 +27,16 @@ import {
   buildChartSeries,
   buildForecast,
   calcTrend,
-  sparklineFromMonthly,
   type ChartPeriod,
-  getAiInsights,
   getConvertedOrders,
   getRecentOrders,
   getTodaysEvents,
   getUpcomingEvents,
-  getWorkerOverview,
 } from '../utils/dashboardData';
 import { isPartialPaymentOrder } from '../utils/orderBilling';
 
 export default function DashboardPage() {
-  const { loading, error, stats, enquiries, workers, analytics, refresh, patchEnquiry } = useAppData();
+  const { loading, error, stats, enquiries, analytics, refresh, patchEnquiry } = useAppData();
   const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<ChartPeriod>('monthly');
   const [tab, setTab] = useState<DashboardTab>('overview');
@@ -55,8 +50,6 @@ export default function DashboardPage() {
 
   const chartData = useMemo(() => buildChartSeries(analytics, chartMode), [analytics, chartMode]);
   const forecastData = useMemo(() => buildForecast(analytics), [analytics]);
-  const insights = useMemo(() => getAiInsights(stats, analytics, enquiries), [stats, analytics, enquiries]);
-  const workerOverview = useMemo(() => getWorkerOverview(workers), [workers]);
 
   if (loading && !stats) return <LoadingScreen />;
 
@@ -122,8 +115,6 @@ export default function DashboardPage() {
           subtext="awaiting callback"
           icon={MessageSquare}
           trend={calcTrend(stats?.new_enquiries ?? 0, Math.max(0, (stats?.new_enquiries ?? 0) - 1))}
-          sparkline={sparklineFromMonthly(analytics, 'revenue')}
-          sparkId="enq"
           gradient={1}
           onClick={() => setTab('enquiries')}
         />
@@ -134,20 +125,16 @@ export default function DashboardPage() {
           subtext="active pipeline"
           icon={ShoppingBag}
           trend={calcTrend(converted.length, analytics?.converted_orders ?? converted.length)}
-          sparkline={sparklineFromMonthly(analytics, 'profit')}
-          sparkId="ord"
           gradient={2}
         />
         <DashboardKpiCard
-          label="Net profit"
-          value={formatCurrency(profit)}
-          numericValue={profit}
+          label="Total revenue"
+          value={formatCurrency(revenue)}
+          numericValue={revenue}
           formatValue={formatCurrency}
-          subtext="after expenses"
+          subtext="from orders"
           icon={TrendingUp}
-          trend={calcTrend(lastM?.profit ?? profit, prevM?.profit ?? 0)}
-          sparkline={sparklineFromMonthly(analytics, 'profit')}
-          sparkId="profit"
+          trend={calcTrend(lastM?.revenue ?? revenue, prevM?.revenue ?? 0)}
           onClick={() => setHistory('revenue')}
         />
         <DashboardKpiCard
@@ -158,11 +145,24 @@ export default function DashboardPage() {
           subtext="from invoices"
           icon={Wallet}
           trend={calcTrend(lastM?.expenses ?? expenses, prevM?.expenses ?? 0)}
-          sparkline={sparklineFromMonthly(analytics, 'expenses')}
-          sparkId="exp"
           gradient={2}
           onClick={() => navigate('/invoices')}
         />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        <GlassCard title="Upcoming events" action={<Link to="/orders" className="text-xs font-semibold text-[var(--primary)]">Calendar</Link>}>
+          <UpcomingEventsList events={getUpcomingEvents(enquiries)} />
+        </GlassCard>
+        <GlassCard title="Today's events">
+          <TodaysEventsWidget events={getTodaysEvents(enquiries)} />
+        </GlassCard>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 items-start">
+        <GlassCard title="Recent orders" action={<Link to="/orders" className="text-xs font-semibold text-[var(--primary)]">View all</Link>}>
+          <RecentOrdersTable orders={getRecentOrders(enquiries)} />
+        </GlassCard>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
@@ -184,29 +184,9 @@ export default function DashboardPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        <GlassCard className="lg:col-span-2" title="Revenue forecast" action={<span className="text-xs text-[var(--muted)]">Projected</span>}>
-          <RevenueForecastChart data={forecastData} />
-        </GlassCard>
-        <GlassCard title="Today's events">
-          <TodaysEventsWidget events={getTodaysEvents(enquiries)} />
-        </GlassCard>
-      </div>
-
-      <AiInsightsPanel insights={insights} />
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <GlassCard title="Recent orders" action={<Link to="/orders" className="text-xs font-semibold text-[var(--primary)]">View all</Link>}>
-          <RecentOrdersTable orders={getRecentOrders(enquiries)} />
-        </GlassCard>
-        <GlassCard title="Upcoming events" action={<Link to="/orders" className="text-xs font-semibold text-[var(--primary)]">Calendar</Link>}>
-          <UpcomingEventsList events={getUpcomingEvents(enquiries)} />
-        </GlassCard>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 items-start">
-        <GlassCard title="Worker overview" action={<Link to="/workers" className="text-xs text-[var(--primary)]">Workers</Link>}>
-          <WorkerAttendanceOverview workers={workerOverview.workers} byRole={workerOverview.byRole} />
+        <GlassCard title="Revenue forecast" action={<span className="text-xs text-[var(--muted)]">Projected</span>}>
+          <RevenueForecastChart data={forecastData} />
         </GlassCard>
       </div>
         </>

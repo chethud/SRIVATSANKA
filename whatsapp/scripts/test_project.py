@@ -192,7 +192,7 @@ def test_bot_flows(client: TestClient, h: dict[str, str]) -> None:
     expected = parse_callback_time(callback)
     last = run_flow(
         phone1,
-        ["new", "Hi", "Bot Test A", "Wedding", "ok", "15 June 2026", "Whitefield", callback, "skip"],
+        ["new", "Hi", "Bot Test A", "Wedding", "ok", "15 June 2026", "150 guests", "Lunch", callback],
     )
     if not last:
         return
@@ -216,7 +216,7 @@ def test_bot_flows(client: TestClient, h: dict[str, str]) -> None:
     phone2 = f"91{uuid.uuid4().int % 10**10:010d}"
     last2 = run_flow(
         phone2,
-        ["new", "Hi", "Bot Test B", "House Warming", "ok", "20 July 2026", "Indiranagar", "today evening", "1,3"],
+        ["new", "Hi", "Bot Test B", "House Warming", "ok", "20 July 2026", "50 pax", "Dinner", "today evening"],
     )
     if last2 and last2.get("enquiry_saved"):
         ok("Bot flow completes with meal selection 1,3")

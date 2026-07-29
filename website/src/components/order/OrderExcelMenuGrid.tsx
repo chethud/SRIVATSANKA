@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import type { Dish, Enquiry, EnquiryDish } from '../../api/client';
 import {
   addOrderDish,
@@ -11,7 +11,13 @@ import {
 import { DishSearchSelect } from '../DishSearchSelect';
 import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
-import { serializeOrderNotes, toDateInputValue, type OrderExtras } from '../../utils/orderNotes';
+import {
+  eventDatesForStyles,
+  expandScheduleDateRange,
+  serializeOrderNotes,
+  toDateInputValue,
+  type OrderExtras,
+} from '../../utils/orderNotes';
 import { resolveSessionTabs } from '../../utils/mealSessions';
 import {
   dishesForColumn,
@@ -31,33 +37,57 @@ export function OrderExcelMenuGrid({
   order,
   extras,
   menuItems,
-  activeSession,
+  sessionTabs,
   dishes,
   onOrderUpdated,
   onDishesCatalogUpdated,
+  onAddCustomSession,
+  customSessionName,
+  onCustomSessionNameChange,
+  addingCustomSession,
+  onAddingCustomSessionChange,
+  customSessionSaving,
 }: {
   order: Enquiry;
   extras: OrderExtras;
   menuItems: EnquiryDish[];
-  activeSession: string;
+  sessionTabs: { id: string; label: string }[];
   dishes: Dish[];
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
+  onAddCustomSession: () => void | Promise<void>;
+  customSessionName: string;
+  onCustomSessionNameChange: (value: string) => void;
+  addingCustomSession: boolean;
+  onAddingCustomSessionChange: (value: boolean) => void;
+  customSessionSaving: boolean;
 }) {
   const columns = resolveMenuColumns(extras, order, menuItems);
-  const activeHasSaved = columns.some((c) => c.baseSession === activeSession);
+  const columnsByDate = useMemo(() => {
+    const map = new Map<string, MenuColumn[]>();
+    for (const col of columns) {
+      const list = map.get(col.date) ?? [];
+      list.push(col);
+      map.set(col.date, list);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [columns]);
 
   return (
     <div className="excel-menu-grid">
-      {!activeHasSaved && (
-        <EmptySessionCard
-          order={order}
-          extras={extras}
-          columns={columns}
-          activeSession={activeSession}
-          onOrderUpdated={onOrderUpdated}
-        />
-      )}
+      <SessionBatchCreator
+        order={order}
+        extras={extras}
+        columns={columns}
+        sessionTabs={sessionTabs}
+        onOrderUpdated={onOrderUpdated}
+        onAddCustomSession={onAddCustomSession}
+        customSessionName={customSessionName}
+        onCustomSessionNameChange={onCustomSessionNameChange}
+        addingCustomSession={addingCustomSession}
+        onAddingCustomSessionChange={onAddingCustomSessionChange}
+        customSessionSaving={customSessionSaving}
+      />
 
       {columns.length > 0 && (
         <div className="excel-saved-sessions">
@@ -65,26 +95,33 @@ export function OrderExcelMenuGrid({
             Saved sessions ({columns.length})
           </h4>
           <div className="excel-menu-stack">
-            {columns.map((col) => (
-              <SessionBlock
-                key={col.id}
-                column={col}
-                columns={columns}
-                extras={extras}
-                menuItems={menuItems}
-                order={order}
-                dishes={dishes}
-                highlighted={col.baseSession === activeSession}
-                onOrderUpdated={onOrderUpdated}
-                onDishesCatalogUpdated={onDishesCatalogUpdated}
-              />
+            {columnsByDate.map(([date, dayColumns]) => (
+              <div key={date} className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-[var(--primary)] px-1">
+                  {formatDate(date)}
+                </p>
+                {dayColumns.map((col) => (
+                  <SessionBlock
+                    key={col.id}
+                    column={col}
+                    columns={columns}
+                    extras={extras}
+                    menuItems={menuItems}
+                    order={order}
+                    dishes={dishes}
+                    onOrderUpdated={onOrderUpdated}
+                    onDishesCatalogUpdated={onDishesCatalogUpdated}
+                  />
+                ))}
+              </div>
             ))}
           </div>
         </div>
       )}
 
       <p className="excel-menu-hint">
-        Every session you save appears in the list below. Use the tabs above to add Breakfast, Lunch, Dinner, and more.
+        For a 3-day event: choose Day 1, select Lunch + Dinner together, create them, then add dishes and times.
+        Switch to Day 2 / Day 3 and repeat.
       </p>
     </div>
   );
@@ -97,7 +134,6 @@ function SessionBlock({
   menuItems,
   order,
   dishes,
-  highlighted,
   onOrderUpdated,
   onDishesCatalogUpdated,
 }: {
@@ -107,19 +143,12 @@ function SessionBlock({
   menuItems: EnquiryDish[];
   order: Enquiry;
   dishes: Dish[];
-  highlighted?: boolean;
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
 }) {
   const items = dishesForColumn(column, menuItems, extras);
   const [deleting, setDeleting] = useState(false);
   const [removed, setRemoved] = useState(false);
-
-  useEffect(() => {
-    if (!highlighted) return;
-    const el = document.getElementById(`session-block-${column.id}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [highlighted, column.id]);
 
   async function removeSession() {
     const sessionLabel = `${column.sessionLabel} · ${formatDate(column.date)}`;
@@ -149,10 +178,7 @@ function SessionBlock({
   if (removed) return null;
 
   return (
-    <article
-      id={`session-block-${column.id}`}
-      className={`excel-session-block${highlighted ? ' excel-session-block--active' : ''}`}
-    >
+    <article id={`session-block-${column.id}`} className="excel-session-block">
       <header className="excel-session-head">
         <button
           type="button"
@@ -229,152 +255,233 @@ function SessionBlock({
   );
 }
 
-function EmptySessionCard({
+function SessionBatchCreator({
   order,
   extras,
   columns,
-  activeSession,
+  sessionTabs,
   onOrderUpdated,
+  onAddCustomSession,
+  customSessionName,
+  onCustomSessionNameChange,
+  addingCustomSession,
+  onAddingCustomSessionChange,
+  customSessionSaving,
 }: {
   order: Enquiry;
   extras: OrderExtras;
   columns: MenuColumn[];
-  activeSession: string;
+  sessionTabs: { id: string; label: string }[];
   onOrderUpdated: (order: Enquiry) => void;
+  onAddCustomSession: () => void | Promise<void>;
+  customSessionName: string;
+  onCustomSessionNameChange: (value: string) => void;
+  addingCustomSession: boolean;
+  onAddingCustomSessionChange: (value: boolean) => void;
+  customSessionSaving: boolean;
 }) {
-  const defaultDate = extras.scheduleDateFrom ?? toDateInputValue(order.eventDate);
+  const eventDays = useMemo(() => {
+    const scheduled = expandScheduleDateRange(extras);
+    if (scheduled.length > 0) return scheduled;
+    return eventDatesForStyles(extras, order.eventDate);
+  }, [extras, order.eventDate]);
+  const defaultDate = eventDays[0] ?? extras.scheduleDateFrom ?? toDateInputValue(order.eventDate) ?? '';
   const [columnDate, setColumnDate] = useState(defaultDate);
-  const [columnPax, setColumnPax] = useState('');
-  const [sessionTimeFrom, setSessionTimeFrom] = useState('');
-  const [sessionTimeTo, setSessionTimeTo] = useState('');
+  const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    setColumnDate(extras.scheduleDateFrom ?? toDateInputValue(order.eventDate));
-    // Fresh session: start with empty times so minutes are chosen explicitly (not stuck on 00)
-    setSessionTimeFrom('');
-    setSessionTimeTo('');
-    setColumnPax('');
-    setError('');
-  }, [activeSession, extras.scheduleDateFrom, order.eventDate]);
+  const alreadyOnDate = useMemo(() => {
+    const set = new Set<string>();
+    for (const col of columns) {
+      if (col.date === columnDate) set.add(col.baseSession);
+    }
+    return set;
+  }, [columns, columnDate]);
 
-  async function saveSession() {
+  useEffect(() => {
+    const preferred = eventDays[0] ?? '';
+    setColumnDate((current) => (current && eventDays.includes(current) ? current : preferred));
+    setError('');
+  }, [eventDays]);
+
+  useEffect(() => {
+    setSelectedSessions((current) => current.filter((id) => !alreadyOnDate.has(id)));
+  }, [columnDate, alreadyOnDate]);
+
+  function toggleSession(sessionId: string) {
+    if (alreadyOnDate.has(sessionId)) return;
+    setSelectedSessions((current) =>
+      current.includes(sessionId) ? current.filter((id) => id !== sessionId) : [...current, sessionId],
+    );
+  }
+
+  async function saveSessions() {
     setError('');
     if (!columnDate) {
-      setError('Pick the service date for this session.');
+      setError('Pick the service date for these sessions.');
       return;
     }
-    const paxNum = columnPax.trim() ? Number(columnPax) : null;
-    if (paxNum == null || Number.isNaN(paxNum) || paxNum < 1) {
-      setError('Enter pax for this session (e.g. 100).');
-      return;
-    }
-    const from = sessionTimeFrom.trim();
-    const to = sessionTimeTo.trim();
-    if (!from || !to) {
-      setError('Set start and end time (hour and minutes).');
+    if (selectedSessions.length === 0) {
+      setError('Select at least one session to create for this day.');
       return;
     }
 
     setSaving(true);
     try {
-      const label = sessionLabelOptions(activeSession);
-      const { columns: nextColumns } = findOrCreateColumn(columns, {
-        date: columnDate,
-        baseSession: activeSession,
-        sessionLabel: label,
-        pax: paxNum,
-        timeFrom: from,
-        timeTo: to,
-      });
+      let nextColumns = columns;
+      for (const sessionId of selectedSessions) {
+        const label = sessionLabelOptions(sessionId);
+        nextColumns = findOrCreateColumn(nextColumns, {
+          date: columnDate,
+          baseSession: sessionId,
+          sessionLabel: label,
+          pax: null,
+          timeFrom: '',
+          timeTo: '',
+        }).columns;
+      }
       const merged: OrderExtras = {
         ...extras,
         menuColumns: stripMenuColumnsForSave(nextColumns),
-        mealSchedules: {
-          ...(extras.mealSchedules ?? {}),
-          [activeSession]: {
-            timeFrom: from || null,
-            timeTo: to || null,
-          },
-        },
+        scheduleDateFrom: extras.scheduleDateFrom || columnDate,
+        scheduleDateTo: extras.scheduleDateTo || columnDate,
       };
       const updated = await updateEnquiry(order.id, { notes: serializeOrderNotes(merged) });
       onOrderUpdated(updated);
+      setSelectedSessions([]);
+      setError('');
     } catch {
-      setError('Could not save session. Please try again.');
+      setError('Could not create sessions. Please try again.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <article className="excel-session-block">
+    <article className="excel-session-block excel-session-block--active">
       <header className="excel-session-head">
-        <p className="excel-session-date">{columnDate ? formatDate(columnDate) : 'Set date below'}</p>
-        <h3 className="excel-session-title">{sessionLabelOptions(activeSession)}</h3>
+        <p className="excel-session-date">{columnDate ? formatDate(columnDate) : 'Choose a day'}</p>
+        <h3 className="excel-session-title">Create sessions for a day</h3>
       </header>
 
-      <div className="excel-session-meta excel-session-meta--draft">
-        <div className="excel-meta-field">
-          <label className="excel-meta-label" htmlFor={`draft-date-${activeSession}`}>
-            Date
-          </label>
-          <input
-            id={`draft-date-${activeSession}`}
-            type="date"
-            value={columnDate}
-            onChange={(e) => setColumnDate(e.target.value)}
-            className="excel-meta-input excel-meta-input--date"
-          />
-        </div>
-        <div className="excel-meta-field excel-meta-field--time">
-          <span className="excel-meta-label">Time</span>
-          <div className="excel-meta-time-row">
-            <AmPmTimeInput
-              value={sessionTimeFrom}
-              onChange={setSessionTimeFrom}
-              className="excel-meta-ampm"
-              aria-label={`${activeSession} from`}
-            />
-            <span className="excel-meta-time-sep" aria-hidden>
-              –
-            </span>
-            <AmPmTimeInput
-              value={sessionTimeTo}
-              onChange={setSessionTimeTo}
-              className="excel-meta-ampm"
-              aria-label={`${activeSession} to`}
+      <div className="excel-session-meta excel-session-meta--draft flex-col !items-stretch gap-4">
+        <div className="excel-meta-field w-full">
+          <span className="excel-meta-label">Event day</span>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {eventDays.map((day, index) => {
+              const chosen = columnDate === day;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => setColumnDate(day)}
+                  className={`order-session-tab ${chosen ? 'order-session-tab--active' : ''}`}
+                >
+                  Day {index + 1} · {formatDate(day)}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2">
+            <label className="excel-meta-label" htmlFor="draft-session-date">
+              Or pick another date
+            </label>
+            <input
+              id="draft-session-date"
+              type="date"
+              value={columnDate}
+              onChange={(e) => setColumnDate(e.target.value)}
+              className="excel-meta-input excel-meta-input--date mt-1"
             />
           </div>
         </div>
-        <div className="excel-meta-field">
-          <label className="excel-meta-label" htmlFor={`draft-pax-${activeSession}`}>
-            Pax
-          </label>
-          <input
-            id={`draft-pax-${activeSession}`}
-            type="number"
-            min={1}
-            value={columnPax}
-            onChange={(e) => setColumnPax(e.target.value)}
-            placeholder="e.g. 100"
-            className="excel-meta-input"
-          />
+
+        <div className="excel-meta-field w-full">
+          <span className="excel-meta-label">Sessions for this day (select multiple)</span>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {sessionTabs.map((session) => {
+              const exists = alreadyOnDate.has(session.id);
+              const chosen = selectedSessions.includes(session.id);
+              return (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => toggleSession(session.id)}
+                  disabled={exists}
+                  title={exists ? 'Already created for this day' : `Add ${session.label}`}
+                  className={`order-session-tab ${chosen ? 'order-session-tab--active' : ''} ${exists ? 'order-session-tab--saved opacity-70' : ''}`}
+                >
+                  {exists ? `✓ ${session.label}` : session.label}
+                </button>
+              );
+            })}
+            {!addingCustomSession ? (
+              <button
+                type="button"
+                onClick={() => onAddingCustomSessionChange(true)}
+                className="order-session-tab order-session-tab--add"
+              >
+                <Plus size={14} /> Custom session
+              </button>
+            ) : (
+              <div className="order-session-add-form">
+                <input
+                  autoFocus
+                  value={customSessionName}
+                  onChange={(e) => onCustomSessionNameChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void onAddCustomSession();
+                    if (e.key === 'Escape') {
+                      onAddingCustomSessionChange(false);
+                      onCustomSessionNameChange('');
+                    }
+                  }}
+                  placeholder="e.g. High Tea"
+                  className="order-session-add-input"
+                  maxLength={40}
+                />
+                <button
+                  type="button"
+                  onClick={() => void onAddCustomSession()}
+                  disabled={customSessionSaving || !customSessionName.trim()}
+                  className="order-session-tab order-session-tab--active"
+                >
+                  {customSessionSaving ? '…' : 'Add'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddingCustomSessionChange(false);
+                    onCustomSessionNameChange('');
+                  }}
+                  className="order-session-tab"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="excel-session-save">
         <Button
           type="button"
-          onClick={() => void saveSession()}
-          disabled={saving}
+          onClick={() => void saveSessions()}
+          disabled={saving || selectedSessions.length === 0}
           className="!py-2.5 !px-5 text-sm"
         >
-          {saving ? 'Saving…' : 'Save session'}
+          {saving
+            ? 'Creating…'
+            : selectedSessions.length > 1
+              ? `Create ${selectedSessions.length} sessions for this day`
+              : selectedSessions.length === 1
+                ? 'Create 1 session for this day'
+                : 'Select sessions to create'}
         </Button>
         <p className="excel-session-empty">
-          Set date, pax, and time (including minutes), then Save session. Add dishes after it saves.
+          Example: Day 1 → select Lunch + Dinner → Create. Then open each saved block below to add dishes, pax, and time.
         </p>
         {error && <p className="excel-session-add-error">{error}</p>}
       </div>

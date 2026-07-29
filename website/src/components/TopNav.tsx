@@ -95,8 +95,8 @@ export function TopNav() {
   }
 
   return (
-    <header className="topnav sticky top-0 z-30 mb-4 sm:mb-5">
-      <div className="topnav__bar">
+    <header className="topnav">
+      <div className={`topnav__bar${pageSearch ? ' topnav__bar--search' : ''}`}>
         <div className="topnav__leading">
           {isMobileNav && (
             <button

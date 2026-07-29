@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import {
-  Bell, Calendar, HardHat, Sparkles,
+  Bell, Calendar, HardHat,
 } from 'lucide-react';
 import { formatDate, updateEnquiryStatus } from '../../api/client';
 import type { Enquiry, Notification, Worker } from '../../api/client';
@@ -267,7 +267,7 @@ export function UpcomingEventsList({ events }: { events: Enquiry[] }) {
     return <p className="text-sm text-[var(--muted)]">No upcoming events scheduled.</p>;
   }
   return (
-    <ul className="space-y-3">
+    <ul className="space-y-3 max-h-72 overflow-y-auto overscroll-contain pr-1">
       {events.map((e) => (
         <li key={e.id} className="flex gap-3 p-3 rounded-2xl bg-[var(--primary-light)]/60 border border-[var(--border)]">
           <div className="w-10 h-10 rounded-xl bg-[var(--card)] flex items-center justify-center shrink-0">
@@ -347,30 +347,6 @@ export function NotificationsWidget({ items }: { items: Notification[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-export function AiInsightsPanel({ insights }: { insights: string[] }) {
-  return (
-    <div className="glass-panel rounded-[var(--radius-xl)] p-5 border border-[var(--border)]">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center">
-          <Sparkles size={18} className="text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold">AI Business Assistant</h3>
-          <p className="text-xs text-[var(--muted)]">Smart recommendations</p>
-        </div>
-        <p className="text-xs text-[var(--muted)] ml-auto">Use the AI chat button ?</p>
-      </div>
-      <ul className="space-y-3">
-        {insights.map((text, i) => (
-          <li key={i} className="text-sm text-[var(--foreground)] leading-relaxed pl-3 border-l-2 border-[var(--accent)]">
-            {text}
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

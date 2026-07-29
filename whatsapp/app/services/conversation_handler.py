@@ -8,6 +8,7 @@ from app.services.chat_handoff import resume_bot_for_phone
 from app.services.guided_flow import process_guided_flow
 from app.services.dish_flow import handle_dish_flow, start_dish_flow
 from app.services.enquiry_service import save_enquiry
+from app.services.human_style import warm_enquiry_signoff
 from app.services.session_store import ConversationPhase, GuidedStep, session_store
 
 ai_agent = AIAgent()
@@ -42,7 +43,7 @@ async def _persist_enquiry(
         return (
             AgentTurnResult(
                 reply=(
-                    "Hmm, that didn’t save — could you share the meals again, or say *skip*?"
+                    "Hmm, that didn’t save. Could you share the meals again, or say *skip*?"
                 ),
                 fields=session.fields,
                 enquiry_fields_complete=True,
@@ -57,7 +58,7 @@ async def handle_conversation(
     """Returns (result, enquiry_saved)."""
     session = session_store.get(whatsapp_id)
 
-    if user_text.strip().lower() in {"new", "start over", "restart"}:
+    if user_text.strip().lower() in {"new", "start over", "restart", "reset", "begin again"}:
         session_store.reset(whatsapp_id)
         await resume_bot_for_phone(db, whatsapp_id)
         session = session_store.get(whatsapp_id)
@@ -66,8 +67,9 @@ async def handle_conversation(
     if session.completed and session._saved:
         return (
             AgentTurnResult(
-                reply=(
-                    "We've already got your enquiry ✅ Send *new* anytime for another occasion."
+                reply=warm_enquiry_signoff(
+                    name=session.fields.customer_name,
+                    event_type=session.fields.event_type,
                 ),
                 fields=session.fields,
                 is_complete=True,
@@ -75,12 +77,12 @@ async def handle_conversation(
             False,
         )
 
-    # Incomplete save left session stuck — send them back to meal selection
+    # Incomplete save left session stuck, send them back to meal selection.
     if session.completed and not session._saved:
         session.completed = False
         session.phase = ConversationPhase.SELECT_CATEGORIES
 
-    # Cuisine preference (types only — no individual dishes)
+    # Cuisine preference (types only, no individual dishes).
     if session.phase == ConversationPhase.SELECT_CATEGORIES:
         result = await handle_dish_flow(session, user_text, db)
         if result.is_complete and not session._saved:
@@ -91,16 +93,16 @@ async def handle_conversation(
         guided = await process_guided_flow(session, whatsapp_id, user_text)
         if guided is not None:
             if guided.enquiry_fields_complete:
-                dish_result = await start_dish_flow(session, db)
-                return _merge_replies(guided.reply, dish_result), False
+                session.completed = True
+                return await _persist_enquiry(db, session, whatsapp_id, guided)
             return guided, False
 
     # Agent-led enquiry (fallback if guided flow completed without all fields)
     result = await ai_agent.process_message(session, user_text)
 
     if _all_fields_filled(session.fields) and session.phase == ConversationPhase.ENQUIRY:
-        dish_result = await start_dish_flow(session, db)
-        return _merge_replies(result.reply if result.reply else None, dish_result), False
+        session.completed = True
+        return await _persist_enquiry(db, session, whatsapp_id, result)
 
     if result.is_complete and not session._saved:
         return await _persist_enquiry(db, session, whatsapp_id, result)

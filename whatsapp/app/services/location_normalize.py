@@ -44,3 +44,35 @@ def normalize_location(text: str) -> str:
         if alias in key or key in alias:
             return canonical
     return raw.title()
+
+
+def extract_location_entity(text: str) -> str:
+    """Pull a clean venue/area name out of conversational replies like 'Yes Hundur'."""
+    raw = re.sub(r"\s+", " ", (text or "").strip())
+    if not raw:
+        return raw
+    lower = raw.lower()
+    if "help" in lower and "venue" in lower:
+        city_match = re.search(r"\b(?:in|at|around|near)\s+([A-Za-z][A-Za-z\s.-]{1,40})", raw, re.I)
+        if city_match:
+            return f"{normalize_location(city_match.group(1).strip())} (Venue Selection Needed)"
+        return "Venue Selection Needed"
+    if lower in {"no help me", "help me", "need help"}:
+        return "Venue Selection Needed"
+
+    cleaned = re.sub(
+        r"^(?:yes|yeah|yep|yup|ok|okay|sure|got it|alright|all right|"
+        r"venue is|location is|hall is|place is|it'?s|its|"
+        r"at|in|near|around)\s*[,.:;\-!]?\s*",
+        "",
+        raw,
+        flags=re.I,
+    )
+    cleaned = re.sub(
+        r"\b(?:yes|yeah|yep|yup|ok|okay|sure)\b[,.:;\-!]?\s*",
+        "",
+        cleaned,
+        flags=re.I,
+    )
+    cleaned = cleaned.strip(" ,.-!")
+    return normalize_location(cleaned or raw)

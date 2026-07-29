@@ -3,6 +3,7 @@ import { DashboardLayout } from './components/Layout';
 import { GuestOnly } from './components/GuestOnly';
 import { RequireAuth } from './components/RequireAuth';
 import LoginPage from './pages/LoginPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import EnquiriesPage from './pages/EnquiriesPage';
 import OrdersPage from './pages/OrdersPage';
@@ -23,6 +24,7 @@ export default function App() {
       <Route element={<GuestOnly />}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<RequireAuth />}>
       <Route element={<DashboardLayout />}>
         <Route index element={<DashboardPage />} />

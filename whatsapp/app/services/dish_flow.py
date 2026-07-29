@@ -30,9 +30,9 @@ def _parse_numbers(text: str) -> list[str]:
 def _format_session_prompt() -> str:
     lead = random.choice(
         (
-            "Almost there — which meals do you need?",
+            "Almost there, which meals do you need?",
             "Which meal services should we plan for?",
-            "Quick one — which meals?",
+            "Quick one, which meals?",
         )
     )
     lines = [lead, ""]
@@ -43,23 +43,12 @@ def _format_session_prompt() -> str:
 
 
 def _format_confirmation(session: ConversationSession) -> str:
-    f = session.fields
-    name = f.customer_name or "there"
-    event_name = (f.event_type or "celebration").lower()
-    if event_name == "general":
-        event_name = "celebration"
+    from app.services.human_style import warm_enquiry_signoff
 
-    variant_a = (
-        f"Thank you so much, {name}! It was a absolute pleasure chatting with you. "
-        f"We’re thrilled at the opportunity to make your {event_name} truly unforgettable. ✨\n\n"
-        f"Have a wonderful rest of your day, and talk to you soon!"
+    return warm_enquiry_signoff(
+        name=session.fields.customer_name,
+        event_type=session.fields.event_type,
     )
-    variant_b = (
-        f"Thank you, {name}! We’re honored to be considered for your big day. "
-        f"Our team will connect with you at the scheduled time. 🙏\n\n"
-        f"Wishing you a lovely day ahead!"
-    )
-    return random.choice((variant_a, variant_b))
 
 
 def _resolve_session_selections(text: str) -> list[str] | None:
@@ -93,7 +82,7 @@ def _preferences_to_items(labels: list[str]) -> list[SelectedDishItem]:
 
 
 async def start_dish_flow(session: ConversationSession, _db: AsyncSession) -> AgentTurnResult:
-    """Ask meal session types only — no per-dish selection."""
+    """Ask meal session types only, no per-dish selection."""
     session.phase = ConversationPhase.SELECT_CATEGORIES
     reply = _format_session_prompt()
     session.history.append({"role": "assistant", "content": reply})
@@ -112,7 +101,7 @@ async def handle_dish_flow(
     labels = _resolve_session_selections(user_text)
     if labels is None:
         reply = (
-            "Hmm, didn’t quite get that — try *1,3* or *breakfast, dinner*, or say *skip*."
+            "Hmm, didn’t quite get that. Try *1,3* or *breakfast, dinner*, or say *skip*."
         )
         session.history.append({"role": "assistant", "content": reply})
         return AgentTurnResult(

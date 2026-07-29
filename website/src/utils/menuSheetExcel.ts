@@ -158,8 +158,14 @@ function activeExtrasAsBlocks(enquiry: Enquiry): SessionBlock[] {
     label: item.title,
     paxLine: item.quantity?.trim() || '',
     amount: typeof item.amount === 'number' ? item.amount : null,
-    dishNames: item.description ? [item.description] : [],
-    fillSession: FILL.counter,
+    dishNames: item.description
+      ? item.description
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+      : [],
+    // Same orange session chrome as meal blocks in Excel downloads
+    fillSession: FILL.session,
     titleIsSpec: isKitchenSpecification(item.title) || isKitchenSpecification(item.description || ''),
   }));
 }
@@ -365,14 +371,21 @@ export async function appendMenuSheet(
     row += 1;
 
     for (const session of extraBlocks) {
+      // Blue band (same as day-date header) so extras match meal color chrome in Excel
+      paintMergedRow(ws, row, colCount, 'Extras', {
+        fill: FILL.header,
+        font: bold,
+        height: 20,
+      });
+      row += 1;
+
       const titleIsRed = session.titleIsSpec || isKitchenSpecification(session.label);
       paintMergedRow(ws, row, colCount, session.label, {
-        fill: titleIsRed ? undefined : FILL.counter,
+        fill: titleIsRed ? undefined : session.fillSession,
         font: titleIsRed
           ? { name: 'Calibri', size: 11, bold: true, color: { argb: FONT_RED } }
           : bold,
-        align: alignLeftMiddle,
-        height: wrappedRowHeight(session.label, totalCharsWide, 14, 20),
+        height: wrappedRowHeight(session.label, totalCharsWide, 14, 22),
       });
       row += 1;
 
@@ -380,8 +393,7 @@ export async function appendMenuSheet(
         paintMergedRow(ws, row, colCount, session.paxLine, {
           fill: FILL.pax,
           font: bold,
-          align: alignLeftMiddle,
-          height: 18,
+          height: 20,
         });
         row += 1;
       }
@@ -393,11 +405,12 @@ export async function appendMenuSheet(
         amountCell.numFmt = '#,##0';
         amountCell.font = bold;
         amountCell.fill = solidFill(FILL.amount);
-        amountCell.alignment = alignLeftMiddle;
+        amountCell.alignment = alignCenter;
         amountCell.border = border;
         for (let c = 1; c <= colCount; c++) {
           ws.getCell(row, c).fill = solidFill(FILL.amount);
           ws.getCell(row, c).border = border;
+          ws.getCell(row, c).alignment = alignCenter;
         }
         ws.getRow(row).height = 18;
         row += 1;

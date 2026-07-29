@@ -1,0 +1,16 @@
+---
+description: Enforce Kannan.rules as chatbot source of truth
+alwaysApply: true
+---
+
+# Kannan Chatbot Source Of Truth
+
+- Treat `D:\Kannan.rules.txt` as the single source of truth for chatbot behavior, flow, state transitions, examples, copy, and guardrails.
+- Before changing any chatbot logic or any bot-facing response, verify it against `D:\Kannan.rules.txt`.
+- Do not assume missing responses, examples, flows, or business rules from memory.
+- Do not invent new chatbot behavior unless the user explicitly updates `D:\Kannan.rules.txt`.
+- Preserve the documented state machine and response patterns from `D:\Kannan.rules.txt`.
+- If implementation and `D:\Kannan.rules.txt` disagree, align the implementation to the rules file unless the user says otherwise.
+- Use `D:\Kannans\learnings.md` only for implementation notes and verified response patterns derived from `D:\Kannan.rules.txt`.
+- Never let `D:\Kannans\learnings.md` override `D:\Kannan.rules.txt`.
+- For every chatbot task, first consult `D:\Kannan.rules.txt`, then apply or update implementation.

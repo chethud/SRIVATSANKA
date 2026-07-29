@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
   HardHat, FileText, BarChart3, Settings,
-  PanelLeftClose, PanelLeft, LogOut, X, Menu,
+  PanelLeftClose, PanelLeft, LogOut, X,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -48,7 +48,6 @@ function DashboardLayoutInner() {
     isMobileNav,
     mobileNavOpen,
     closeMobileNav,
-    openMobileNav,
   } = useLayout();
   const location = useLocation();
   const navigate = useNavigate();
@@ -187,24 +186,16 @@ function DashboardLayoutInner() {
         className={`flex-1 flex flex-col min-w-0 ${
           isWhatsAppChat
             ? 'h-dvh max-h-dvh p-0 overflow-hidden'
-            : 'min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 lg:px-8'
+            : `min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 lg:px-8${
+                isMobileNav ? ' main--mobile-topnav' : ''
+              }`
         }`}
         style={{ marginLeft: isMobileNav ? 0 : sidebarWidth }}
       >
         {!isWhatsAppChat && (
-          <div className="topnav-root">
+          <div className={`topnav-root${isMobileNav ? ' topnav-root--fixed' : ''}`}>
             <TopNav />
           </div>
-        )}
-        {isWhatsAppChat && isMobileNav && (
-          <button
-            type="button"
-            onClick={openMobileNav}
-            className="wa-mobile-menu-btn"
-            aria-label="Open menu"
-          >
-            <Menu size={18} />
-          </button>
         )}
         <div
           className={

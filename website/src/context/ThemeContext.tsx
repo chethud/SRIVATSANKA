@@ -22,29 +22,45 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readFontScale(): FontScale {
-  const saved = localStorage.getItem('srivatsanka-font-scale');
-  if (saved === 'sm' || saved === 'md' || saved === 'lg' || saved === 'xl') return saved;
+  try {
+    const saved = localStorage.getItem('srivatsanka-font-scale');
+    if (saved === 'sm' || saved === 'md' || saved === 'lg' || saved === 'xl') return saved;
+  } catch {
+    /* ignore storage read failures */
+  }
   return 'md';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('srivatsanka-theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') return saved;
+    try {
+      const saved = localStorage.getItem('srivatsanka-theme') as Theme | null;
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {
+      /* ignore storage read failures */
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   const [fontScale, setFontScaleState] = useState<FontScale>(readFontScale);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('srivatsanka-theme', theme);
+    try {
+      localStorage.setItem('srivatsanka-theme', theme);
+    } catch {
+      /* ignore storage write failures */
+    }
   }, [theme]);
 
   useEffect(() => {
     const px = FONT_SCALE_OPTIONS.find((o) => o.id === fontScale)?.px ?? 18;
     document.documentElement.style.fontSize = `${px}px`;
     document.documentElement.setAttribute('data-font-scale', fontScale);
-    localStorage.setItem('srivatsanka-font-scale', fontScale);
+    try {
+      localStorage.setItem('srivatsanka-font-scale', fontScale);
+    } catch {
+      /* ignore storage write failures */
+    }
   }, [fontScale]);
 
   const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));

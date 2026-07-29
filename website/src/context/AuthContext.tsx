@@ -8,8 +8,12 @@ interface AuthState {
   loading: boolean;
   login: (emailOrUsername: string, password: string) => Promise<void>;
   logout: () => void;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  clearPasswordRecovery: () => void;
   isAuthenticated: boolean;
   usesSupabase: boolean;
+  passwordRecovery: boolean;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -37,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -91,11 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (isSupabaseAuth && supabase) {
       const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecovery(true);
+        }
         if (session?.access_token) {
           applySupabaseSession(session, setToken, setUsername, setAuthenticated);
           return;
         }
         if (event === 'SIGNED_OUT') {
+          setPasswordRecovery(false);
           applySupabaseSession(null, setToken, setUsername, setAuthenticated);
         }
       });
@@ -119,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw new Error(error.message);
       const session = data.session;
       if (!session?.access_token) throw new Error('Sign in failed — no session returned');
+      setPasswordRecovery(false);
       applySupabaseSession(session, setToken, setUsername, setAuthenticated);
       void verifySession()
         .then((me) => setUsername(me.username))
@@ -135,10 +145,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthenticated(true);
   }, []);
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!isSupabaseAuth || !supabase) {
+      throw new Error(
+        'Email password reset needs Supabase sign-in. Ask your admin to update the dashboard password on the server.',
+      );
+    }
+    const redirectTo = `${window.location.origin}/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    if (!isSupabaseAuth || !supabase) {
+      throw new Error('Password update is only available with Supabase sign-in.');
+    }
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+    setPasswordRecovery(false);
+  }, []);
+
+  const clearPasswordRecovery = useCallback(() => {
+    setPasswordRecovery(false);
+  }, []);
+
   const logout = useCallback(async () => {
     if (isSupabaseAuth && supabase) {
       await supabase.auth.signOut();
     }
+    setPasswordRecovery(false);
     setAuthToken(null);
     setToken(null);
     setUsername(null);
@@ -152,10 +187,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       logout,
+      requestPasswordReset,
+      updatePassword,
+      clearPasswordRecovery,
       isAuthenticated: isSupabaseAuth ? authenticated : Boolean(token),
       usesSupabase: isSupabaseAuth,
+      passwordRecovery,
     }),
-    [token, username, loading, login, logout, authenticated],
+    [
+      token,
+      username,
+      loading,
+      login,
+      logout,
+      requestPasswordReset,
+      updatePassword,
+      clearPasswordRecovery,
+      authenticated,
+      passwordRecovery,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

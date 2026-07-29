@@ -39,14 +39,24 @@ def _get_jwk_client() -> PyJWKClient | None:
 
 
 def is_supabase_auth_configured() -> bool:
+    """True only when Supabase Auth is intentionally enabled with non-empty settings.
+
+    Empty / commented env values must not block AWS-only legacy Admin login.
+    """
     import os
+
     if os.getenv("TESTING") == "true":
+        return False
+    url = _supabase_base_url()
+    anon = (settings.supabase_anon_key or "").strip()
+    jwt_secret = (settings.supabase_jwt_secret or "").strip()
+    if not url and len(anon) < 10 and len(jwt_secret) < 16:
         return False
     if _jwks_url():
         return True
-    if len((settings.supabase_anon_key or "").strip()) >= 10:
+    if len(anon) >= 10:
         return True
-    return len((settings.supabase_jwt_secret or "").strip()) >= 16
+    return len(jwt_secret) >= 16
 
 
 def _identity_from_payload(payload: dict) -> str:

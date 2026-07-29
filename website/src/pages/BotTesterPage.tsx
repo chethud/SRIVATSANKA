@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, RefreshCw, Send, Trash2, User, X } from 'lucide-react';
+import { ArrowLeft, Menu, Plus, RefreshCw, Send, Trash2, User, X } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
+import { useLayout } from '../context/LayoutContext';
 import { WhatsAppIcon } from '../components/WhatsAppIcon';
 import {
   deleteChatConversation,
@@ -45,6 +46,7 @@ function whatsappDpUrl(name: string | null | undefined, phone: string) {
 
 export default function BotTesterPage() {
   const { refresh, connected } = useAppData();
+  const { isMobileNav, openMobileNav } = useLayout();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -62,6 +64,8 @@ export default function BotTesterPage() {
   const [error, setError] = useState('');
   const threadRef = useRef<HTMLDivElement>(null);
   const autoSelectedRef = useRef(false);
+  const stickToBottomRef = useRef(true);
+  const prevPhoneRef = useRef('');
 
   const loadConversations = useCallback(async () => {
     try {
@@ -75,12 +79,12 @@ export default function BotTesterPage() {
     }
   }, []);
 
-  const loadMessages = useCallback(async (phone: string) => {
+  const loadMessages = useCallback(async (phone: string, opts?: { silent?: boolean }) => {
     if (!phone) {
       setMessages([]);
       return;
     }
-    setLoadingThread(true);
+    if (!opts?.silent) setLoadingThread(true);
     try {
       const rows = await fetchChatMessages(phone);
       setMessages(rows);
@@ -88,7 +92,7 @@ export default function BotTesterPage() {
     } catch {
       setError('Could not load chat history for this number.');
     } finally {
-      setLoadingThread(false);
+      if (!opts?.silent) setLoadingThread(false);
     }
   }, []);
 
@@ -106,28 +110,36 @@ export default function BotTesterPage() {
       setSelectedPhone(fromUrl);
       setSendMode('idle');
       autoSelectedRef.current = true;
-      return;
-    }
-
-    if (conversations.length > 0) {
-      const first = conversations[0].phoneNumber;
-      setSelectedPhone(first);
-      setSearchParams({ phone: first }, { replace: true });
-      setSendMode('idle');
-      autoSelectedRef.current = true;
     }
   }, [loadingList, conversations, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!selectedPhone) return;
+    stickToBottomRef.current = true;
     void loadMessages(selectedPhone);
-    const id = setInterval(() => void loadMessages(selectedPhone), 3000);
+    const id = setInterval(() => void loadMessages(selectedPhone, { silent: true }), 3000);
     return () => clearInterval(id);
   }, [selectedPhone, loadMessages]);
 
+  function handleThreadScroll() {
+    const el = threadRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom < 96;
+  }
+
   useEffect(() => {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, loadingThread]);
+    const el = threadRef.current;
+    if (!el) return;
+    const phoneChanged = prevPhoneRef.current !== selectedPhone;
+    prevPhoneRef.current = selectedPhone;
+    if (phoneChanged) stickToBottomRef.current = true;
+    if (!stickToBottomRef.current) return;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: phoneChanged || loadingThread ? 'auto' : 'smooth',
+    });
+  }, [messages, loadingThread, selectedPhone]);
 
   function selectConversation(phone: string, mode?: SendMode) {
     const row = conversations.find((c) => c.phoneNumber === phone);
@@ -139,6 +151,16 @@ export default function BotTesterPage() {
     setError('');
     setProfileOpen(false);
     setDpFailed(false);
+  }
+
+  function clearSelectedConversation() {
+    setSelectedPhone('');
+    setMessages([]);
+    setInput('');
+    setError('');
+    setProfileOpen(false);
+    setDpFailed(false);
+    setSearchParams({}, { replace: true });
   }
 
   function startNewChat() {
@@ -202,9 +224,7 @@ export default function BotTesterPage() {
     setError('');
     try {
       await deleteChatConversation(selectedPhone);
-      setMessages([]);
-      setSelectedPhone('');
-      setSearchParams({}, { replace: true });
+      clearSelectedConversation();
       autoSelectedRef.current = false;
       await loadConversations();
     } catch (err) {
@@ -218,6 +238,7 @@ export default function BotTesterPage() {
     if (!text.trim() || !selectedPhone || sending) return;
     setSending(true);
     setError('');
+    stickToBottomRef.current = true;
     try {
       if (sendMode === 'owner') {
         await sendOwnerChatMessage(selectedPhone, text.trim());
@@ -243,6 +264,8 @@ export default function BotTesterPage() {
   const profileName = active?.customerName ?? null;
   const profileDp = selectedPhone ? whatsappDpUrl(profileName, selectedPhone) : '';
   const profileLetters = selectedPhone ? profileInitials(profileName, selectedPhone) : '?';
+  const showThread = Boolean(selectedPhone);
+  const showList = !isMobileNav || !showThread;
 
   useEffect(() => {
     if (!selectedPhone || !botPaused) return;
@@ -306,6 +329,16 @@ export default function BotTesterPage() {
       )}
 
       <header className="wa-chats__header">
+        {isMobileNav && (
+          <button
+            type="button"
+            onClick={openMobileNav}
+            className="topnav__icon-btn wa-chats__menu-btn"
+            aria-label="Open menu"
+          >
+            <Menu size={18} />
+          </button>
+        )}
         <WhatsAppIcon size={22} title="WhatsApp" />
         <h1 className="wa-chats__title">WhatsApp Chats</h1>
         {!connected && (
@@ -318,6 +351,7 @@ export default function BotTesterPage() {
       )}
 
       <div className="wa-chats__body">
+        {showList && (
         <aside className="wa-chats__list">
           <div className="wa-chats__list-toolbar">
             <div className="flex items-center justify-between mb-2">
@@ -389,7 +423,9 @@ export default function BotTesterPage() {
             )}
           </div>
         </aside>
+        )}
 
+        {(!isMobileNav || showThread) && (
         <section className="wa-chats__thread">
           {!selectedPhone ? (
             <div className="wa-chats__empty">
@@ -399,29 +435,41 @@ export default function BotTesterPage() {
           ) : (
             <>
               <div className="wa-chats__thread-head">
-                <button
-                  type="button"
-                  className="wa-chats__thread-profile"
-                  onClick={() => setProfileOpen(true)}
-                  title="View profile photo"
-                >
-                  {!dpFailed ? (
-                    <img
-                      src={profileDp}
-                      alt=""
-                      className="wa-chats__avatar"
-                      onError={() => setDpFailed(true)}
-                    />
-                  ) : (
-                    <span className="wa-chats__avatar wa-chats__avatar--fallback">{profileLetters}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {isMobileNav && (
+                    <button
+                      type="button"
+                      onClick={clearSelectedConversation}
+                      className="wa-chats__back"
+                      aria-label="Back to chat list"
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
                   )}
-                  <div className="min-w-0 text-left">
-                    <p className="font-semibold truncate">{formatPhoneDisplay(selectedPhone)}</p>
-                    {active?.customerName && (
-                      <p className="text-xs text-[var(--muted)] truncate">{active.customerName}</p>
+                  <button
+                    type="button"
+                    className="wa-chats__thread-profile"
+                    onClick={() => setProfileOpen(true)}
+                    title="View profile photo"
+                  >
+                    {!dpFailed ? (
+                      <img
+                        src={profileDp}
+                        alt=""
+                        className="wa-chats__avatar"
+                        onError={() => setDpFailed(true)}
+                      />
+                    ) : (
+                      <span className="wa-chats__avatar wa-chats__avatar--fallback">{profileLetters}</span>
                     )}
-                  </div>
-                </button>
+                    <div className="min-w-0 text-left">
+                      <p className="font-semibold truncate">{formatPhoneDisplay(selectedPhone)}</p>
+                      {active?.customerName && (
+                        <p className="text-xs text-[var(--muted)] truncate">{active.customerName}</p>
+                      )}
+                    </div>
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {active?.botPaused && (
                     <button
@@ -445,7 +493,11 @@ export default function BotTesterPage() {
                 </div>
               </div>
 
-              <div ref={threadRef} className="wa-chats__messages">
+              <div
+                ref={threadRef}
+                className="wa-chats__messages"
+                onScroll={handleThreadScroll}
+              >
                 {loadingThread && messages.length === 0 ? (
                   <p className="text-sm text-[var(--muted)] text-center mt-10">Loading messages…</p>
                 ) : messages.length === 0 ? (
@@ -582,6 +634,7 @@ export default function BotTesterPage() {
             </>
           )}
         </section>
+        )}
       </div>
     </div>
   );

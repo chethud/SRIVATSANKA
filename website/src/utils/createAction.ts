@@ -11,8 +11,7 @@ export function getCreateActionForPath(pathname: string): CreateActionType | nul
   return null;
 }
 
-export function getSecondaryCreateActionForPath(pathname: string): CreateActionType | null {
-  if (pathname.startsWith('/dishes')) return 'session';
+export function getSecondaryCreateActionForPath(_pathname: string): CreateActionType | null {
   return null;
 }
 

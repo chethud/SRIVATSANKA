@@ -25,7 +25,7 @@ def is_gemini_configured() -> bool:
 
 
 def _build_chat_history(session: ConversationSession) -> list[dict]:
-    """History for Gemini chat — excludes the latest user turn (sent separately)."""
+    """History for Gemini chat, excludes the latest user turn (sent separately)."""
     history: list[dict] = []
     for msg in session.history[:-1]:
         role = "user" if msg["role"] == "user" else "model"
@@ -62,7 +62,7 @@ def looks_like_leaked_prompt(text: str) -> bool:
         return True
     lower = t.lower()
     if any(m in lower for m in _LEAK_MARKERS):
-        # If leak is only a trailing fragment after a real answer, sanitize() will trim —
+        # If leak is only a trailing fragment after a real answer, sanitize() will trim it.
         # treat full-message leaks / short garbage as bad.
         first_line = lower.split("\n", 1)[0].strip()
         if any(m in first_line for m in _LEAK_MARKERS) or len(t) < 48:
@@ -123,7 +123,7 @@ def sanitize_whatsapp_reply(text: str) -> str:
 
 
 def trim_whatsapp_reply(text: str, max_chars: int = 320) -> str:
-    """Keep bot replies short — WhatsApp chat style."""
+    """Keep bot replies short, WhatsApp chat style."""
     text = sanitize_whatsapp_reply(text)
     if not text:
         return ""
@@ -133,7 +133,7 @@ def trim_whatsapp_reply(text: str, max_chars: int = 320) -> str:
     if len(text) <= max_chars:
         return text
     chunk = text[:max_chars]
-    for sep in (". ", ".\n", "! ", "? ", " — ", "\n"):
+    for sep in (". ", ".\n", "! ", "? ", "\n"):
         idx = chunk.rfind(sep)
         if idx > max_chars // 2:
             return chunk[: idx + len(sep.rstrip())].strip()
@@ -158,11 +158,11 @@ def _generate_reply(system_instruction: str, session: ConversationSession, user_
                 generation_config=genai.GenerationConfig(temperature=0.75, max_output_tokens=180),
             )
             chat = model.start_chat(history=_build_chat_history(session))
-            # Steer the model away from dumping knowledge blocks
+            # Steer the model away from dumping knowledge blocks.
             prompt = (
                 f"Customer message:\n{user_text}\n\n"
                 "Reply as a helpful WhatsApp consultant only. "
-                "Plain short sentences — no headings, no bullet dumps, no internal labels."
+                "Plain short sentences only. No headings, no bullet dumps, no internal labels."
             )
             response = chat.send_message(prompt)
             text = trim_whatsapp_reply((response.text or "").strip()[:2000])
@@ -190,9 +190,9 @@ def _showcase_system(session: ConversationSession, *, sharing_photos: bool = Fal
     )
     return f"""You are an experienced celebration consultant for {COMPANY['legal_name']} on WhatsApp
 (catering, décor, pooja/rituals, venues, guest hospitality).
-You work with {COMPANY['managing_director']}'s team in Bengaluru.
+You work with {COMPANY['managing_director']}'s team.
 
-Chatting with {name} about their {event} — say "{event.lower()}" when natural.
+Chatting with {name} about their {event}. Say "{event.lower()}" when natural.
 
 {context}
 
@@ -203,8 +203,12 @@ YOUR TASK
 - Keep it short unless they asked for detail.
 - Answer ONLY from the website knowledge above.
 - Acknowledge briefly, answer, then at most one gentle next step.
-- Do NOT rush into date/venue/callback unless they clearly want to continue.
-- If ready, offer to note date & venue next in one short line.{photo_note}"""
+- Do NOT rush into date, venue, or callback unless they clearly want to continue.
+- Do not assume the event is in Bengaluru or Bangalore. Always confirm the venue status and location explicitly.
+- Custom / fusion / live counters: respond warmly and note it for the planner/chef call. Never reject restrictively.
+- If they want to discuss on call, offer to schedule a callback instead of forcing more form questions.
+- If they choose straight to planning, ask for the date only. Do not dump mandap/floral/menu showcase text.
+- If ready, offer to note the date and venue details next in one short line.{photo_note}"""
 
 
 def _collect_details_system(session: ConversationSession, next_prompt: str | None) -> str:
@@ -224,10 +228,18 @@ Still helpful to know: {pending}
 {NATURAL_STYLE}
 
 YOUR TASK
-- Short natural WhatsApp reply only — no headings or labels.
+- Short natural WhatsApp reply only, no headings or labels.
 - Acknowledge what they said, then ask for: {pending}
 - If they asked something else, answer briefly first.
+- Custom / fusion / live counters: respond warmly and say you noted it for the planner/chef call. Never reject restrictively.
+- If they want to discuss on call, pivot immediately to asking for the best callback time.
+- If the event is today/tomorrow/within 7 days, prioritize an immediate senior callback and skip meal/theme questions.
+- Meal lunch/dinner/high tea: only for birthdays or informal family gatherings.
+- Guest ranges and relative dates must keep full context (e.g. "30 to 50", "3rd week of next month").
+- Venue replies: acknowledge the clean place name only.
+- Callback now/ASAP: say the lead planning team will call ASAP, never invent a timestamp.
 - Do NOT invent dates, locations, or callback times.
+- Do not assume the event is in Bengaluru or Bangalore. If asking for location, explicitly ask whether the venue is fixed and collect either venue name plus area or preferred city/locality.
 """
 
 
@@ -289,8 +301,15 @@ def looks_like_question(text: str) -> bool:
 
 
 def _is_probable_date(text: str) -> bool:
-    """True only when the message actually looks like a date — not any digit (e.g. mor3)."""
+    """True only when the message actually looks like a date, not any digit (e.g. mor3)."""
     t = text.lower().strip()
+    if re.search(
+        r"\b(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\b|"
+        r"\b(?:early|mid|late)[\s-]*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next\s+month)\b|"
+        r"\b(?:this|next)\s+(?:week|month|weekend|year)\b",
+        t,
+    ):
+        return True
     if re.search(
         r"\b\d{1,2}([/-]\d{1,2})?([/-]\d{2,4})?\b|"
         r"\b\d{1,2}(st|nd|rd|th)\b|"
@@ -355,23 +374,99 @@ def is_likely_field_answer(text: str, field_key: str) -> bool:
             return True
         if field_key == "preferred_callback" and _is_probable_callback(text):
             return True
-        if field_key == "event_location" and len(text.strip()) > 4 and "?" not in text:
-            if not text.lower().startswith(("what", "how", "why", "can", "do ", "tell")):
-                return True
+        if field_key == "event_location" and _is_probable_location(text) and "?" not in text:
+            return True
         return False
     if field_key == "event_date":
         return _is_probable_date(text)
     if field_key == "preferred_callback":
-        return _is_probable_callback(text) or (2 <= len(text.strip()) <= 60)
-    # Location: short place-like answers, not long sentences asking for info
-    if field_key == "event_location":
+        return _is_probable_callback(text)
+    if field_key == "guest_count":
         t = text.strip()
-        if len(t) < 2 or len(t) > 80:
+        if re.search(r"\b\d{1,2}(?:st|nd|rd|th)\b", t, re.I) and re.search(
+            r"\b(week|month|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b",
+            t,
+            re.I,
+        ):
             return False
-        if len(t.split()) > 10:
-            return False
+        if re.search(r"\d+", t) and re.search(r"\b(guests?|people|pax|persons?)\b", t, re.I):
+            return True
+        if re.search(r"^\s*\d{1,5}(?:\s*(?:-|to|–|—)\s*\d{1,5})?\s*$", t, re.I):
+            return True
+        if any(w in t.lower() for w in ("hundred", "thousand", "pax", "people", "guests", "approx", "about", "around")):
+            return bool(re.search(r"\d+", t)) or any(
+                w in t.lower() for w in ("hundred", "thousand")
+            )
+        return False
+    if field_key == "meal_preference":
+        t = text.lower()
+        return any(
+            w in t
+            for w in (
+                "lunch",
+                "dinner",
+                "breakfast",
+                "snacks",
+                "tea",
+                "coffee",
+                "meal",
+                "food",
+                "veg",
+                "skip",
+                "none",
+            )
+        )
+    if field_key == "event_location":
+        return _is_probable_location(text)
+    return False
+
+
+def _is_probable_location(text: str) -> bool:
+    t = text.strip()
+    if len(t) < 2 or len(t) > 80:
+        return False
+    if len(t.split()) > 10:
+        return False
+    lower = t.lower()
+    if looks_like_question(t):
+        return False
+    place_cues = (
+        "venue",
+        "hall",
+        "home",
+        "house",
+        "apartment",
+        "flat",
+        "resort",
+        "hotel",
+        "temple",
+        "bangalore",
+        "bengaluru",
+        "mysore",
+        "mysuru",
+        "chennai",
+        "hyderabad",
+        "area",
+        "road",
+        "layout",
+        "nagar",
+        "puram",
+        "not fixed",
+        "not yet",
+        "undecided",
+        "help",
+        "suggest",
+        "looking for venue",
+    )
+    if any(c in lower for c in place_cues):
         return True
-    return 2 <= len(text.strip()) <= 80
+    # Short place-like token(s), not a full sentence about something else
+    if 1 <= len(t.split()) <= 5 and not re.search(
+        r"\b(call|menu|food|decor|price|cost|photo|portfolio)\b",
+        lower,
+    ):
+        return True
+    return False
 
 
 def _is_probable_callback(text: str) -> bool:

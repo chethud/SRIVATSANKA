@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -25,10 +25,14 @@ from app.schemas import (
     EnquiryUpdateIn,
     NotificationOut,
     NotificationReadIn,
+    OrderExcelImportIn,
+    OrderExcelImportOut,
+    OrderExcelPreviewOut,
     OwnerPhoneIn,
     UpdateEnquiryStatus,
 )
 from app.services.dashboard_assistant import answer_dashboard_query
+from app.services.order_excel_import import import_normalized_order, parse_order_excel_bytes
 from app.services.order_billing import billing_total_from_notes
 from app.services.profit import order_amount
 from app.services.whatsapp_client import is_whatsapp_configured
@@ -237,6 +241,48 @@ async def create_enquiry(
     )
     row = result.scalar_one()
     return _enquiry_to_out(row)
+
+
+@router.post("/orders/import-excel/preview", response_model=OrderExcelPreviewOut)
+async def preview_order_excel_import(file: UploadFile = File(...)) -> OrderExcelPreviewOut:
+    filename = (file.filename or "order-import.xlsx").strip() or "order-import.xlsx"
+    if not filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Upload an .xlsx file")
+    try:
+        parsed = parse_order_excel_bytes(await file.read(), filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Could not read this Excel file") from exc
+    return OrderExcelPreviewOut(
+        fileName=filename,
+        layout=parsed["layout"],
+        warnings=parsed.get("warnings") or [],
+        order=parsed["order"],
+    )
+
+
+@router.post("/orders/import-excel", response_model=OrderExcelImportOut)
+async def import_order_excel(
+    payload: OrderExcelImportIn,
+    db: AsyncSession = Depends(get_db),
+) -> OrderExcelImportOut:
+    try:
+        enquiry, warnings = await import_normalized_order(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    result = await db.execute(
+        select(Enquiry)
+        .options(*_enquiry_load_options())
+        .where(Enquiry.id == enquiry.id)
+    )
+    row = result.scalar_one()
+    return OrderExcelImportOut(
+        mode=payload.mode,
+        warnings=warnings,
+        order=_enquiry_to_out(row),
+    )
 
 
 @router.get("/enquiries", response_model=list[EnquiryOut])

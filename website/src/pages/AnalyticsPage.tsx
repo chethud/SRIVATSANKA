@@ -9,9 +9,7 @@ import { formatCurrency } from '../api/client';
 import {
   RevenueExpenseBarChart,
   MonthlyTrendChart,
-  ProfitBreakdownPie,
   EnquiryStatusChart,
-  EventTypeChart,
   ExpenseItemsChart,
 } from '../components/charts';
 
@@ -92,32 +90,23 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6 items-start">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <Card className="p-6 min-w-0">
           <h3 className="font-semibold mb-1 flex items-center gap-2">
             <TrendingDown size={18} className="text-[var(--chart-amber)]" />
             Expense breakdown
           </h3>
           <p className="text-xs text-[var(--muted)] mb-4">Each uploaded expense bill (auto-recognized)</p>
-          {analytics && <ExpenseItemsChart analytics={analytics} />}
+          <div className="w-full min-h-[200px]">
+            {analytics && <ExpenseItemsChart analytics={analytics} />}
+          </div>
         </Card>
-        <Card className="p-6">
-          <h3 className="font-semibold mb-1">Revenue by order</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Confirmed payments on converted orders</p>
-          {analytics && <ProfitBreakdownPie analytics={analytics} />}
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-        <Card className="p-6">
+        <Card className="p-6 min-w-0">
           <h3 className="font-semibold mb-1">Enquiries by outcome</h3>
           <p className="text-xs text-[var(--muted)] mb-4">Converted vs unconverted</p>
-          {analytics && <EnquiryStatusChart analytics={analytics} />}
-        </Card>
-        <Card className="p-6">
-          <h3 className="font-semibold mb-1">Events by type</h3>
-          <p className="text-xs text-[var(--muted)] mb-4">Weddings, birthdays, and more</p>
-          {analytics && <EventTypeChart analytics={analytics} />}
+          <div className="w-full min-h-[260px]">
+            {analytics && <EnquiryStatusChart analytics={analytics} />}
+          </div>
         </Card>
       </div>
     </>

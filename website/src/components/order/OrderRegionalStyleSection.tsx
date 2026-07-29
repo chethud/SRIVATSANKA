@@ -3,6 +3,7 @@ import { MapPin } from 'lucide-react';
 import { formatDate, updateEnquiry, type Enquiry } from '../../api/client';
 import {
   eventDatesForStyles,
+  expandScheduleDateRange,
   resolveStyleForDate,
   serializeOrderNotes,
   type OrderExtras,
@@ -27,10 +28,11 @@ export function OrderRegionalStyleSection({
   extras: OrderExtras;
   onOrderUpdated: (order: Enquiry) => void;
 }) {
-  const days = useMemo(
-    () => eventDatesForStyles(extras, order.eventDate),
-    [extras, order.eventDate],
-  );
+  const days = useMemo(() => {
+    const scheduled = expandScheduleDateRange(extras);
+    if (scheduled.length > 0) return scheduled;
+    return eventDatesForStyles(extras, order.eventDate);
+  }, [extras, order.eventDate]);
 
   const [byDate, setByDate] = useState<Record<string, string>>(() => ({
     ...(extras.regionalStylesByDate ?? {}),

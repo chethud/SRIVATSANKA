@@ -1,5 +1,3 @@
-import { useMemo } from 'react';
-import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { AnimatedCounter } from './AnimatedCounter';
 
@@ -10,10 +8,8 @@ type DashboardKpiCardProps = {
   subtext: string;
   icon: LucideIcon;
   trend?: { pct: number; up: boolean };
-  sparkline?: number[];
   gradient?: 1 | 2;
   formatValue?: (n: number) => string;
-  sparkId?: string;
   onClick?: () => void;
 };
 
@@ -24,17 +20,11 @@ export function DashboardKpiCard({
   subtext,
   icon: Icon,
   trend,
-  sparkline = [],
   gradient = 1,
   formatValue,
-  sparkId = 'kpi',
   onClick,
 }: DashboardKpiCardProps) {
   const bg = gradient === 2 ? 'var(--kpi-gradient-2)' : 'var(--kpi-gradient-1)';
-  const sparkData = useMemo(
-    () => sparkline.map((v, i) => ({ i, v })),
-    [sparkline],
-  );
   const interactive = Boolean(onClick);
 
   return (
@@ -74,22 +64,6 @@ export function DashboardKpiCard({
           <Icon size={20} className="text-[var(--primary)]" strokeWidth={2.25} />
         </div>
       </div>
-
-      {sparkData.length > 1 && (
-        <div className="h-10 mt-3 -mx-1 opacity-70">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkData}>
-              <defs>
-                <linearGradient id={`spark-${sparkId}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area type="monotone" dataKey="v" stroke="var(--primary)" strokeWidth={1.5} fill={`url(#spark-${sparkId})`} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       <div className="flex items-center justify-between mt-2 gap-2">
         <p className="text-xs text-[var(--muted)]">{subtext}</p>

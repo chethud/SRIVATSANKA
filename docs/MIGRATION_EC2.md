@@ -2,6 +2,8 @@
 
 This guide details the step-by-step process of migrating the React frontend, FastAPI backend, and local database (SQLite/PostgreSQL) to your newly provisioned AWS EC2 instance.
 
+**Production auth & data are AWS-only:** Admin JWT login (`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`) and SQLite on the instance. Do not enable Supabase on EC2.
+
 ---
 
 ## 1. Active Infrastructure Details
@@ -115,13 +117,14 @@ sudo systemctl status kannans-backend
 ## 5. Build and Configure Nginx (Frontend + Reverse Proxy)
 
 ### A. Build the Frontend
-In the `website` directory of the project, build the production assets:
+In the `website` directory of the project, build the production assets **without Supabase**:
 ```bash
 cd /home/ubuntu/srivatsanka/website
+# Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are unset/blank (.env.production does this)
 npm install
 npm run build
 ```
-This builds static assets to `/home/ubuntu/srivatsanka/website/dist`.
+This builds static assets to `/home/ubuntu/srivatsanka/website/dist`. Sign-in uses Admin username/password against `/api/auth/login`.
 
 ### B. Configure Nginx
 Replace `/etc/nginx/sites-available/default` with the following configuration (replace `yourdomain.com` with your domain name if you register one, or leave the IP addresses):

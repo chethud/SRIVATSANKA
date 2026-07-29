@@ -22,6 +22,13 @@ class GuidedStep(str, Enum):
 
 
 @dataclass
+class SlotValue:
+    value: str | int | None = None
+    confidence: float = 0.0
+    collected: bool = False
+
+
+@dataclass
 class ConversationSession:
     whatsapp_id: str
     phase: ConversationPhase = ConversationPhase.ENQUIRY
@@ -35,7 +42,26 @@ class ConversationSession:
     welcome_media_sent: bool = False
     sent_gallery_urls: list[str] = field(default_factory=list)
     guided_step: GuidedStep = GuidedStep.AWAIT_HI
+    previous_guided_step: GuidedStep | None = None
     _saved: bool = False
+    consecutive_loop_count: int = 0
+    last_assistant_question: str | None = None
+    last_asked_slot: str | None = None
+    failed_turns_in_state: int = 0
+    slot_fail_counts: dict[str, int] = field(default_factory=dict)
+    showcase_prompted: bool = False
+    slots: dict[str, SlotValue] = field(
+        default_factory=lambda: {
+            "customer_name": SlotValue(),
+            "event_type": SlotValue(),
+            "event_date": SlotValue(),
+            "guest_count": SlotValue(),
+            "event_location": SlotValue(),
+            "meal_preference": SlotValue(),
+            "preferred_callback": SlotValue(),
+            "special_requests": SlotValue(),
+        }
+    )
 
 
 class SessionStore:

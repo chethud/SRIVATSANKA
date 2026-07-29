@@ -41,14 +41,13 @@ def _more_info_reply(session: ConversationSession) -> str:
     occasion = (session.fields.event_type or "celebration").lower()
     if occasion == "general":
         occasion = "celebration"
+    # No open follow-up question here — caller asks the next planning field.
     return random.choice(
         (
             f"For your {occasion}, we handle catering, décor, pooja setup, venue help, "
-            f"and guest hospitality — all pure veg. Want photos, or can we move further?",
-            f"Sure — we cover food, décor, rituals, venues, and hospitality for your {occasion}. "
-            f"What would you like to know first?",
-            f"Of course. End-to-end {occasion} support: catering, décor, pooja, and venues. "
-            f"Any particular part you're asking about?",
+            f"and guest hospitality, all pure veg.",
+            f"Sure, we cover food, décor, rituals, venues, and hospitality for your {occasion}.",
+            f"Of course. End-to-end {occasion} support: catering, décor, pooja, and venues.",
         )
     )
 
@@ -58,14 +57,13 @@ def _food_reply(session: ConversationSession) -> str:
     if occasion == "general":
         occasion = "celebration"
     dishes = ", ".join(POPULAR_DISHES[:3])
+    # No open follow-up question here — caller asks the next planning field.
     return random.choice(
         (
-            f"For food, we do pure-veg South Indian menus — Karnataka, Andhra, Tamil Nadu, and Kerala styles, "
-            f"with live counters too. Want to know about a specific meal, or can we move further?",
-            f"Happy to focus on food — authentic vegetarian catering for your {occasion}, including {dishes}. "
-            f"Any cuisine preference?",
-            f"Sure — food is our main strength. Custom pure-veg menus and live stations for your {occasion}. "
-            f"What would you like to know about the menu?",
+            f"For food, we do pure-veg South Indian menus across Karnataka, Andhra, Tamil Nadu, and Kerala styles, "
+            f"with live counters too.",
+            f"Happy to focus on food, authentic vegetarian catering for your {occasion}, including {dishes}.",
+            f"Sure, food is our main strength. Custom pure-veg menus and live stations for your {occasion}.",
         )
     )
 
@@ -85,7 +83,7 @@ def _fallback_answer(
     hint = natural_continue_hint(event_type=session.fields.event_type)
 
     if sharing_photos or customer_wants_photos(user_text):
-        return "Sure — sharing a few photos from our site 👇"
+        return "Sure, sharing a few photos from our site 👇"
 
     # Focus on the topic they asked about
     if any(w in t for w in ("food", "menu", "dish", "cuisine", "veg", "live counter", "live station", "cater")):
@@ -100,13 +98,13 @@ def _fallback_answer(
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
         return (
-            f"We're {COMPANY['legal_name']} — catering & celebration services in Bengaluru "
+            f"We're {COMPANY['legal_name']}, catering & celebration services in Bengaluru "
             f"since {COMPANY['established']}. Happy to tell you more."
         )
 
     if any(w in t for w in ("eat rep", "eat repeat", "restaurant", "dining")):
         return (
-            f"That's Eat Rep Eat — our vegetarian experience center at N R Colony. "
+            f"That's Eat Rep Eat, our vegetarian experience center at N R Colony. "
             f"Open {COMPANY['eat_rep_eat_hours']}."
         )
 
@@ -115,7 +113,7 @@ def _fallback_answer(
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate", "quote")):
         return (
-            f"Pricing depends on menu & guest count for your {occasion.lower()} — "
+            f"Pricing depends on menu & guest count for your {occasion.lower()}, "
             f"easiest on a quick call. {hint}"
         )
 
@@ -149,7 +147,7 @@ async def _gemini_or_fallback(
             return _more_info_reply(session)
 
     if not is_gemini_configured():
-        logger.warning("GEMINI_API_KEY not set — using website knowledge reply for: %s", user_text[:80])
+        logger.warning("GEMINI_API_KEY not set; using website knowledge reply for: %s", user_text[:80])
         return _fallback_answer(session, user_text, sharing_photos=sharing_photos)
 
     try:
@@ -177,13 +175,12 @@ async def answer_showcase_question(
     *,
     sharing_photos: bool = False,
 ) -> str:
-    session.history.append({"role": "user", "content": user_text})
+    # History is recorded by the caller via record_exchange (avoid duplicates).
     reply = await _gemini_or_fallback(
         session,
         user_text,
         sharing_photos=sharing_photos or customer_wants_photos(user_text),
     )
-    session.history.append({"role": "assistant", "content": reply})
     return reply
 
 
@@ -192,12 +189,11 @@ async def answer_details_question(
     user_text: str,
     next_detail_prompt: str | None,
 ) -> str:
-    session.history.append({"role": "user", "content": user_text})
+    # History is recorded by the caller via record_exchange (avoid duplicates).
     reply = await _gemini_or_fallback(
         session,
         user_text,
         next_detail_prompt=next_detail_prompt,
         sharing_photos=customer_wants_photos(user_text),
     )
-    session.history.append({"role": "assistant", "content": reply})
     return reply

@@ -13,7 +13,7 @@ HUMAN_CONSULTANT_STYLE = f"""# SHORT & NATURAL RESPONSE STYLE (HIGHEST PRIORITY)
 You are an experienced celebration consultant for {COMPANY['legal_name']} on WhatsApp
 (catering, décor, rituals, venues, and guest hospitality).
 Always introduce the company using the full name \"Srivatsanka Events & Services\".
-Every reply must feel like a real human WhatsApp chat — never a chatbot or support script.
+Every reply must feel like a real human WhatsApp chat, never a chatbot or support script.
 
 ## LENGTH (STRICT)
 - Ideal: 1–3 short sentences.
@@ -23,15 +23,15 @@ Every reply must feel like a real human WhatsApp chat — never a chatbot or sup
 - No long paragraphs. No walls of text. Do not dump lists of services unless asked.
 
 ## UNDERSTAND BEFORE RESPONDING (STRICT)
-1. Read the customer's message carefully — including spelling mistakes.
+1. Read the customer's message carefully, including spelling mistakes.
 2. Infer what they meant (e.g. "mor3" = more, "forther" = further, "weding" = wedding).
-3. Focus only on what they asked — do not jump to a new form question if they asked for information.
+3. Focus only on what they asked, do not jump to a new form question if they asked for information.
 4. Acknowledge briefly, answer that point simply, then continue only if needed.
 5. Never repeat their message back word-for-word (especially with typos).
-6. Keep language simple — not complicated.
+6. Keep language simple, not complicated.
 
 ## VOICE
-Write like WhatsApp: simple everyday language. Vary wording — never the same phrase every turn.
+Write like WhatsApp: simple everyday language. Vary wording, never the same phrase every turn.
 Prefer: Got it. / Sounds good. / Absolutely. / Certainly. / No problem. / Happy to help. /
 Of course. / Perfect. / Great. / Thanks for sharing. / I understand. / That sounds wonderful. / No worries.
 
@@ -42,7 +42,19 @@ If a short answer is enough, stop. At most one emoji, only if it fits.
 Never claim to be a bot or AI.
 Never output internal labels, markdown headings, or words like RULES / COMPANY / FAQS / Requirements / Tone.
 Never dump lists unless the customer asked for a list.
-Never continue a reply with instruction headings — stop after the customer-facing answer.
+Never continue a reply with instruction headings, stop after the customer-facing answer.
+
+## FIELD HANDLING (STRICT)
+- Guest ranges: if they say "30-50", "200 to 300", or "around 50-70", keep the FULL range in your reply. Never drop to a single number.
+- Dates: keep full relative context (e.g. "the 3rd week of next month", "mid-August"). Never echo only "3rd".
+- Urgent dates (today, tomorrow, or within 7 days): do not ask meal/theme/extra details. Fast-track to an immediate senior callback.
+- Meal type (lunch/dinner/high tea): ask ONLY for birthdays or informal family gatherings. Skip for weddings, engagements, receptions, upanayanam, baby showers, and housewarmings.
+- Venue/location: extract the clean place name (e.g. "Hundur"). Never echo filler like "Yes Hundur".
+- Custom / fusion / live counters: always respond warmly and say you noted it for the planner/chef call. Never give restrictive rejections.
+- If they want to "discuss on call" / "tell me on call": stop collecting more details and immediately ask for the best callback time.
+- Callback "now" / "ASAP" / "right away": say the lead planning team will call ASAP. Never invent a calculated timestamp.
+- If they choose straight to planning: jump to the date question. Do not dump mandap/floral/menu showcase text.
+- Never send dry system text like "We've already got your enquiry". Always close with warm hospitality.
 """
 
 
@@ -182,6 +194,10 @@ def _near(word: str, options: tuple[str, ...], cutoff: float = 0.75) -> bool:
 def wants_more_info(text: str) -> bool:
     """Customer wants information — not ready to fill the next form field."""
     t = normalize_customer_text(text)
+    if is_portfolio_inquiry(text):
+        return True
+    if is_service_topic_reply(text):
+        return True
     cues = (
         "know more",
         "need more",
@@ -204,6 +220,8 @@ def wants_more_info(text: str) -> bool:
         "what services",
         "details",
         "information",
+        "get more details",
+        "can i get more",
     )
     if any(c in t for c in cues):
         return True
@@ -264,7 +282,7 @@ def thanks_reply() -> str:
 def undecided_reply() -> str:
     return random.choice(
         (
-            "No problem — take your time. Happy to answer any questions.",
+            "No problem, take your time. Happy to answer any questions.",
             "No rush at all. Ask me anything about our catering.",
             "Of course. We're here whenever you're ready.",
         )
@@ -282,36 +300,149 @@ def small_talk_reply(*, event_label: str | None = None) -> str:
 
 
 def welcome_message() -> str:
-    brand = COMPANY["legal_name"]
-    return random.choice(
-        (
-            f"Hi! Welcome to {brand} 😊\nMay I know your name?",
-            f"Hello! You've reached {brand}. What's your name?",
-            f"Hi there — {brand} here. Who am I speaking with?",
-        )
+    return (
+        "Hello! Welcome to Srivatsanka Events & Catering. ✨\n\n"
+        "Something special is brewing! We’d love to know who we’re chatting with. May I have your name, please?"
     )
 
 
 def acknowledge_opening_without_name(text: str, event_type: str | None) -> str:
-    """First message shared occasion/details but no name — short ack, then ask name."""
-    from app.data.company_knowledge import is_known_event_type
+    """First message shared occasion/details but no name; short ack, then ask name."""
+    if event_type:
+        occasion = event_type.lower()
+        return f"We'd love to help with your {occasion}! May I know your name first?"
+    return welcome_message()
 
-    brand = COMPANY["legal_name"]
-    if is_known_event_type(event_type):
-        label = event_type.lower()  # type: ignore[union-attr]
-        return random.choice(
-            (
-                f"That sounds wonderful! Happy to help with your {label}.\nMay I know your name?",
-                f"Lovely — we can help with your {label}. What's your name?",
-                f"Great! What's your name?",
-            )
-        )
-    return random.choice(
-        (
-            f"Hi! Welcome to {brand} 🙂 May I know your name?",
-            f"Hello from {brand}! What's your name?",
-            f"Hi there — {brand} here. Who am I speaking with?",
-        )
+
+def wants_discuss_on_call(text: str) -> bool:
+    """Customer wants to skip form details and talk on a call instead."""
+    t = normalize_customer_text(text)
+    cues = (
+        "discuss on call",
+        "discuss over call",
+        "tell me on call",
+        "tell on call",
+        "talk on call",
+        "talk over call",
+        "speak on call",
+        "on the call",
+        "during the call",
+        "over a call",
+        "over the call",
+        "lets discuss on call",
+        "let's discuss on call",
+        "i'll talk on call",
+        "ill talk on call",
+        "will talk on call",
+        "prefer a call",
+        "prefer call",
+        "call and discuss",
+        "discuss later on call",
+    )
+    return any(c in t for c in cues)
+
+
+def wants_straight_to_planning(text: str) -> bool:
+    """Customer wants to skip gallery/showcase and start collecting details."""
+    t = normalize_customer_text(text)
+    cues = (
+        "straight to planning",
+        "straight into planning",
+        "dive straight",
+        "dive into planning",
+        "dive into",
+        "start planning",
+        "lets plan",
+        "let's plan",
+        "begin planning",
+        "move further",
+        "move forward",
+        "go further",
+        "go ahead",
+        "continue",
+        "proceed",
+        "take details",
+        "note the",
+    )
+    if any(c in t for c in cues):
+        return True
+    if "planning" in t and any(w in t for w in ("straight", "dive", "start", "lets", "let's", "into")):
+        return True
+    return t in {"planning", "plan", "further", "move", "yes move", "yes further", "yes continue", "dive"}
+
+
+def wants_showcase_look(text: str) -> bool:
+    """Customer wants to see past setups / photos / cuisines first."""
+    t = normalize_customer_text(text)
+    cues = (
+        "look",
+        "photo",
+        "photos",
+        "pic",
+        "pics",
+        "showcase",
+        "past setup",
+        "past setups",
+        "signature cuisine",
+        "show me",
+        "see some",
+        "gallery",
+        "examples",
+        "menu",
+        "cuisine",
+    )
+    return any(c in t for c in cues)
+
+
+def warm_enquiry_signoff(*, name: str | None = None, event_type: str | None = None) -> str:
+    """Signature hospitality close for completed / already-saved enquiries."""
+    who = (name or "there").strip() or "there"
+    return (
+        f"Thank you so much, {who}! It was an absolute pleasure chatting with you. "
+        "We’re excited to make your celebration truly unforgettable. ✨\n\n"
+        "Have a wonderful rest of your day, and talk to you soon!"
+    )
+
+
+def urgent_timeline_reply() -> str:
+    return (
+        "Got it! Since your celebration is right around the corner, we are prioritizing your inquiry! "
+        "Our senior event executive will call you immediately to confirm availability and discuss setups."
+    )
+
+
+def immediate_callback_reply(*, name: str | None = None) -> str:
+    who = (name or "there").strip() or "there"
+    return f"Got it, {who}! We have notified our lead planning team to give you a callback as soon as possible on this number. 📱"
+
+
+def planning_date_prompt() -> str:
+    return "Perfect! Let's get right down to planning. 🗓️\n\nWhat is your tentative date or month for the celebration?"
+
+
+def callback_confirmation_reply(*, name: str | None = None, callback_label: str | None = None) -> str:
+    who = (name or "there").strip() or "there"
+    label = (callback_label or "").strip().lower()
+    if not label or label in {"anytime", "whenever", "you decide", "when free", "any time today"}:
+        return f"Sounds great, {who}! Our senior event planner will give you a call during business hours today on this number."
+    if "today evening after 7" in label:
+        slot = "today after 7:00 PM"
+    elif "tomorrow morning around 11" in label:
+        slot = "tomorrow around 11:00 AM"
+    elif "day after around tea time" in label or "day after tea time" in label:
+        slot = "day after tomorrow between 4:00 PM and 5:00 PM"
+    elif "weekend morning" in label:
+        slot = "this weekend morning"
+    else:
+        slot = callback_label or "the requested time"
+    return f"Noted, {who}! We have scheduled your callback for {slot}. Our senior event planner will reach out to you on this number. 🗓️"
+
+
+def callback_pivot_prompt(*, name: str | None = None) -> str:
+    who = (name or "there").strip() or "there"
+    return (
+        f"Of course, {who}! We can discuss all the details directly on call. "
+        "When would be the best time to give you a quick call?"
     )
 
 
@@ -322,45 +453,54 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
         occasion = "celebration"
 
     if field_key == "event_date":
-        return random.choice(
-            (
-                f"When is your {occasion}?",
-                f"When’s your {occasion} planned?",
-                f"What date is your {occasion}?",
-                f"When are you planning your {occasion}?",
-            )
-        )
+        return planning_date_prompt()
+    if field_key == "guest_count":
+        from app.services.guided_flow import get_event_profile
+        profile = get_event_profile(event_type)
+        return profile["pax_question"]
     if field_key == "event_location":
         return random.choice(
             (
-                "Which area in Bengaluru is the venue?",
-                "Where in Bengaluru will it be held?",
-                "Which part of Bengaluru is the venue in?",
+                "Do you already have a venue booked for the celebration, or are you looking for help with venue selection? If it is fixed, please share the venue name and area. If not, just let us know your preferred city or locality.",
+                f"For your {occasion}, is the venue already fixed? If yes, please share the venue name and area. If not yet, just tell us your preferred city or locality and we can help from there.",
             )
         )
     if field_key == "preferred_callback":
         return random.choice(
             (
-                "When’s a good time for a quick call?",
-                "What time should we call you?",
+                "We’d love to connect you with our senior planner so we can share custom proposals and discuss venues and menu tastings.\n\nWhen would be the best time to give you a quick call? (e.g., today evening, tomorrow after 6 PM, or weekend morning?)",
                 "When works for a short callback?",
             )
         )
+    if field_key == "meal_preference":
+        return "Are you planning a lunch feast, an evening dinner, or high tea snacks?"
     return "Could you share a bit more?"
 
 
 def acknowledge_field(field_key: str, value: str, *, event_type: str | None = None) -> str:
-    """Short acknowledgement — avoid echoing long/messy customer text."""
+    """Short acknowledgement, avoid echoing long/messy customer text."""
     v = (value or "").strip()
     if len(v) > 20 or len(v.split()) > 3 or re.search(r"[?]|(need|more|detail|know|tell)", v, re.I):
         return soft_ack()
     if field_key == "event_date":
         return random.choice(("Got it.", "Perfect.", "Thanks!", "Noted."))
+    if field_key == "guest_count":
+        return random.choice(("Got it.", "Perfect.", "Thanks!", "Noted."))
+    if field_key == "meal_preference":
+        return random.choice(("Got it.", "Perfect.", "Sounds good."))
     if field_key == "event_location":
-        return random.choice((f"Got it — {v}.", "Sounds good.", "Perfect.", "Thanks!"))
+        return f"Got it, {v}! We have noted down the location."
     if field_key == "preferred_callback":
         return random.choice(("Perfect.", "Sounds good.", "Absolutely.", "Got it."))
     return soft_ack()
+
+
+def _occasion_phrase(event_type: str | None) -> str:
+    occasion = (event_type or "celebration").strip().lower()
+    if not occasion or occasion == "general":
+        return "a celebration"
+    article = "an" if occasion[0] in "aeiou" else "a"
+    return f"{article} {occasion} celebration"
 
 
 def natural_field_ack(
@@ -370,6 +510,26 @@ def natural_field_ack(
     *,
     event_type: str | None = None,
 ) -> str:
+    if field_key == "event_date":
+        display = (value or "").strip()
+        if re.match(r"^\d", display):
+            display = f"The {display}"
+        elif display and display[0].islower():
+            display = display[0].upper() + display[1:]
+        return f"{display} is a wonderful time for {_occasion_phrase(event_type)}!\n\n{next_prompt}"
+    if field_key == "guest_count":
+        display = re.sub(r"\s*[-–—]\s*", " to ", str(value).strip(), count=1)
+        display = re.sub(r"\s+", " ", display)
+        low_match = re.search(r"(\d+)", display)
+        low = int(low_match.group(1)) if low_match else 100
+        style = "intimate celebration" if low <= 80 else "celebration"
+        article = "An" if style.startswith("intimate") else "A"
+        return f"Got it! {article} {style} with {display} guests sounds wonderful.\n\n{next_prompt}"
+    if field_key == "event_location":
+        place = (value or "").strip()
+        return f"Got it, {place}! We have noted down the location.\n\n{next_prompt}"
+    if field_key == "meal_preference":
+        return f"Got it! We'll plan for the {value} service.\n\n{next_prompt}"
     ack = acknowledge_field(field_key, value, event_type=event_type)
     if random.random() < 0.5:
         return f"{ack}\n{next_prompt}"
@@ -381,7 +541,7 @@ def continue_hint(*, event_type: str | None = None) -> str:
         (
             "Any questions, or can we move further?",
             "Want to know anything, or can we move further?",
-            "Happy to answer questions — or can we move further?",
+            "Happy to answer questions, or can we move further?",
         )
     )
 
@@ -415,3 +575,121 @@ def looks_like_polite_filler(text: str) -> bool:
         "hmm",
         "hm",
     } or bool(re.fullmatch(r"o+k+", t))
+
+
+def is_service_topic_reply(text: str) -> bool:
+    """Short topic picks like 'food' / 'decor' after the bot offered service areas."""
+    t = normalize_customer_text(text).strip().rstrip("?.!")
+    topics = {
+        "food",
+        "menu",
+        "cuisine",
+        "cuisines",
+        "catering",
+        "cater",
+        "decor",
+        "décor",
+        "decoration",
+        "decorations",
+        "pooja",
+        "ritual",
+        "rituals",
+        "venue",
+        "venues",
+        "hospitality",
+        "photos",
+        "photo",
+        "portfolio",
+        "gallery",
+    }
+    if t in topics:
+        return True
+    words = t.split()
+    if 1 <= len(words) <= 3 and any(w in topics for w in words):
+        return True
+    return False
+
+
+def is_portfolio_inquiry(text: str) -> bool:
+    """State 2 catalog / portfolio questions from Kannan.rules.txt §4."""
+    t = normalize_customer_text(text)
+    cues = (
+        "what events",
+        "what event",
+        "events do you",
+        "what do you cater",
+        "what do you offer",
+        "what services",
+        "services do you",
+        "what have you done",
+        "events have you done",
+        "until today",
+        "i want to know what you do",
+        "know what you do",
+        "what do you do",
+        "tell me what you do",
+        "your portfolio",
+        "show portfolio",
+        "types of events",
+        "kind of events",
+        "list of events",
+        "what all events",
+        "what all do you",
+    )
+    if any(c in t for c in cues):
+        return True
+    if re.search(r"\b(what|which)\b.*\b(events?|services?|offerings?)\b", t):
+        return True
+    if re.search(r"\b(do you|can you)\b.*\b(cater|handle|cover|organize|organise)\b", t) and "?" in text:
+        return True
+    return False
+
+
+def catalog_portfolio_reply(*, customer_name: str | None = None) -> str:
+    """Exact catalog variants from Kannan.rules.txt State 2 §4."""
+    name = (customer_name or "").strip() or "there"
+    variant_a = (
+        "We specialize in crafting authentic, unforgettable traditional celebrations! 🌟\n\n"
+        "Here are the key events we cater to:\n"
+        "✨ **Weddings, Engagements & Receptions**\n"
+        "🍃 **Upanayanam, Housewarmings & Baby Showers (Seemantham)**\n"
+        "🎉 **Birthdays, Anniversaries & Family Gatherings**\n"
+        "🙏 **Traditional Ceremonies & Religious Poojas**\n\n"
+        "Our core expertise spans **Pure Vegetarian South Indian Catering** "
+        "(Karnataka, Andhra, Tamil Nadu & Kerala cuisines), **Stage & Theme Floral Decor**, "
+        "**Pooja Setups**, and **End-to-End Event Planning**.\n\n"
+        f"Which of these special occasions are you planning today, {name}?"
+    )
+    variant_b = (
+        "We’d love to share! Srivatsanka provides complete end-to-end event solutions "
+        "tailored to your family's traditions. ✨\n\n"
+        "**Our Core Services Include:**\n"
+        "🍱 **Pure Vegetarian Regional Catering:** Authentic South Indian feasts across "
+        "Karnataka, Andhra, Tamil Nadu & Kerala recipes.\n"
+        "🌸 **Bespoke Decor:** Stage, floral, mandap, and theme setups.\n"
+        "🪔 **Ritual & Pooja Support:** Traditional pooja arrangements, sacred ceremony setups, "
+        "and ritual coordination.\n"
+        "🏰 **Venue & Hospitality:** Venue selection, venue planning, and guest management.\n\n"
+        "Are you looking for full event planning or specific catering/decor services for your "
+        "upcoming celebration?"
+    )
+    return random.choice((variant_a, variant_b))
+
+
+def is_unsupported_event_request(text: str) -> bool:
+    """Cocktail / alcohol / expo / conference — Kannan.rules.txt unsupported list."""
+    t = normalize_customer_text(text)
+    if re.search(r"\b(cocktail|cocktails|alcohol|alcoholic|bar party|booze|liquor|hard drinks?)\b", t):
+        return True
+    if re.search(r"\b(exhibition|expo|conference|conferences|trade show|tradeshow)\b", t):
+        return True
+    return False
+
+
+def unsupported_event_refusal(*, customer_name: str | None = None) -> str:
+    name = (customer_name or "").strip() or "there"
+    return (
+        f"Thank you for reaching out, {name}! At Srivatsanka, we specialize exclusively in "
+        "traditional, family, and cultural celebrations. We will notify the team to confirm "
+        "regarding your request. Thank you and have a nice day!! ✨"
+    )

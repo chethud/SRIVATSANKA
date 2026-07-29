@@ -45,7 +45,7 @@ WEEKDAYS = {
 IMMEDIATE_RE = re.compile(
     r"\b("
     r"immediately|imediately|imidiately|imideatly|immediatly|imediatly|"
-    r"asap|right\s*now|urgent|urgently|now|soon|"
+    r"asap|right\s*now|right\s*away|urgent|urgently|now|soon|"
     r"as\s*soon\s*as\s*possible|call\s*me\s*now|call\s*now"
     r")\b",
     re.I,
@@ -133,6 +133,11 @@ def _mentions_today(lower: str) -> bool:
 
 def _is_immediate(lower: str) -> bool:
     return bool(IMMEDIATE_RE.search(lower))
+
+
+def is_immediate_callback(text: str | None) -> bool:
+    """True when the customer asked for now / ASAP / right away."""
+    return _is_immediate((text or "").lower())
 
 
 def normalize_callback_label(text: str) -> str:

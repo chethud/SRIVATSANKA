@@ -1,6 +1,33 @@
-# Supabase setup — data + authentication
+# Supabase setup — optional / local experiments only
 
-Use Supabase for **all dashboard data** (PostgreSQL) and **sign-in** (Supabase Auth).
+> **Production is AWS-only.** Live dashboard + API on EC2 (`13.232.230.198`) use **SQLite** and **Admin username/password** (`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`). Do **not** set `SUPABASE_*` or `VITE_SUPABASE_*` on EC2.
+
+This document describes an optional Supabase setup for local experiments. It is **not** the production path.
+
+---
+
+## Production (AWS EC2) — quick reference
+
+| Piece | Where |
+|------|--------|
+| Frontend | nginx → `/home/ubuntu/srivatsanka/website/dist` |
+| API | `kannans-backend` (uvicorn on `127.0.0.1:8000`) |
+| Database | SQLite `whatsapp/kannans.db` via `DATABASE_URL=sqlite+aiosqlite:///./kannans.db` |
+| Sign-in | Username/password from `whatsapp/.env` (`DASHBOARD_*`) + local JWT |
+| Forgot password | Change `DASHBOARD_PASSWORD` on EC2, then `sudo systemctl restart kannans-backend` |
+
+Build the website **without** Supabase (see [website/.env.production](../website/.env.production)):
+
+```bash
+cd website
+npm run build   # .env.production blanks VITE_SUPABASE_*
+```
+
+---
+
+# Optional: Supabase for local experiments
+
+Use Supabase for **local** PostgreSQL / Auth experiments only if you intentionally enable it.
 
 Project example: `https://hlzndlmcvpmsxzkawsbz.supabase.co`
 
@@ -27,6 +54,15 @@ Project example: `https://hlzndlmcvpmsxzkawsbz.supabase.co`
 3. Share these credentials with your team — they sign in on the website with **email**, not `Admin`.
 
 Enable **Email** provider under **Authentication** → **Providers** if it is off.
+
+### Password reset (Forgot password)
+
+1. Supabase → **Authentication** → **URL Configuration**
+2. Add your site URLs under **Redirect URLs**, including:
+   - `http://127.0.0.1:5174/reset-password` (local)
+   - `http://13.232.230.198/reset-password` (EC2)
+   - your production domain `/reset-password` if you use one
+3. Users click **Forgot password?** on sign-in; Supabase emails a link that opens `/reset-password` so they can set a new password.
 
 ---
 

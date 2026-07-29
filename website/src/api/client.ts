@@ -569,6 +569,69 @@ export interface InvoiceRecognizePreview {
   message?: string | null;
 }
 
+export interface OrderExcelMenuColumn {
+  id: string;
+  date: string;
+  sessionLabel: string;
+  baseSession: string;
+  pax: number | null;
+  timeFrom?: string | null;
+  timeTo?: string | null;
+  amount?: number | null;
+}
+
+export interface OrderExcelDishRow {
+  tempId: string;
+  dishName: string;
+  category: string;
+  sessionColumnId: string;
+  notes?: string | null;
+}
+
+export interface OrderExcelExtraItem {
+  id: string;
+  title: string;
+  description: string;
+  quantity: string;
+  amount?: number | null;
+  enabled?: boolean;
+  isCustom?: boolean;
+}
+
+export interface OrderExcelNormalizedOrder {
+  customerName: string;
+  phoneNumber: string;
+  eventType: string;
+  eventDate: string;
+  eventLocation: string;
+  guestCount: number;
+  preferredCallbackAt: string;
+  dietary: string[];
+  scheduleDateFrom?: string | null;
+  scheduleDateTo?: string | null;
+  menuColumns: OrderExcelMenuColumn[];
+  dishes: OrderExcelDishRow[];
+  extraItems: OrderExcelExtraItem[];
+  venueMapLink?: string | null;
+  regionalStylesByDate?: Record<string, string>;
+  customSessions?: string[];
+  sourceFileName?: string | null;
+  sourceLayout?: string | null;
+}
+
+export interface OrderExcelRecognizePreview {
+  fileName: string;
+  layout: string;
+  warnings: string[];
+  order: OrderExcelNormalizedOrder;
+}
+
+export interface OrderExcelImportResult {
+  mode: 'new' | 'existing';
+  warnings: string[];
+  order: Enquiry;
+}
+
 export interface InvoiceUploadResult extends InvoiceUpload {
   recognized: boolean;
 }
@@ -581,6 +644,28 @@ export async function recognizeExpenseInvoice(file: File): Promise<InvoiceRecogn
     body: fd,
   });
   return parseApiResponse<InvoiceRecognizePreview>(res, '/api/invoices/recognize');
+}
+
+export async function recognizeOrderExcel(file: File): Promise<OrderExcelRecognizePreview> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetchWithAuth('/api/orders/import-excel/preview', {
+    method: 'POST',
+    body: fd,
+  });
+  return parseApiResponse<OrderExcelRecognizePreview>(res, '/api/orders/import-excel/preview');
+}
+
+export async function importOrderExcel(data: {
+  mode: 'new' | 'existing';
+  existingEnquiryId?: string;
+  order: OrderExcelNormalizedOrder;
+}): Promise<OrderExcelImportResult> {
+  return apiFetch<OrderExcelImportResult>('/api/orders/import-excel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
 }
 
 export async function confirmExpenseInvoice(data: {

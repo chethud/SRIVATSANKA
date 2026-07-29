@@ -92,6 +92,64 @@ def _parse_next_month_day(lower: str, reference: datetime) -> datetime | None:
     return None
 
 
+def is_urgent_event_date(text: str, now: datetime | None = None) -> bool:
+    """True when the occasion is today, tomorrow, or within the next 7 days."""
+    raw = (text or "").strip().lower()
+    if not raw or "to be discussed" in raw:
+        return False
+
+    # Clearly farther-out windows are never urgent
+    if any(
+        w in raw
+        for w in (
+            "next month",
+            "next year",
+            "in a month",
+            "after a month",
+            "coming month",
+        )
+    ):
+        return False
+
+    if any(
+        w in raw
+        for w in (
+            "today",
+            "tonight",
+            "tomorrow",
+            "tmrw",
+            "tmr",
+            "day after tomorrow",
+            "this week",
+            "same week",
+            "coming week",
+        )
+    ):
+        return True
+
+    # Only treat concrete calendar dates as urgent (avoid +7-day parse fallback)
+    concrete = bool(
+        re.search(
+            r"\b(?:\d{1,2}\s*(?:st|nd|rd|th)?\s+"
+            r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
+            r"aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+            r"|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
+            r"aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}"
+            r"|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b"
+            r"|\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b"
+            r"|\b\d{1,2}(?:st|nd|rd|th)?\b)",
+            raw,
+        )
+    )
+    if not concrete:
+        return False
+
+    reference = now or datetime.now()
+    parsed = parse_event_date(text, now=reference)
+    delta = (parsed.date() - reference.date()).days
+    return 0 <= delta <= 7
+
+
 def parse_event_date(text: str, now: datetime | None = None) -> datetime:
     """Convert customer occasion date text to a concrete datetime (noon local)."""
     reference = now or datetime.now()

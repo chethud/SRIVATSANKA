@@ -169,27 +169,35 @@ export function resolveStyleForDate(extras: OrderExtras, date: string): string |
   return extras.regionalStylesByDate?.[key]?.trim() || null;
 }
 
-/** Event days to assign styles for (schedule range ∪ menu columns ∪ event date). */
+/** Expand Event schedule from/to into inclusive YYYY-MM-DD days. Empty if unset. */
+export function expandScheduleDateRange(extras: OrderExtras): string[] {
+  const from = normalizeDateOnly(extras.scheduleDateFrom);
+  const to = normalizeDateOnly(extras.scheduleDateTo ?? extras.scheduleDateFrom);
+  if (!from || !to) return [];
+  const cursor = parseDateOnlyLocal(from);
+  const end = parseDateOnlyLocal(to);
+  if (!cursor || !end) return [];
+  const dates: string[] = [];
+  const walk = new Date(cursor);
+  while (walk <= end) {
+    dates.push(normalizeDateOnly(
+      `${walk.getFullYear()}-${String(walk.getMonth() + 1).padStart(2, '0')}-${String(walk.getDate()).padStart(2, '0')}`,
+    ));
+    walk.setDate(walk.getDate() + 1);
+  }
+  return dates;
+}
+
+/** Event days for styles / menu day chips.
+ * Prefer the Event schedule range when set; do not mix in the original enquiry eventDate. */
 export function eventDatesForStyles(
   extras: OrderExtras,
   eventDate: string | null | undefined,
 ): string[] {
+  const scheduled = expandScheduleDateRange(extras);
+  if (scheduled.length > 0) return scheduled;
+
   const dates = new Set<string>();
-  const from = normalizeDateOnly(extras.scheduleDateFrom);
-  const to = normalizeDateOnly(extras.scheduleDateTo ?? extras.scheduleDateFrom);
-  if (from && to) {
-    const cursor = parseDateOnlyLocal(from);
-    const end = parseDateOnlyLocal(to);
-    if (cursor && end) {
-      const walk = new Date(cursor);
-      while (walk <= end) {
-        dates.add(normalizeDateOnly(
-          `${walk.getFullYear()}-${String(walk.getMonth() + 1).padStart(2, '0')}-${String(walk.getDate()).padStart(2, '0')}`,
-        ));
-        walk.setDate(walk.getDate() + 1);
-      }
-    }
-  }
   for (const col of extras.menuColumns ?? []) {
     if (col.date) dates.add(normalizeDateOnly(col.date));
   }

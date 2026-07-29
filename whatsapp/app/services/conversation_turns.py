@@ -100,10 +100,20 @@ def customer_wants_to_proceed(text: str) -> bool:
 
 
 def extract_name(text: str) -> str:
-    """Pull a name from casual WhatsApp phrasing."""
+    """Pull a name from casual WhatsApp phrasing. Never treat questions as names."""
+    from app.services.gemini_conversation import looks_like_question
+    from app.services.human_style import wants_more_info
+
     t = text.strip()
+    if not t:
+        return ""
+    if looks_like_question(t) or wants_more_info(t):
+        return ""
+    if "?" in t:
+        return ""
     for pat in (
-        r"(?:i'?m|i am|my name is|this is|call me|it's|its)\s+([A-Za-z][A-Za-z\s'.-]{0,40})",
+        r"(?:hi\s+i\s+am|hello\s+i\s+am|i'?m|i am|my name is|this is|call me|it's|its|hello)\s+([A-Za-z][A-Za-z\s'.-]{0,40}?)"
+        r"(?=\s+(?:i\s+am|looking|planning|need|for|and|with|on|wedding|engagement|reception|birthday|housewarming|upanayanam|seemantham|baby\s+shower)\b|[,.!?]|$)",
         r"^(?:hi|hello|hey|hii)[,!\s]+(?:i'?m|i am|this is)?\s*([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30})?)",
         r"^([A-Za-z][A-Za-z\s'.-]{1,40}),?\s+(?:here|speaking)",
     ):
@@ -113,6 +123,28 @@ def extract_name(text: str) -> str:
             if name.lower() not in GREETING_ONLY and len(name) >= 2:
                 return name[:80]
     words = [w.strip(".,!") for w in t.split() if w.strip(".,!")]
+    # Reject sentence-like or intent-heavy messages
+    intent_words = {
+        "planning",
+        "looking",
+        "need",
+        "want",
+        "wedding",
+        "birthday",
+        "catering",
+        "decor",
+        "venue",
+        "price",
+        "cost",
+        "menu",
+        "food",
+        "events",
+        "services",
+    }
+    if any(w.lower() in intent_words for w in words):
+        # Still allow "I am Tejasvi planning a wedding" via regex above
+        if not re.search(r"\b(i'?m|i am|my name is|this is|call me)\b", t, re.I):
+            return ""
     if 1 <= len(words) <= 3 and all(w.isalpha() or "'" in w for w in words):
         joined = " ".join(words)
         if joined.lower() not in GREETING_ONLY and not is_greeting_only(joined):

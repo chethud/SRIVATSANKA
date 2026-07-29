@@ -20,20 +20,30 @@ const MOBILE_MQ = '(max-width: 1023px)';
 export const SIDEBAR_EXPANDED = '14rem';
 export const SIDEBAR_COLLAPSED = '4.25rem';
 
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function readIsMobileNav(): boolean {
   if (typeof window === 'undefined') return false;
   return window.matchMedia(MOBILE_MQ).matches;
 }
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem(STORAGE_KEY) === '1';
-  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [isMobileNav, setIsMobileNav] = useState(readIsMobileNav);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, sidebarCollapsed ? '1' : '0');
+    try {
+      localStorage.setItem(STORAGE_KEY, sidebarCollapsed ? '1' : '0');
+    } catch {
+      /* ignore storage write failures */
+    }
   }, [sidebarCollapsed]);
 
   useEffect(() => {

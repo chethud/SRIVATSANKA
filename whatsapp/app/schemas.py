@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -9,8 +10,10 @@ class EnquiryFields(BaseModel):
     event_type: str | None = None
     event_date: str | None = None
     event_location: str | None = None
-    guest_count: int | None = None
+    guest_count: int | str | None = None
     preferred_callback: str | None = None
+    notes: str | None = None
+    meal_preference: str | None = None
 
 
 class SelectedDishItem(BaseModel):
@@ -80,6 +83,81 @@ class OrderDishUpdate(BaseModel):
     quantityUnit: str | None = None
     unitPrice: float | None = None
     served: bool | None = None
+
+
+class OrderExcelMenuColumn(BaseModel):
+    id: str
+    date: str
+    sessionLabel: str
+    baseSession: str
+    pax: int | None = None
+    timeFrom: str | None = None
+    timeTo: str | None = None
+    amount: float | None = None
+
+
+class OrderExcelDishRow(BaseModel):
+    tempId: str
+    dishName: str
+    category: str
+    sessionColumnId: str
+    notes: str | None = None
+
+
+class OrderExcelExtraItem(BaseModel):
+    id: str
+    title: str
+    description: str = ""
+    quantity: str = ""
+    amount: float | None = None
+    enabled: bool = True
+    isCustom: bool = True
+
+
+class OrderExcelNormalizedOrder(BaseModel):
+    customerName: str
+    phoneNumber: str
+    eventType: str
+    eventDate: datetime
+    eventLocation: str
+    guestCount: int = 0
+    preferredCallbackAt: datetime
+    dietary: list[str] = Field(default_factory=list)
+    scheduleDateFrom: str | None = None
+    scheduleDateTo: str | None = None
+    menuColumns: list[OrderExcelMenuColumn] = Field(default_factory=list)
+    dishes: list[OrderExcelDishRow] = Field(default_factory=list)
+    extraItems: list[OrderExcelExtraItem] = Field(default_factory=list)
+    venueMapLink: str | None = None
+    regionalStylesByDate: dict[str, str] = Field(default_factory=dict)
+    customSessions: list[str] = Field(default_factory=list)
+    sourceFileName: str | None = None
+    sourceLayout: str | None = None
+
+
+class OrderExcelPreviewOut(BaseModel):
+    fileName: str
+    layout: str
+    warnings: list[str] = Field(default_factory=list)
+    order: OrderExcelNormalizedOrder
+
+
+class OrderExcelImportIn(BaseModel):
+    mode: Literal["new", "existing"]
+    existingEnquiryId: str | None = None
+    order: OrderExcelNormalizedOrder
+
+    @model_validator(mode="after")
+    def validate_existing_target(self) -> "OrderExcelImportIn":
+        if self.mode == "existing" and not (self.existingEnquiryId and self.existingEnquiryId.strip()):
+            raise ValueError("existingEnquiryId is required when mode is existing")
+        return self
+
+
+class OrderExcelImportOut(BaseModel):
+    mode: Literal["new", "existing"]
+    warnings: list[str] = Field(default_factory=list)
+    order: "EnquiryOut"
 
 
 class DishIn(BaseModel):
