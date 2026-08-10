@@ -1,4 +1,4 @@
-# SRIVATSANKA brand assets
+# Srivatsanka Events and Services — brand assets
 
 Built from your official logo artwork. The **infinity-leaf icon** is preserved exactly from the source file; typography is flat premium serif (no outlines, glow, or shadows).
 

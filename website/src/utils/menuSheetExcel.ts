@@ -523,7 +523,7 @@ async function appendVenueMapQr(
 export async function buildMenuSheetWorkbook(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'SRIVATSANKA EVENTS';
+  wb.creator = 'Srivatsanka Events and Services';
   await appendMenuSheet(wb, enquiry, copyType);
   return wb;
 }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLayout } from '../context/LayoutContext';
+import { BRAND_NAME } from '../brand';
 
 type BrandLogoProps = {
   variant?: 'sidebar' | 'card' | 'compact' | 'horizontal';
@@ -14,12 +15,12 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
     <Link
       to="/"
       className={`flex items-center justify-center w-full h-[72px] min-h-[72px] max-h-[72px] ${className}`}
-      title="SRIVATSANKA EVENTS AND SERVICES — Dashboard"
+      title={`${BRAND_NAME} — Dashboard`}
       aria-label="Go to dashboard"
     >
       <div className={`flex items-center gap-2.5 w-full min-w-0 ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>
         <img
-          src="/brand/logo-icon.svg?v=4"
+          src="/brand/logo-icon.svg?v=5"
           alt=""
           width={40}
           height={40}
@@ -28,9 +29,9 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
           draggable={false}
         />
         {!sidebarCollapsed && (
-          <span className="min-w-0 flex-1 text-[11px] font-bold tracking-[0.05em] text-[var(--primary)] leading-[1.15]">
+          <span className="min-w-0 flex-1 text-[10px] font-bold tracking-[0.04em] text-[var(--primary)] leading-[1.2]">
             <span className="block">SRIVATSANKA</span>
-            <span className="block tracking-[0.12em]">EVENTS</span>
+            <span className="block tracking-[0.06em]">EVENTS AND SERVICES</span>
           </span>
         )}
       </div>
@@ -45,14 +46,14 @@ export function BrandLogo({ variant = 'sidebar', className = '' }: BrandLogoProp
 
   const src =
     variant === 'compact'
-      ? '/brand/logo-icon.svg?v=4'
-      : '/brand/logo-horizontal.svg?v=4';
+      ? '/brand/logo-icon.svg?v=5'
+      : '/brand/logo-horizontal.svg?v=5';
 
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <img
         src={src}
-        alt="SRIVATSANKA EVENTS"
+        alt={BRAND_NAME}
         className={variant === 'compact' ? 'w-12 h-12' : 'w-full max-w-[280px] h-auto object-contain'}
         decoding="async"
         draggable={false}

@@ -4,6 +4,7 @@ import { KeyRound, Lock } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { LoadingScreen } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
+import { BRAND_NAME } from '../brand';
 
 export default function LoginPage() {
   const {
@@ -87,7 +88,7 @@ export default function LoginPage() {
                   ? usesSupabase
                     ? 'We will email you a reset link'
                     : 'Password reset help'
-                  : 'SRIVATSANKA EVENTS dashboard'}
+                  : `${BRAND_NAME} dashboard`}
               </p>
             </div>
           </div>

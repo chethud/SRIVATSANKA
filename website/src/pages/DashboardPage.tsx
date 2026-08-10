@@ -18,6 +18,7 @@ import {
   RevenueForecastChart,
 } from '../components/charts';
 import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
+import { BRAND_NAME } from '../brand';
 import { PaymentReceivedModal } from '../components/PaymentReceivedModal';
 import { PartialPaymentsPanel } from '../components/PartialPaymentsPanel';
 import { useAppData } from '../context/AppDataContext';
@@ -82,7 +83,7 @@ export default function DashboardPage() {
       <header className="mb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-[var(--foreground)] tracking-tight">Operations overview</h1>
-          <p className="text-[var(--muted)] mt-1.5 text-sm">SRIVATSANKA EVENTS</p>
+          <p className="text-[var(--muted)] mt-1.5 text-sm">{BRAND_NAME}</p>
         </div>
         <DashboardTabBar
           tab={tab}

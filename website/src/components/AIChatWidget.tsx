@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Loader2, Sparkles, X } from 'lucide-react';
 import { askDashboardAssistant } from '../api/client';
 import { AI_ASSISTANT_RULES, renderMarkdownish } from '../utils/aiAssistantRules';
+import { BRAND_NAME_SHORT } from '../brand';
 
 export function AIChatWidget() {
   const [open, setOpen] = useState(false);
@@ -44,7 +45,7 @@ export function AIChatWidget() {
               <Sparkles size={18} />
             </div>
             <div className="ai-chat__head-text">
-              <p className="ai-chat__title">SRIVATSANKA AI</p>
+              <p className="ai-chat__title">{BRAND_NAME_SHORT} AI</p>
               <p className="ai-chat__subtitle">Pick a quick question</p>
             </div>
             <button
