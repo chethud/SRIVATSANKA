@@ -110,6 +110,7 @@ def main() -> int:
                 "new",
                 "Hi",
                 "Test User",
+                "yes",
                 "Wedding",
                 "ok",
                 "15 June 2026",
@@ -127,7 +128,7 @@ def main() -> int:
             client,
             headers,
             "MULTI_ENTITY",
-            ["new", "Hi I am Tejasvi planning a baby shower"],
+            ["new", "Hi I am Tejasvi planning a baby shower", "yes"],
         )
         if multi:
             fields = multi[-1].get("fields") or {}
@@ -141,20 +142,47 @@ def main() -> int:
                 bad("MULTI_ENTITY event", str(fields.get("event_type")))
 
         run_scenario(client, headers, "EVENT_NO_NAME", ["new", "Looking for wedding catering"])
-        run_scenario(client, headers, "PORTFOLIO", ["new", "Hi", "Anita", "What events do you cater to?"])
+        run_scenario(client, headers, "PORTFOLIO", ["new", "Hi", "Anita", "yes", "What events do you cater to?"])
         run_scenario(
             client,
             headers,
             "URGENT",
-            ["new", "Hi", "Ravi", "Wedding", "ok", "Tomorrow"],
+            ["new", "Hi", "Ravi", "yes", "Wedding", "ok", "Tomorrow"],
         )
         run_scenario(
             client,
             headers,
             "EARLY_PIVOT",
-            ["new", "Hi", "Meera", "Wedding", "ok", "let's discuss on call"],
+            ["new", "Hi", "Meera", "yes", "Wedding", "ok", "let's discuss on call"],
         )
-        run_scenario(client, headers, "UNSUPPORTED", ["new", "Hi", "Kiran", "Cocktails party"])
+        run_scenario(client, headers, "UNSUPPORTED", ["new", "Hi", "Kiran", "yes", "Cocktails party"])
+        name_yes = run_scenario(
+            client,
+            headers,
+            "NAME_CONFIRM_YES",
+            ["new", "Hi", "Priya", "yes"],
+        )
+        if name_yes:
+            fields = name_yes[-1].get("fields") or {}
+            reply = name_yes[-1].get("reply") or ""
+            if fields.get("customer_name") == "Priya" and "celebration" in reply.lower():
+                ok("NAME_CONFIRM_YES confirmed name")
+            else:
+                bad("NAME_CONFIRM_YES", f"fields={fields!r} reply={reply[:120]!r}")
+
+        name_no = run_scenario(
+            client,
+            headers,
+            "NAME_CONFIRM_NO",
+            ["new", "Hi", "WrongName", "no", "Sneha", "yes"],
+        )
+        if name_no:
+            fields = name_no[-1].get("fields") or {}
+            if fields.get("customer_name") == "Sneha":
+                ok("NAME_CONFIRM_NO retyped name")
+            else:
+                bad("NAME_CONFIRM_NO", str(fields.get("customer_name")))
+
         run_scenario(client, headers, "RESET", ["new", "Hi", "RESET"])
 
         # Correct step order including guest count (rules State 4)
@@ -166,6 +194,7 @@ def main() -> int:
                 "new",
                 "Hi",
                 "Test User",
+                "yes",
                 "Wedding",
                 "ok",
                 "15 June 2026",
@@ -176,6 +205,30 @@ def main() -> int:
         )
         if legacy and legacy[-1].get("enquiry_saved"):
             ok("FULL_CALLBACK_STEPS enquiry_saved")
+            extra = run_scenario(
+                client,
+                headers,
+                "POST_SIGNOFF_EXTRA",
+                [
+                    "new",
+                    "Hi",
+                    "Follow User",
+                    "yes",
+                    "Wedding",
+                    "ok",
+                    "15 June 2026",
+                    "100 guests",
+                    "Indiranagar",
+                    "tomorrow 4pm",
+                    "Also we need Jain food and stage decor",
+                ],
+            )
+            if extra:
+                last_reply = (extra[-1].get("reply") or "").lower()
+                if "noted" in last_reply and "call" in last_reply:
+                    ok("POST_SIGNOFF_EXTRA team will call")
+                else:
+                    bad("POST_SIGNOFF_EXTRA", repr(extra[-1].get("reply")))
         else:
             bad("FULL_CALLBACK_STEPS enquiry_saved", "flow did not complete")
         if legacy:

@@ -192,7 +192,7 @@ def test_bot_flows(client: TestClient, h: dict[str, str]) -> None:
     expected = parse_callback_time(callback)
     last = run_flow(
         phone1,
-        ["new", "Hi", "Bot Test A", "Wedding", "ok", "15 June 2026", "150 guests", "Whitefield", callback],
+        ["new", "Hi", "Bot Test A", "yes", "Wedding", "ok", "15 June 2026", "150 guests", "Whitefield", callback],
     )
     if not last:
         return
@@ -220,6 +220,7 @@ def test_bot_flows(client: TestClient, h: dict[str, str]) -> None:
             "new",
             "Hi",
             "Bot Test B",
+            "yes",
             "House Warming",
             "ok",
             "20 July 2026",

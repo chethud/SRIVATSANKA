@@ -97,6 +97,8 @@ def reset_session_to_greeting(session: ConversationSession) -> None:
     session.guided_step = GuidedStep.AWAIT_HI
     session.previous_guided_step = None
     session.showcase_prompted = False
+    session.pending_name = None
+    session.name_confirmed = False
     session.consecutive_loop_count = 0
     session.last_assistant_question = None
     session.last_asked_slot = None

@@ -16,11 +16,11 @@ Always introduce the company using the full name \"Srivatsanka Events & Services
 Every reply must feel like a real human WhatsApp chat, never a chatbot or support script.
 
 ## LENGTH (STRICT)
-- Ideal: 1–3 short sentences.
-- Most replies: under 40 words.
-- Greeting: 10–20 words. Simple answer: 5–20 words. Answer + next question: 15–35 words.
+- Prefer moderate WhatsApp replies: warm and clear, usually 1–3 short sentences (~20–50 words).
+- Not too long (no essays / walls of text) and not too minimal (avoid one-word robotic replies).
+- Greeting: short. Answer + next question: keep natural.
 - Longer only if they ask for detailed info (still under ~100 words).
-- No long paragraphs. No walls of text. Do not dump lists of services unless asked.
+- Do not dump lists of services unless asked.
 
 ## UNDERSTAND BEFORE RESPONDING (STRICT)
 1. Read the customer's message carefully, including spelling mistakes.
@@ -309,6 +309,54 @@ def welcome_message() -> str:
     )
 
 
+def name_confirm_prompt(name: str) -> str:
+    who = (name or "").strip() or "that"
+    return (
+        f"Just checking, is your name {who}?\n\n"
+        "Reply *Yes* to confirm, or *No* if I got it wrong."
+    )
+
+
+def name_confirmed_event_ask(name: str) -> str:
+    who = (name or "").strip() or "there"
+    return f"Thanks, {who}! What celebration is this for?"
+
+
+def name_reask_prompt() -> str:
+    return "No problem! Please type your name again."
+
+
+def is_name_confirm_yes(text: str) -> bool:
+    t = normalize_customer_text(text)
+    return t in {
+        "yes",
+        "y",
+        "yeah",
+        "yep",
+        "yup",
+        "correct",
+        "right",
+        "haan",
+        "ha",
+        "ok",
+        "okay",
+        "sure",
+        "confirmed",
+        "that's me",
+        "thats me",
+        "yes it is",
+        "yes that's right",
+        "yes thats right",
+    }
+
+
+def is_name_confirm_no(text: str) -> bool:
+    t = normalize_customer_text(text)
+    if t in {"no", "n", "nope", "nah", "wrong", "incorrect", "not me", "nope wrong"}:
+        return True
+    return t.startswith("no ") and len(t.split()) <= 4
+
+
 def acknowledge_opening_without_name(text: str, event_type: str | None) -> str:
     """First message shared occasion/details but no name; short ack, then ask name."""
     if event_type:
@@ -398,13 +446,25 @@ def wants_showcase_look(text: str) -> bool:
 
 
 def warm_enquiry_signoff(*, name: str | None = None, event_type: str | None = None) -> str:
-    """Signature hospitality close for completed / already-saved enquiries."""
+    """Warm close after callback — moderate length (not too long, not too short)."""
     who = (name or "there").strip() or "there"
     return (
-        f"Thank you so much, {who}! It was an absolute pleasure chatting with you. "
-        "We’re excited to make your celebration truly unforgettable. ✨\n\n"
-        "Have a wonderful rest of your day, and talk to you soon!"
+        f"Thank you so much, {who}! It was lovely chatting with you. "
+        "We’re excited to help with your celebration. Talk to you soon! ✨"
     )
+
+
+def post_signoff_followup_reply(*, name: str | None = None) -> str:
+    """After thank-you: customer shares extra specs — note them, team will call."""
+    who = (name or "there").strip() or "there"
+    return (
+        f"Thanks for sharing that, {who}! We’ve noted your additional details. "
+        "Our team member will call you shortly to discuss everything."
+    )
+
+
+def post_signoff_thanks_reply(*, name: str | None = None) -> str:
+    return "You’re welcome! Our team will call you as planned."
 
 
 def urgent_timeline_reply() -> str:

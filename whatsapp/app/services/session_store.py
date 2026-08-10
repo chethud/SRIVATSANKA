@@ -15,6 +15,7 @@ class ConversationPhase(str, Enum):
 class GuidedStep(str, Enum):
     AWAIT_HI = "await_hi"
     AWAIT_NAME = "await_name"
+    AWAIT_NAME_CONFIRM = "await_name_confirm"
     AWAIT_EVENT_TYPE = "await_event_type"
     AWAIT_POST_SHOWCASE = "await_post_showcase"
     COLLECT_DETAILS = "collect_details"
@@ -50,6 +51,8 @@ class ConversationSession:
     failed_turns_in_state: int = 0
     slot_fail_counts: dict[str, int] = field(default_factory=dict)
     showcase_prompted: bool = False
+    pending_name: str | None = None
+    name_confirmed: bool = False
     slots: dict[str, SlotValue] = field(
         default_factory=lambda: {
             "customer_name": SlotValue(),

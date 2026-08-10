@@ -32,6 +32,8 @@ from app.services.human_style import (
     detail_question,
     immediate_callback_reply,
     intent_b_planning_reply,
+    is_name_confirm_no,
+    is_name_confirm_yes,
     is_portfolio_inquiry,
     is_service_topic_reply,
     is_small_talk,
@@ -39,6 +41,9 @@ from app.services.human_style import (
     is_undecided,
     is_unsupported_event_request,
     looks_like_polite_filler,
+    name_confirm_prompt,
+    name_confirmed_event_ask,
+    name_reask_prompt,
     showcase_followup_date_ask,
     small_talk_reply,
     thanks_reply,
@@ -53,7 +58,7 @@ from app.services.human_style import (
     warm_enquiry_signoff,
     welcome_message,
 )
-from app.services.session_store import ConversationSession, GuidedStep
+from app.services.session_store import ConversationSession, GuidedStep, SlotValue
 from app.services.event_date import is_urgent_event_date
 from app.services.location_normalize import extract_location_entity
 from app.services.callback_time import is_immediate_callback, normalize_callback_label
@@ -349,7 +354,58 @@ def _complete_enquiry_reply(
 
 
 def _company_intro_message(name: str) -> str:
-    return f"Lovely to connect with you, {name}! 😊 How can we help bring your celebration to life today? Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?"
+    return name_confirmed_event_ask(name)
+
+
+def _confirm_and_store_name(session: ConversationSession, name: str) -> None:
+    cleaned = (name or "").strip()
+    session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": cleaned})
+    session.pending_name = None
+    session.name_confirmed = True
+    clear_slot_failures(session, "customer_name")
+    slot = session.slots.setdefault("customer_name", SlotValue())
+    slot.value = cleaned
+    slot.confidence = 1.0
+    slot.collected = True
+
+
+def _reply_after_name_confirmed(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    name = session.fields.customer_name or "there"
+    if is_known_event_type(session.fields.event_type):
+        move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
+        reply = _event_showcase_message(session.fields.event_type, with_images=False)
+        session.showcase_prompted = True
+    else:
+        move_to(session, GuidedStep.AWAIT_EVENT_TYPE)
+        reply = name_confirmed_event_ask(name)
+    track_question(
+        session,
+        reply,
+        slot_key=None if session.fields.event_type else "event_type",
+    )
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields, media=[])
+
+
+def _start_name_confirmation(
+    session: ConversationSession,
+    name: str,
+    user_text: str,
+    *,
+    event_type: str | None = None,
+) -> AgentTurnResult:
+    session.pending_name = name.strip()
+    session.name_confirmed = False
+    # Keep name pending until Yes — do not finalize customer_name yet
+    if session.fields.customer_name:
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": None})
+    if event_type and is_known_event_type(event_type):
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
+    move_to(session, GuidedStep.AWAIT_NAME_CONFIRM)
+    reply = name_confirm_prompt(session.pending_name)
+    track_question(session, reply, slot_key="customer_name")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
 
 
 def _event_showcase_message(event_type: str, *, with_images: bool = False) -> str:
@@ -571,15 +627,13 @@ async def process_guided_flow(
         name = extract_name(text)
         event_type = _detect_event(text, name=name)
 
-        if name:
-            session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": name})
-            if event_type:
-                session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
-                move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
-                reply = _event_showcase_message(event_type, with_images=False)
-            else:
-                move_to(session, GuidedStep.AWAIT_EVENT_TYPE)
-                reply = _company_intro_message(name)
+        if name or session.pending_name:
+            return _start_name_confirmation(
+                session,
+                name or session.pending_name,
+                text,
+                event_type=event_type,
+            )
         elif is_greeting_only(text):
             move_to(session, GuidedStep.AWAIT_NAME)
             reply = welcome_message()
@@ -600,6 +654,60 @@ async def process_guided_flow(
             reply = acknowledge_opening_without_name(text, event_type)
 
         track_question(session, reply, slot_key="customer_name" if session.guided_step == GuidedStep.AWAIT_NAME else None)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if step == GuidedStep.AWAIT_NAME_CONFIRM:
+        candidate = (session.pending_name or "").strip()
+        typed_name = extract_name(text)
+
+        # Message that just provided the candidate name → ask Yes/No
+        if candidate and typed_name and typed_name.lower() == candidate.lower():
+            reply = name_confirm_prompt(candidate)
+            track_question(session, reply, slot_key="customer_name")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if candidate and is_name_confirm_yes(text) and not (
+            typed_name and typed_name.lower() != candidate.lower()
+        ):
+            _confirm_and_store_name(session, candidate)
+            return _reply_after_name_confirmed(session, text)
+
+        if is_name_confirm_no(text):
+            if typed_name and (not candidate or typed_name.lower() != candidate.lower()):
+                session.pending_name = typed_name
+                session.name_confirmed = False
+                reply = name_confirm_prompt(typed_name)
+                track_question(session, reply, slot_key="customer_name")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+            session.pending_name = None
+            session.name_confirmed = False
+            session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": None})
+            move_to(session, GuidedStep.AWAIT_NAME, force=True)
+            reply = name_reask_prompt()
+            track_question(session, reply, slot_key="customer_name")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if typed_name and typed_name.lower() not in SKIP_NAMES:
+            session.pending_name = typed_name
+            session.name_confirmed = False
+            reply = name_confirm_prompt(typed_name)
+            track_question(session, reply, slot_key="customer_name")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if not candidate:
+            move_to(session, GuidedStep.AWAIT_NAME, force=True)
+            reply = name_reask_prompt()
+            track_question(session, reply, slot_key="customer_name")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        reply = name_confirm_prompt(candidate)
+        track_question(session, reply, slot_key="customer_name")
         record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -628,7 +736,7 @@ async def process_guided_flow(
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
-        name = extract_name(text)
+        name = extract_name(text) or (session.pending_name or "")
         if not name or name.lower() in SKIP_NAMES:
             record_slot_failure(session, slot_key="customer_name")
             if session.fields.event_type:
@@ -639,31 +747,13 @@ async def process_guided_flow(
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
-        clear_slot_failures(session, "customer_name")
-
         # Clear bogus event types that were actually someone's name
         stored = session.fields.event_type
         if stored and (not is_known_event_type(stored) or stored.lower() == name.lower()):
             session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": None})
 
-        session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": name})
         maybe_event = _detect_event(text, name=name)
-
-        if is_known_event_type(session.fields.event_type):
-            move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
-            showcase = _event_showcase_message(session.fields.event_type, with_images=False)
-            reply = f"Lovely to connect with you, {name}! 😊\n\n{showcase}"
-        elif maybe_event:
-            session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": maybe_event})
-            move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
-            showcase = _event_showcase_message(maybe_event, with_images=False)
-            reply = f"Lovely to connect with you, {name}! 😊\n\n{showcase}"
-        else:
-            move_to(session, GuidedStep.AWAIT_EVENT_TYPE)
-            reply = _company_intro_message(name)
-        track_question(session, reply, slot_key="event_type" if session.guided_step == GuidedStep.AWAIT_EVENT_TYPE else None)
-        record_exchange(session, text, reply)
-        return AgentTurnResult(reply=reply, fields=session.fields)
+        return _start_name_confirmation(session, name, text, event_type=maybe_event)
 
     if step == GuidedStep.AWAIT_EVENT_TYPE:
         if is_greeting_only(text) and session.fields.customer_name:

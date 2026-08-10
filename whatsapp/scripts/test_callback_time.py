@@ -136,6 +136,7 @@ def test_bot_flows() -> None:
             "new",
             "Hi",
             "Test User",
+            "yes",
             "Wedding",
             "ok",
             "15 June 2026",
@@ -209,6 +210,7 @@ def test_bot_flows() -> None:
             "new",
             "Hi",
             "Alice",
+            "yes",
             "Wedding",
             "ok",
             "15 June 2026",
@@ -228,7 +230,7 @@ def test_bot_flows() -> None:
         else:
             bad("Alice response mismatch", f"got {reply1!r}")
 
-        if "absolute pleasure chatting with you" in reply1.lower() or "honored to be considered" in reply1.lower():
+        if "lovely chatting with you" in reply1.lower() or "talk to you soon" in reply1.lower():
             ok("Alice gets emotional sign-off with callback confirmation")
         else:
             bad("Alice sign-off mismatch", f"got {reply1!r}")
@@ -239,6 +241,7 @@ def test_bot_flows() -> None:
             "new",
             "Hi",
             "Bob",
+            "yes",
             "Birthday",
             "ok",
             "15 June 2026",
@@ -263,6 +266,7 @@ def test_bot_flows() -> None:
             "new",
             "Hi",
             "Charlie",
+            "yes",
             "Birthday",
             "ok",
             "15 June 2026",
@@ -285,8 +289,8 @@ def test_bot_flows() -> None:
             bad("Charlie response mismatch", f"got {reply3!r}")
 
         if "Charlie" in reply3 and (
-            "absolute pleasure chatting with you" in reply3.lower()
-            or "honored to be considered" in reply3.lower()
+            "lovely chatting with you" in reply3.lower()
+            or "talk to you soon" in reply3.lower()
         ):
             ok("Charlie gets emotional sign-off (birthday event)")
         else:

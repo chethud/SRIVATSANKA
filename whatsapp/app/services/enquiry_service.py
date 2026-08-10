@@ -111,6 +111,31 @@ async def save_enquiry(
     return enquiry
 
 
+async def append_followup_note_for_phone(
+    db: AsyncSession,
+    whatsapp_id: str,
+    note: str,
+) -> bool:
+    """Append a post-sign-off customer note to the latest enquiry for this phone."""
+    text = (note or "").strip()
+    if not text:
+        return False
+    phone = normalize_phone(whatsapp_id)
+    result = await db.execute(
+        select(Enquiry).where(Enquiry.phoneNumber == phone).order_by(desc(Enquiry.createdAt)).limit(1)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry:
+        return False
+    marker = f"[Follow-up note]: {text}"
+    existing = (enquiry.notes or "").strip()
+    if marker in existing:
+        return True
+    enquiry.notes = f"{existing}\n{marker}".strip() if existing else marker
+    await db.commit()
+    return True
+
+
 def _format_dishes_for_whatsapp(dishes: list[SelectedDishItem] | None) -> str:
     if not dishes:
         return "Cuisine: To be discussed on callback"

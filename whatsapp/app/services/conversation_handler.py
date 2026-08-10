@@ -2,13 +2,18 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas import AgentTurnResult
+from app.schemas import AgentTurnResult, EnquiryFields
 from app.services.ai_agent import AIAgent, _all_fields_filled
 from app.services.chat_handoff import resume_bot_for_phone
 from app.services.guided_flow import process_guided_flow
 from app.services.dish_flow import handle_dish_flow, start_dish_flow
-from app.services.enquiry_service import save_enquiry
-from app.services.human_style import warm_enquiry_signoff
+from app.services.enquiry_service import append_followup_note_for_phone, save_enquiry
+from app.services.human_style import (
+    is_thanks_only,
+    post_signoff_followup_reply,
+    post_signoff_thanks_reply,
+    warm_enquiry_signoff,
+)
 from app.services.session_store import ConversationPhase, GuidedStep, session_store
 
 ai_agent = AIAgent()
@@ -65,12 +70,26 @@ async def handle_conversation(
         user_text = "Hi"
 
     if session.completed and session._saved:
+        # Post thank-you: note any extra specs; tell them a team member will call.
+        if is_thanks_only(user_text):
+            reply = post_signoff_thanks_reply(name=session.fields.customer_name)
+        else:
+            note = user_text.strip()
+            if note:
+                existing = session.fields.notes or ""
+                marker = f"[Follow-up note]: {note}"
+                if marker not in existing:
+                    session.fields = EnquiryFields(
+                        **{**session.fields.model_dump(), "notes": f"{existing}\n{marker}".strip()}
+                    )
+                try:
+                    await append_followup_note_for_phone(db, whatsapp_id, note)
+                except Exception:
+                    logger.exception("Failed to append follow-up note for %s", whatsapp_id)
+            reply = post_signoff_followup_reply(name=session.fields.customer_name)
         return (
             AgentTurnResult(
-                reply=warm_enquiry_signoff(
-                    name=session.fields.customer_name,
-                    event_type=session.fields.event_type,
-                ),
+                reply=reply,
                 fields=session.fields,
                 is_complete=True,
             ),

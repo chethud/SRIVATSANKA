@@ -24,3 +24,6 @@ Rules for this file:
 - Greeting-only repeats while waiting for a name must not burn the circuit-breaker loop budget.
 - State 3 Intent B replies must be a single ack + date ask. Never stack `Got it! Let's jump...` with `Perfect! Let's get right down to planning...` in the same message.
 - After showcase/portfolio summary (Intent A), append only the availability/date ask — not a second planning preamble.
+- After capturing a name, ask a short Yes/No confirm (`Just checking, is your name {name}?`). Yes finalizes the name; No asks them to type the name again. Do not ask event/showcase questions until the name is confirmed.
+- After the thank-you / sign-off, if the customer sends extra details, note them and reply moderately that a team member will call — do not reopen the form.
+- Prefer moderate reply length (1–3 short sentences): not overly polished essays, not one-word replies.

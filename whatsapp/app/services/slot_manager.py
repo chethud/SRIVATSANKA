@@ -34,7 +34,7 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
     step = session.guided_step
     allowed: set[str] = set()
 
-    if step in {GuidedStep.AWAIT_HI, GuidedStep.AWAIT_NAME}:
+    if step in {GuidedStep.AWAIT_HI, GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_NAME_CONFIRM}:
         allowed.add("customer_name")
         allowed.add("event_type")
     elif step == GuidedStep.AWAIT_EVENT_TYPE:
@@ -63,8 +63,8 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
     elif step == GuidedStep.DONE:
         allowed.add("special_requests")
 
-    # Never overwrite an already-captured name/event from noisy later text
-    if session.fields.customer_name:
+    # Never overwrite an already-confirmed name/event from noisy later text
+    if session.name_confirmed and session.fields.customer_name:
         allowed.discard("customer_name")
     if session.fields.event_type:
         allowed.discard("event_type")
@@ -87,6 +87,10 @@ def apply_entities(session: ConversationSession, entities: ExtractedEntities) ->
             entities.callback_requested
             or session.guided_step == GuidedStep.COLLECT_DETAILS
         ):
+            continue
+        # Name stays pending until Yes confirmation (STATE 1.2)
+        if key == "customer_name" and not session.name_confirmed:
+            session.pending_name = str(value).strip()
             continue
         if data.get(key) in (None, ""):
             data[key] = value
