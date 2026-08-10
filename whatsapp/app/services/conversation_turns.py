@@ -111,6 +111,33 @@ def extract_name(text: str) -> str:
         return ""
     if "?" in t:
         return ""
+    # Never treat polite fillers / intents as a personal name
+    reject_names = {
+        "hi",
+        "hello",
+        "hey",
+        "hii",
+        "hiii",
+        "namaste",
+        "vanakkam",
+        "start",
+        "help",
+        "yes",
+        "ok",
+        "okay",
+        "sure",
+        "no",
+        "skip",
+        "none",
+        "new",
+        "reset",
+        "restart",
+        "thanks",
+        "thank you",
+        "good morning",
+        "good evening",
+        "good afternoon",
+    }
     for pat in (
         r"(?:hi\s+i\s+am|hello\s+i\s+am|i'?m|i am|my name is|this is|call me|it's|its|hello)\s+([A-Za-z][A-Za-z\s'.-]{0,40}?)"
         r"(?=\s+(?:i\s+am|looking|planning|need|for|and|with|on|wedding|engagement|reception|birthday|housewarming|upanayanam|seemantham|baby\s+shower)\b|[,.!?]|$)",
@@ -120,7 +147,7 @@ def extract_name(text: str) -> str:
         m = re.search(pat, t, re.I)
         if m:
             name = m.group(1).strip().strip(".,").title()
-            if name.lower() not in GREETING_ONLY and len(name) >= 2:
+            if name.lower() not in GREETING_ONLY and name.lower() not in reject_names and len(name) >= 2:
                 return name[:80]
     words = [w.strip(".,!") for w in t.split() if w.strip(".,!")]
     # Reject sentence-like or intent-heavy messages
@@ -147,9 +174,13 @@ def extract_name(text: str) -> str:
             return ""
     if 1 <= len(words) <= 3 and all(w.isalpha() or "'" in w for w in words):
         joined = " ".join(words)
-        if joined.lower() not in GREETING_ONLY and not is_greeting_only(joined):
+        if (
+            joined.lower() not in GREETING_ONLY
+            and joined.lower() not in reject_names
+            and not is_greeting_only(joined)
+        ):
             return joined.title()[:80]
-    if len(words) == 1 and len(t) >= 2 and t.lower() not in GREETING_ONLY:
+    if len(words) == 1 and len(t) >= 2 and t.lower() not in GREETING_ONLY and t.lower() not in reject_names:
         return t[:80]
     return ""
 

@@ -81,8 +81,13 @@ def clear_slot_failures(session: ConversationSession, slot_key: str | None = Non
 
 
 def should_trip_circuit_breaker(session: ConversationSession) -> bool:
-    """Rules: consecutive_loop_count >= 2 OR 3 failed turns in the same state."""
-    return session.consecutive_loop_count >= 2 or session.failed_turns_in_state >= 3
+    """Rules: consecutive_loop_count >= 2 OR 3 failed turns in the same state.
+
+    Streak semantics: first ask sets count=1, second identical-slot ask sets count=2.
+    Trip only once we are about to ask a *third* time (count >= 3), or after 3 hard failures.
+    Asking twice (greeting + clarify) must not wipe the session before the user can answer.
+    """
+    return session.consecutive_loop_count >= 3 or session.failed_turns_in_state >= 3
 
 
 def reset_session_to_greeting(session: ConversationSession) -> None:

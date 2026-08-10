@@ -87,6 +87,8 @@ def sanitize_whatsapp_reply(text: str) -> str:
     text = re.sub(r"^#+\s*", "", text, flags=re.M)
     text = re.sub(r"\*\*+", "", text)
     text = re.sub(r"`+", "", text)
+    # Kannan.rules.txt: never use em-dashes
+    text = text.replace("—", ",").replace("–", ",")
 
     # Cut off any leaked instruction section, keep the human answer above it
     cut_patterns = (
@@ -104,6 +106,9 @@ def sanitize_whatsapp_reply(text: str) -> str:
     # Drop trailing orphan bullets / stars
     text = re.sub(r"\n\s*[\*\-•]+\s*$", "", text).strip()
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    # Soften robotic numbered pickers like "1. Lunch 2. Dinner"
+    text = re.sub(r"(?m)^\s*\d+\.\s+", "", text)
+    text = re.sub(r"\b(\d+)\.\s+(?=[A-Za-z])", r"\1) ", text)
 
     if looks_like_leaked_prompt(text):
         # Try keeping only the first 1–2 sentences if a leak marker appears later
@@ -430,6 +435,12 @@ def _is_probable_location(text: str) -> bool:
     lower = t.lower()
     if looks_like_question(t):
         return False
+    # Guest-count answers must never be treated as venues
+    if re.search(r"\b(guests?|people|pax|persons?)\b", lower) or re.search(
+        r"^\s*\d{1,5}(?:\s*(?:-|to|–|—)\s*\d{1,5})?\s*$",
+        lower,
+    ):
+        return False
     place_cues = (
         "venue",
         "hall",
@@ -462,7 +473,7 @@ def _is_probable_location(text: str) -> bool:
         return True
     # Short place-like token(s), not a full sentence about something else
     if 1 <= len(t.split()) <= 5 and not re.search(
-        r"\b(call|menu|food|decor|price|cost|photo|portfolio)\b",
+        r"\b(call|menu|food|decor|price|cost|photo|portfolio|guest|pax|people)\b",
         lower,
     ):
         return True
@@ -479,6 +490,8 @@ def _is_probable_callback(text: str) -> bool:
         return True
     if re.search(r"\bin\s+\d+\s*(min|hour)", t):
         return True
+    if re.search(r"\b(day after|tea time|weekend|after\s+\d|around\s+\d)\b", t):
+        return True
     return any(
         w in t
         for w in (
@@ -492,5 +505,7 @@ def _is_probable_callback(text: str) -> bool:
             "noon",
             "call me",
             "tonight",
+            "anytime",
+            "whenever",
         )
     ) or bool(re.search(r"\btom\w*row\b", t))

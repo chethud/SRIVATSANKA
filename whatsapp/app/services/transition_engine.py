@@ -30,10 +30,24 @@ def move_to(session: ConversationSession, next_step: GuidedStep) -> None:
 
 
 def advance_from_slots(session: ConversationSession) -> None:
+    """Skip ahead only when required slots for later states are already filled.
+
+    Rules STATE 1.5: event without name must NOT skip past name collection.
+    """
     fields = session.fields
     if fields.customer_name and session.guided_step == GuidedStep.AWAIT_HI:
-        move_to(session, GuidedStep.AWAIT_EVENT_TYPE if not fields.event_type else GuidedStep.AWAIT_POST_SHOWCASE)
-    if fields.event_type and session.guided_step in {GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_EVENT_TYPE}:
+        move_to(
+            session,
+            GuidedStep.AWAIT_EVENT_TYPE if not fields.event_type else GuidedStep.AWAIT_POST_SHOWCASE,
+        )
+    # Name alone on AWAIT_NAME → event type (handler may also greet; skip-ahead is safe)
+    if fields.customer_name and not fields.event_type and session.guided_step == GuidedStep.AWAIT_NAME:
+        move_to(session, GuidedStep.AWAIT_EVENT_TYPE)
+    # Only advance to showcase when BOTH name and event are present from AWAIT_NAME,
+    # or when event is collected while already on AWAIT_EVENT_TYPE.
+    if fields.customer_name and fields.event_type and session.guided_step == GuidedStep.AWAIT_NAME:
+        move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
+    if fields.event_type and session.guided_step == GuidedStep.AWAIT_EVENT_TYPE:
         move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
     if fields.event_date and session.guided_step == GuidedStep.AWAIT_POST_SHOWCASE:
         move_to(session, GuidedStep.COLLECT_DETAILS)

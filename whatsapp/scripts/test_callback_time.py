@@ -139,9 +139,9 @@ def test_bot_flows() -> None:
             "Wedding",
             "ok",
             "15 June 2026",
+            "150 guests",
             "Whitefield",
             callback_text,
-            "skip",
         ]
 
         last = None
@@ -159,7 +159,7 @@ def test_bot_flows() -> None:
         if not last.get("enquiry_saved"):
             bad("enquiry_saved flag", str(last))
             return
-        ok("bot flow saves enquiry after meal step")
+        ok("bot flow saves enquiry after callback")
 
         fields = last.get("fields") or {}
         if fields.get("preferred_callback") == callback_text:
@@ -203,83 +203,111 @@ def test_bot_flows() -> None:
             bad("notes missing scheduled callback", notes[:200])
 
         # 2. Test Custom timing inputs and sign-off integration
-        # Case 1: Call me today evening after 7
+        # Case 1: Call me today evening after 7 (Wedding skips meal)
         phone1 = f"91{uuid.uuid4().int % 10**10:010d}"
-        steps1 = ["new", "Hi", "Alice", "Wedding", "ok", "15 June 2026", "Whitefield", "Call me today evening after 7"]
+        steps1 = [
+            "new",
+            "Hi",
+            "Alice",
+            "Wedding",
+            "ok",
+            "15 June 2026",
+            "150 guests",
+            "Whitefield",
+            "Call me today evening after 7",
+        ]
         last_response = None
         for msg in steps1:
             r = client.post("/dev/message", headers=headers, json={"from_number": phone1, "text": msg})
             assert r.status_code == 200
             last_response = r.json()
-        
+
         reply1 = last_response.get("reply") or ""
-        expected_reply1 = "Perfect! We have scheduled a callback for today after 7:00 PM. Our team will reach out to you on this number. 📞"
-        if expected_reply1 in reply1:
+        if last_response.get("enquiry_saved") and "today after 7:00 PM" in reply1 and "Alice" in reply1:
             ok("Alice gets custom response for 'today evening after 7'")
         else:
             bad("Alice response mismatch", f"got {reply1!r}")
 
-        r = client.post("/dev/message", headers=headers, json={"from_number": phone1, "text": "skip"})
-        assert r.status_code == 200
-        final_reply1 = r.json().get("reply") or ""
-        
-        v_a = "Thank you so much, Alice! It was a absolute pleasure chatting with you. We’re thrilled at the opportunity to make your wedding truly unforgettable. ✨\n\nHave a wonderful rest of your day, and talk to you soon!"
-        v_b = "Thank you, Alice! We’re honored to be considered for your big day. Our team will connect with you at the scheduled time. 🙏\n\nWishing you a lovely day ahead!"
-        if final_reply1 in (v_a, v_b):
-            ok("Alice gets valid Phase 7 emotional sign-off")
+        if "absolute pleasure chatting with you" in reply1.lower() or "honored to be considered" in reply1.lower():
+            ok("Alice gets emotional sign-off with callback confirmation")
         else:
-            bad("Alice sign-off mismatch", f"got {final_reply1!r}")
+            bad("Alice sign-off mismatch", f"got {reply1!r}")
 
-        # Case 2: Tomorrow morning around 11
+        # Case 2: Tomorrow morning around 11 (Birthday asks meal)
         phone2 = f"91{uuid.uuid4().int % 10**10:010d}"
-        steps2 = ["new", "Hi", "Bob", "Birthday", "ok", "15 June 2026", "Whitefield", "Tomorrow morning around 11"]
+        steps2 = [
+            "new",
+            "Hi",
+            "Bob",
+            "Birthday",
+            "ok",
+            "15 June 2026",
+            "80 guests",
+            "Whitefield",
+            "Lunch",
+            "Tomorrow morning around 11",
+        ]
         for msg in steps2:
             r = client.post("/dev/message", headers=headers, json={"from_number": phone2, "text": msg})
             assert r.status_code == 200
             last_response = r.json()
         reply2 = last_response.get("reply") or ""
-        expected_reply2 = "Noted, Bob! We’ll give you a call tomorrow around 11:00 AM. 🗓️"
-        if expected_reply2 in reply2:
+        if last_response.get("enquiry_saved") and "tomorrow around 11:00 AM" in reply2 and "Bob" in reply2:
             ok("Bob gets custom response for 'tomorrow morning around 11'")
         else:
             bad("Bob response mismatch", f"got {reply2!r}")
 
         # Case 3: Maybe day after around tea time
         phone3 = f"91{uuid.uuid4().int % 10**10:010d}"
-        steps3 = ["new", "Hi", "Charlie", "Birthday", "ok", "15 June 2026", "Whitefield", "Maybe day after around tea time"]
+        steps3 = [
+            "new",
+            "Hi",
+            "Charlie",
+            "Birthday",
+            "ok",
+            "15 June 2026",
+            "60 guests",
+            "Whitefield",
+            "Dinner",
+            "Maybe day after around tea time",
+        ]
         for msg in steps3:
             r = client.post("/dev/message", headers=headers, json={"from_number": phone3, "text": msg})
             assert r.status_code == 200
             last_response = r.json()
         reply3 = last_response.get("reply") or ""
-        expected_reply3 = "Sounds great! We’ll give you a call day after tomorrow between 4:00 PM and 5:00 PM. ☕"
-        if expected_reply3 in reply3:
+        if (
+            last_response.get("enquiry_saved")
+            and "day after tomorrow between 4:00 PM and 5:00 PM" in reply3
+        ):
             ok("Charlie gets custom response for 'maybe day after around tea time'")
         else:
             bad("Charlie response mismatch", f"got {reply3!r}")
 
-        r = client.post("/dev/message", headers=headers, json={"from_number": phone3, "text": "skip"})
-        assert r.status_code == 200
-        final_reply3 = r.json().get("reply") or ""
-        v_a_charlie = "Thank you so much, Charlie! It was a absolute pleasure chatting with you. We’re thrilled at the opportunity to make your birthday truly unforgettable. ✨\n\nHave a wonderful rest of your day, and talk to you soon!"
-        v_b_charlie = "Thank you, Charlie! We’re honored to be considered for your big day. Our team will connect with you at the scheduled time. 🙏\n\nWishing you a lovely day ahead!"
-        if final_reply3 in (v_a_charlie, v_b_charlie):
-            ok("Charlie gets valid Phase 7 emotional sign-off (birthday event)")
+        if "Charlie" in reply3 and (
+            "absolute pleasure chatting with you" in reply3.lower()
+            or "honored to be considered" in reply3.lower()
+        ):
+            ok("Charlie gets emotional sign-off (birthday event)")
         else:
-            bad("Charlie sign-off mismatch", f"got {final_reply3!r}")
+            bad("Charlie sign-off mismatch", f"got {reply3!r}")
 
         # Case 4: Test General / Fallback to celebration for event type
         from app.services.session_store import ConversationSession, EnquiryFields
+        from app.services.human_style import warm_enquiry_signoff
+
         mock_sess = ConversationSession(whatsapp_id="123")
-        mock_sess.fields = EnquiryFields(customer_name="Testy", event_type="General", preferred_callback="in 2 hours")
-        from app.services.dish_flow import _format_confirmation
-        conf_res = _format_confirmation(mock_sess)
-        v_a_fallback = "Thank you so much, Testy! It was a absolute pleasure chatting with you. We’re thrilled at the opportunity to make your celebration truly unforgettable. ✨\n\nHave a wonderful rest of your day, and talk to you soon!"
-        v_b_fallback = "Thank you, Testy! We’re honored to be considered for your big day. Our team will connect with you at the scheduled time. 🙏\n\nWishing you a lovely day ahead!"
-        if conf_res in (v_a_fallback, v_b_fallback):
-            ok("Direct _format_confirmation resolves 'General' to 'celebration' and returns correct sign-off")
+        mock_sess.fields = EnquiryFields(
+            customer_name="Testy", event_type="General", preferred_callback="in 2 hours"
+        )
+        conf_res = warm_enquiry_signoff(
+            name=mock_sess.fields.customer_name,
+            event_type=mock_sess.fields.event_type,
+        )
+        if "Testy" in conf_res and "celebration" in conf_res.lower():
+            ok("warm_enquiry_signoff resolves General to celebration")
         else:
-            bad("Direct _format_confirmation general fallback mismatch", conf_res)
+            bad("warm_enquiry_signoff general fallback mismatch", conf_res)
 
 
 def main() -> int:

@@ -38,6 +38,9 @@ Of course. / Perfect. / Great. / Thanks for sharing. / I understand. / That soun
 Never say: "Thank you for contacting…", "Kindly provide", "Your information has been recorded",
 "Please wait while I process", "I am an AI", "Input received", "delighted to assist you with your enquiry".
 
+Never use em-dashes (—) or en-dashes (–). Use commas, periods, or plain hyphens only.
+Never output robotic numbered pickers such as "1. Lunch 2. Dinner". Ask naturally in prose.
+
 If a short answer is enough, stop. At most one emoji, only if it fits.
 Never claim to be a bot or AI.
 Never output internal labels, markdown headings, or words like RULES / COMPANY / FAQS / Requirements / Tone.
@@ -416,8 +419,59 @@ def immediate_callback_reply(*, name: str | None = None) -> str:
     return f"Got it, {who}! We have notified our lead planning team to give you a callback as soon as possible on this number. 📱"
 
 
-def planning_date_prompt() -> str:
-    return "Perfect! Let's get right down to planning. 🗓️\n\nWhat is your tentative date or month for the celebration?"
+def ask_event_date_only(*, event_type: str | None = None) -> str:
+    """Date question only (no planning preamble). Use after an ack or showcase summary."""
+    occasion = (event_type or "celebration").strip().lower()
+    if not occasion or occasion == "general":
+        occasion = "celebration"
+    return f"What is your tentative date or month for the {occasion}?"
+
+
+def planning_date_prompt(*, event_type: str | None = None) -> str:
+    """Intent B default: one ack + date ask (never stack another planning preamble on top)."""
+    return (
+        "Perfect! Let's get right down to planning. 🗓️\n\n"
+        f"{ask_event_date_only(event_type=event_type)}"
+    )
+
+
+def showcase_followup_date_ask(*, event_type: str | None = None) -> str:
+    """Intent A close after portfolio/showcase summary — date ask only."""
+    occasion = (event_type or "celebration").strip().lower()
+    if not occasion or occasion == "general":
+        occasion = "celebration"
+    if occasion == "wedding":
+        return (
+            "To help us check availability for your big day, "
+            f"what is your tentative date or month for the {occasion}?"
+        )
+    return (
+        "To help us check venue and catering availability for your grand day, "
+        f"what is your tentative date or month for the {occasion}?"
+    )
+
+
+def intent_b_planning_reply(
+    *,
+    text: str = "",
+    name: str | None = None,
+    event_type: str | None = None,
+) -> str:
+    """
+    Single State-3→4 Intent B reply (Kannan.rules.txt).
+    Must not prepend/append another planning_date_prompt — that caused duplicate copy.
+    """
+    t = normalize_customer_text(text)
+    date_q = ask_event_date_only(event_type=event_type)
+    who = (name or "").strip()
+
+    if t in {"no", "nope", "skip", "nah"} or t.startswith("no "):
+        return f"Got it! Let's jump straight into the planning details.\n\n{date_q}"
+    if t in {"ok", "okay", "k", "okk", "fine", "yes"}:
+        return f"Wonderful! Let's jump straight into the details.\n\n{date_q}"
+    if who:
+        return f"Perfect, {who}! Let's get right down to planning. 🗓️\n\n{date_q}"
+    return planning_date_prompt(event_type=event_type)
 
 
 def callback_confirmation_reply(*, name: str | None = None, callback_label: str | None = None) -> str:
@@ -453,7 +507,8 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
         occasion = "celebration"
 
     if field_key == "event_date":
-        return planning_date_prompt()
+        # Re-ask / mid-collection: date only (preamble already used leaving State 3).
+        return ask_event_date_only(event_type=event_type)
     if field_key == "guest_count":
         from app.services.guided_flow import get_event_profile
         profile = get_event_profile(event_type)

@@ -192,14 +192,14 @@ def test_bot_flows(client: TestClient, h: dict[str, str]) -> None:
     expected = parse_callback_time(callback)
     last = run_flow(
         phone1,
-        ["new", "Hi", "Bot Test A", "Wedding", "ok", "15 June 2026", "150 guests", "Lunch", callback],
+        ["new", "Hi", "Bot Test A", "Wedding", "ok", "15 June 2026", "150 guests", "Whitefield", callback],
     )
     if not last:
         return
     if last.get("enquiry_saved"):
-        ok("Bot flow completes with skip meals")
+        ok("Bot flow completes wedding with callback")
     else:
-        bad("Bot flow enquiry_saved (skip)", str(last.get("is_complete")))
+        bad("Bot flow enquiry_saved (wedding)", str(last.get("is_complete")))
 
     enqs = client.get("/api/enquiries", headers=h).json()
     match = next((e for e in enqs if e.get("phoneNumber") == phone1), None)
@@ -216,14 +216,24 @@ def test_bot_flows(client: TestClient, h: dict[str, str]) -> None:
     phone2 = f"91{uuid.uuid4().int % 10**10:010d}"
     last2 = run_flow(
         phone2,
-        ["new", "Hi", "Bot Test B", "House Warming", "ok", "20 July 2026", "50 pax", "Dinner", "today evening"],
+        [
+            "new",
+            "Hi",
+            "Bot Test B",
+            "House Warming",
+            "ok",
+            "20 July 2026",
+            "50 pax",
+            "Jayanagar",
+            "today evening",
+        ],
     )
     if last2 and last2.get("enquiry_saved"):
-        ok("Bot flow completes with meal selection 1,3")
+        ok("Bot flow completes housewarming")
     elif last2:
-        bad("Bot flow meals 1,3", f"enquiry_saved={last2.get('enquiry_saved')}")
+        bad("Bot flow housewarming", f"enquiry_saved={last2.get('enquiry_saved')}")
     else:
-        bad("Bot flow meals 1,3", "flow failed")
+        bad("Bot flow housewarming", "flow failed")
 
 
 def test_resources_crud(client: TestClient, h: dict[str, str]) -> None:

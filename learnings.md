@@ -18,3 +18,9 @@ Rules for this file:
 - Interrupt intents like discuss on call or call me should move directly to callback scheduling.
 - Urgent timelines should skip remaining parameter gathering and fast-track to callback.
 - Responses must stay short, warm, conversational, and must not use em-dashes.
+- Event without name must ask for the name before showcase (STATE 1.5). Never advance to showcase on event alone.
+- Polite fillers (`ok`, `yes`, `skip`) must never be stored as a customer name.
+- Guest-count answers must never be stored as venue/location.
+- Greeting-only repeats while waiting for a name must not burn the circuit-breaker loop budget.
+- State 3 Intent B replies must be a single ack + date ask. Never stack `Got it! Let's jump...` with `Perfect! Let's get right down to planning...` in the same message.
+- After showcase/portfolio summary (Intent A), append only the availability/date ask — not a second planning preamble.

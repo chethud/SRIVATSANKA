@@ -50,7 +50,28 @@ def _sanitize_name(name: str | None) -> str | None:
         maxsplit=1,
         flags=re.I,
     )[0].strip(" ,.-")
-    return cleaned or None
+    if not cleaned:
+        return None
+    reject = {
+        "hi",
+        "hello",
+        "hey",
+        "yes",
+        "ok",
+        "okay",
+        "sure",
+        "no",
+        "skip",
+        "none",
+        "thanks",
+        "thank you",
+        "new",
+        "reset",
+        "restart",
+    }
+    if cleaned.lower() in reject:
+        return None
+    return cleaned
 
 
 def _extract_date_entity(text: str) -> str:

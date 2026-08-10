@@ -24,12 +24,14 @@ from app.services.guided_conversation import (
 from app.services.gemini_conversation import is_likely_field_answer, looks_like_question
 from app.services.human_style import (
     acknowledge_opening_without_name,
+    ask_event_date_only,
     ask_move_further_prompt,
     callback_confirmation_reply,
     callback_pivot_prompt,
     catalog_portfolio_reply,
     detail_question,
     immediate_callback_reply,
+    intent_b_planning_reply,
     is_portfolio_inquiry,
     is_service_topic_reply,
     is_small_talk,
@@ -37,7 +39,7 @@ from app.services.human_style import (
     is_undecided,
     is_unsupported_event_request,
     looks_like_polite_filler,
-    planning_date_prompt,
+    showcase_followup_date_ask,
     small_talk_reply,
     thanks_reply,
     undecided_reply,
@@ -608,8 +610,10 @@ async def process_guided_flow(
             return AgentTurnResult(reply=reply, fields=session.fields)
 
         if is_greeting_only(text):
+            # Warm re-greeting — do not burn the loop budget before the user shares a name.
             reply = welcome_message()
-            track_question(session, reply, slot_key="customer_name")
+            session.last_assistant_question = reply
+            session.last_asked_slot = "customer_name"
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -627,7 +631,10 @@ async def process_guided_flow(
         name = extract_name(text)
         if not name or name.lower() in SKIP_NAMES:
             record_slot_failure(session, slot_key="customer_name")
-            reply = _ask_name_again(text)
+            if session.fields.event_type:
+                reply = acknowledge_opening_without_name(text, session.fields.event_type)
+            else:
+                reply = _ask_name_again(text)
             track_question(session, reply, slot_key="customer_name")
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
@@ -768,7 +775,11 @@ async def process_guided_flow(
 
         if wants_straight_to_planning(text) or wants_to_move_further(text):
             move_to(session, GuidedStep.COLLECT_DETAILS)
-            reply = planning_date_prompt()
+            reply = intent_b_planning_reply(
+                text=text,
+                name=session.fields.customer_name,
+                event_type=session.fields.event_type,
+            )
             reply = handle_custom_request(session, text, reply)
             track_question(session, reply, slot_key="event_date")
             record_exchange(session, text, reply)
@@ -781,7 +792,7 @@ async def process_guided_flow(
             reply = (
                 f"We’d love to show you! {showcase}\n\n"
                 f"You can explore our portfolio anytime at **srivatsanka.com**.\n\n"
-                f"{planning_date_prompt()}"
+                f"{showcase_followup_date_ask(event_type=session.fields.event_type)}"
             )
             reply = handle_custom_request(session, text, reply)
             track_question(session, reply, slot_key="event_date")
@@ -790,7 +801,7 @@ async def process_guided_flow(
 
         # Info / "more details" / topic asks → answer once (no second question), then date
         move_to(session, GuidedStep.COLLECT_DETAILS)
-        date_ask = planning_date_prompt()
+        date_ask = ask_event_date_only(event_type=session.fields.event_type)
         if (
             looks_like_question(text)
             or wants_more_info(text)
@@ -804,14 +815,18 @@ async def process_guided_flow(
                     f"Absolutely! {profile['showcase']} "
                     f"You can also browse menus and setups at **srivatsanka.com**."
                 )
+                date_ask = showcase_followup_date_ask(event_type=session.fields.event_type)
             else:
                 answered = await answer_showcase_question(session, text)
             if _is_custom_request(text):
                 answered = handle_custom_request(session, text, answered)
             reply = f"{answered}\n\n{date_ask}"
         else:
-            reply = (
-                f"Got it! Let's jump straight into the planning details.\n\n{date_ask}"
+            # Intent B fallback (ok / emoji / unclassifiable) — one reply only
+            reply = intent_b_planning_reply(
+                text=text,
+                name=session.fields.customer_name,
+                event_type=session.fields.event_type,
             )
             reply = handle_custom_request(session, text, reply)
         track_question(session, reply, slot_key="event_date")
@@ -840,6 +855,21 @@ async def process_guided_flow(
                 reply = natural_field_ack(
                     "event_date",
                     str(session.fields.event_date),
+                    next_prompt,
+                    event_type=session.fields.event_type,
+                )
+                track_question(session, reply, slot_key=_next_detail_key(session))
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
+        # Entity sweep already captured guest count this turn — ack and ask venue (do not also
+        # treat the same message as a location).
+        if "guest_count" in newly_collected and "event_location" not in newly_collected:
+            next_prompt = _next_detail_prompt(session)
+            if next_prompt:
+                reply = natural_field_ack(
+                    "guest_count",
+                    str(session.fields.guest_count),
                     next_prompt,
                     event_type=session.fields.event_type,
                 )
