@@ -26,4 +26,6 @@ Rules for this file:
 - After showcase/portfolio summary (Intent A), append only the availability/date ask — not a second planning preamble.
 - After capturing a name, ask a short Yes/No confirm (`Just checking, is your name {name}?`). Yes finalizes the name; No asks them to type the name again. Do not ask event/showcase questions until the name is confirmed.
 - After the thank-you / sign-off, if the customer sends extra details, note them and reply moderately that a team member will call — do not reopen the form.
+- After sign-off, `book again` / `another event` / `new booking` resets to STATE 1 so they can book another celebration.
+- Dashboard: completed/converted orders have a **Book again** action that creates a new order with the same customer details.
 - Prefer moderate reply length (1–3 short sentences): not overly polished essays, not one-word replies.

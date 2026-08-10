@@ -12,7 +12,7 @@ from app.services.human_style import (
     is_thanks_only,
     post_signoff_followup_reply,
     post_signoff_thanks_reply,
-    warm_enquiry_signoff,
+    wants_book_again,
 )
 from app.services.session_store import ConversationPhase, GuidedStep, session_store
 
@@ -63,7 +63,9 @@ async def handle_conversation(
     """Returns (result, enquiry_saved)."""
     session = session_store.get(whatsapp_id)
 
-    if user_text.strip().lower() in {"new", "start over", "restart", "reset", "begin again"}:
+    if user_text.strip().lower() in {"new", "start over", "restart", "reset", "begin again"} or (
+        session.completed and session._saved and wants_book_again(user_text)
+    ):
         session_store.reset(whatsapp_id)
         await resume_bot_for_phone(db, whatsapp_id)
         session = session_store.get(whatsapp_id)

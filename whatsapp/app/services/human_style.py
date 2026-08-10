@@ -459,8 +459,30 @@ def post_signoff_followup_reply(*, name: str | None = None) -> str:
     who = (name or "there").strip() or "there"
     return (
         f"Thanks for sharing that, {who}! We’ve noted your additional details. "
-        "Our team member will call you shortly to discuss everything."
+        "Our team member will call you shortly to discuss everything.\n\n"
+        "If you’d like to book another celebration, just type *book again*."
     )
+
+
+def wants_book_again(text: str) -> bool:
+    """Customer wants to start a fresh enquiry after a completed chat."""
+    t = normalize_customer_text(text)
+    cues = (
+        "book again",
+        "book again please",
+        "another booking",
+        "another event",
+        "new booking",
+        "new enquiry",
+        "new order",
+        "one more event",
+        "another celebration",
+        "book one more",
+        "book another",
+    )
+    if t in cues:
+        return True
+    return any(c in t for c in cues) and len(t.split()) <= 8
 
 
 def post_signoff_thanks_reply(*, name: str | None = None) -> str:

@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ChefHat, Clock, MapPin, Phone, Pencil, FileText, UtensilsCrossed, Calendar,
-  FileSpreadsheet, Printer,
+  FileSpreadsheet, Printer, RotateCcw,
 } from 'lucide-react';
 import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
+  createEnquiry,
   formatDate,
   formatDateTime,
   markEnquiryDelivered,
   updateEnquiry,
+  updateEnquiryStatus,
 } from '../../api/client';
 import { AmPmTimeInput } from '../AmPmTimeInput';
 import { Button } from '../Layout';
@@ -79,8 +81,43 @@ export function OrderDetailView({
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [deliveryBusy, setDeliveryBusy] = useState(false);
+  const [bookAgainBusy, setBookAgainBusy] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const { refresh } = useAppData();
+  const navigate = useNavigate();
+
+  async function handleBookAgain() {
+    const ok = window.confirm(
+      `Book again for ${order.customerName}?\n\nThis creates a new order with the same customer details. You can update the event date, venue, and menu next.`,
+    );
+    if (!ok) return;
+    setBookAgainBusy(true);
+    try {
+      const eventDate = new Date();
+      eventDate.setDate(eventDate.getDate() + 30);
+      eventDate.setHours(12, 0, 0, 0);
+      const callbackAt = new Date();
+      callbackAt.setDate(callbackAt.getDate() + 1);
+      callbackAt.setHours(10, 0, 0, 0);
+      const created = await createEnquiry({
+        customerName: order.customerName,
+        phoneNumber: order.phoneNumber,
+        eventType: order.eventType || 'Wedding',
+        eventDate: eventDate.toISOString(),
+        eventLocation: order.eventLocation || 'TBD',
+        guestCount: order.guestCount || 0,
+        preferredCallbackAt: callbackAt.toISOString(),
+        notes: `Book again from order ${order.id}`,
+      });
+      const converted = await updateEnquiryStatus(created.id, 'CONVERTED');
+      await refresh();
+      navigate(`/orders/${converted.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not book again. Please try again.');
+    } finally {
+      setBookAgainBusy(false);
+    }
+  }
 
   async function handleDownloadExcel(copyType: 'kitchen' | 'billing') {
     setExcelBusy(true);
@@ -261,6 +298,15 @@ export function OrderDetailView({
         </div>
         <div className="flex flex-col items-end gap-2">
           <span className="order-status-badge">{statusLabel(order.status)}</span>
+          <button
+            type="button"
+            disabled={bookAgainBusy}
+            onClick={() => void handleBookAgain()}
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] disabled:opacity-60 min-h-[2.5rem]"
+          >
+            <RotateCcw size={14} />
+            {bookAgainBusy ? 'Booking…' : 'Book again'}
+          </button>
           {order.paymentReceived ? (
             <span className="text-xs font-medium text-[var(--success-text)]">Payment received</span>
           ) : order.deliveredAt ? (
