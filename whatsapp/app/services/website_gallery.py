@@ -83,7 +83,7 @@ def prepare_gallery_photos(
         url = item["url"]
         if url in sent:
             continue
-        caption = item.get("caption") or "Srivatsanka Events & Services"
+        caption = item.get("caption") or "Srivatsanka Events and Services"
         attachments.append(MediaAttachment(url=url, caption=caption))
         mark_gallery_sent(session, [url])
         if len(attachments) >= limit:

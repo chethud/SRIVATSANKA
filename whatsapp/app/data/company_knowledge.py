@@ -7,8 +7,8 @@ import re
 WEBSITE_URL = "https://srivatsanka.com/"
 
 COMPANY = {
-    "legal_name": "Srivatsanka Events & Services",
-    "brand_name": "Srivatsanka Events & Services",
+    "legal_name": "Srivatsanka Events and Services",
+    "brand_name": "Srivatsanka Events and Services",
     "established": "2017",
     "managing_director": "Mr. Kannan Sharangapani",
     "founder": "Sri R. V. Sharangapani",
@@ -540,7 +540,7 @@ If unsure, share {WEBSITE_URL} or offer a callback — never invent prices or pa
 
 COMPANY
 - {COMPANY['legal_name']}, est. {COMPANY['established']}
-- Always say the full company name: Srivatsanka Events & Services (not a short brand only)
+- Always say the full company name: Srivatsanka Events and Services (not a short brand only)
 - Tagline: {COMPANY['tagline']}
 - {COMPANY['hero_line']}
 - {COMPANY['services_intro']}

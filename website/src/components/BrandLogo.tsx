@@ -14,7 +14,7 @@ function SidebarBrandLogo({ className = '' }: { className?: string }) {
     <Link
       to="/"
       className={`flex items-center justify-center w-full h-[72px] min-h-[72px] max-h-[72px] ${className}`}
-      title="SRIVATSANKA EVENTS — Dashboard"
+      title="SRIVATSANKA EVENTS AND SERVICES — Dashboard"
       aria-label="Go to dashboard"
     >
       <div className={`flex items-center gap-2.5 w-full min-w-0 ${sidebarCollapsed ? 'justify-center' : 'px-1'}`}>

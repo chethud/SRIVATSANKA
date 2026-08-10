@@ -21,7 +21,7 @@ RESET_PHRASES = frozenset(
 CIRCUIT_BREAKER_REPLY = (
     "It looks like we got a little tangled up! Let's start fresh. 🌿\n\n"
     "You can type **RESTART** at any time to kickstart our conversation from the beginning.\n\n"
-    "Hello! Welcome to Srivatsanka Events & Catering. ✨ May I have your name, please?"
+    "Hello! Welcome to Srivatsanka Events and Services. ✨ May I have your name, please?"
 )
 
 

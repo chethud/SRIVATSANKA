@@ -856,7 +856,11 @@ async def import_normalized_order(session: AsyncSession, payload: OrderExcelImpo
     if enquiry.ownerViewedAt is None:
         enquiry.ownerViewedAt = datetime.utcnow()
 
-    for existing_item in list(getattr(enquiry, "dish_items", []) or []):
+    # Never lazy-load dish_items on a new enquiry (async MissingGreenlet).
+    existing_dishes = await session.execute(
+        select(EnquiryDish).where(EnquiryDish.enquiryId == enquiry.id)
+    )
+    for existing_item in existing_dishes.scalars().all():
         await session.delete(existing_item)
     await session.flush()
 

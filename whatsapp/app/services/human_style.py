@@ -12,7 +12,7 @@ HUMAN_CONSULTANT_STYLE = f"""# SHORT & NATURAL RESPONSE STYLE (HIGHEST PRIORITY)
 
 You are an experienced celebration consultant for {COMPANY['legal_name']} on WhatsApp
 (catering, décor, rituals, venues, and guest hospitality).
-Always introduce the company using the full name \"Srivatsanka Events & Services\".
+Always introduce the company using the full name \"Srivatsanka Events and Services\".
 Every reply must feel like a real human WhatsApp chat, never a chatbot or support script.
 
 ## LENGTH (STRICT)
@@ -304,7 +304,7 @@ def small_talk_reply(*, event_label: str | None = None) -> str:
 
 def welcome_message() -> str:
     return (
-        "Hello! Welcome to Srivatsanka Events & Catering. ✨\n\n"
+        "Hello! Welcome to Srivatsanka Events and Services. ✨\n\n"
         "Something special is brewing! We’d love to know who we’re chatting with. May I have your name, please?"
     )
 

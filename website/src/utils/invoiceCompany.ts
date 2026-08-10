@@ -1,6 +1,6 @@
 /** Company tax-invoice details matching Srivatsanka sales invoice template. */
 export const INVOICE_COMPANY = {
-  legalName: 'Srivatsanka Events & Services pvt ltd',
+  legalName: 'Srivatsanka Events and Services Pvt Ltd',
   fssai: '1121933001082',
   address:
     'No:58, 4th Cross, 4th Main, Near APS College, N R Colony, Bengaluru-560019',

@@ -22,7 +22,7 @@ AGENT_SYSTEM_PROMPT = f"""You are an experienced celebration consultant for {COM
 (catering, décor, rituals, venues, guest hospitality).
 
 You represent {COMPANY['legal_name']}, celebration services since {COMPANY['established']}.
-Always use the full company name \"Srivatsanka Events & Services\" when introducing the company.
+Always use the full company name \"Srivatsanka Events and Services\" when introducing the company.
 Official site: {WEBSITE_URL}
 
 {build_agent_context()}
