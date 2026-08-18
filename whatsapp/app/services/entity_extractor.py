@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from app.data.company_knowledge import is_known_event_type, match_event_type
 from app.services.callback_time import is_immediate_callback, normalize_callback_label
 from app.services.conversation_turns import extract_name
-from app.services.event_date import is_urgent_event_date
+from app.services.event_date import is_urgent_event_date, looks_like_event_date
 from app.services.human_style import wants_discuss_on_call
 from app.services.location_normalize import extract_location_entity
 from app.services.session_store import ConversationSession
@@ -84,8 +84,9 @@ def _extract_date_entity(text: str) -> str:
         r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+next\s+month",
         r"next\s+month(?:\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+week)?",
         r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+(?:this\s+|next\s+)?\w+",
-        r"(?:early|mid|late)[\s-]*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month)",
-        r"(?:this|next)\s+(?:week|month|weekend|year)",
+        r"(?:early|mid|late|end of)\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month|this\s+month)",
+        r"(?:this|next|coming)\s+(?:week|month|weekend|year)",
+        r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?",
     )
     for pat in fuller:
         match = re.search(pat, lower, re.I)
@@ -153,17 +154,20 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
     )
 
     # Date words often appear in callback phrases — do not treat those as event_date.
+    from app.services.human_style import wants_showcase_look
+    from app.services.website_gallery import customer_wants_photos
+
     callbackish = bool(
         wants_discuss_on_call(raw)
         or re.search(r"\b(call|callback|ring me|speak|talk)\b", lower)
     )
-    if is_urgent_event_date(raw) and not callbackish:
+    photoish = wants_showcase_look(raw) or customer_wants_photos(raw)
+    if photoish:
+        pass
+    elif is_urgent_event_date(raw) and not callbackish:
         entities.event_date = _extract_date_entity(raw)
         entities.urgent_date = True
-    elif (not callbackish) and re.search(
-        r"\b(today|tomorrow|next|week|month|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2})\b",
-        lower,
-    ):
+    elif (not callbackish) and looks_like_event_date(raw):
         date_entity = _extract_date_entity(raw)
         if date_entity and date_entity != raw[:3]:
             entities.event_date = date_entity

@@ -137,6 +137,22 @@ def extract_name(text: str) -> str:
         "good morning",
         "good evening",
         "good afternoon",
+        "see",
+        "pics",
+        "pic",
+        "photo",
+        "photos",
+        "pictures",
+        "picture",
+        "gallery",
+        "images",
+        "image",
+        "showcase",
+        "setups",
+        "portfolio",
+        "samples",
+        "plan",
+        "planning",
     }
     for pat in (
         r"(?:hi\s+i\s+am|hello\s+i\s+am|i'?m|i am|my name is|this is|call me|it's|its|hello)\s+([A-Za-z][A-Za-z\s'.-]{0,40}?)"
@@ -167,6 +183,17 @@ def extract_name(text: str) -> str:
         "food",
         "events",
         "services",
+        "pics",
+        "pic",
+        "photos",
+        "photo",
+        "pictures",
+        "gallery",
+        "images",
+        "showcase",
+        "portfolio",
+        "setups",
+        "see",
     }
     if any(w.lower() in intent_words for w in words):
         # Still allow "I am Tejasvi planning a wedding" via regex above

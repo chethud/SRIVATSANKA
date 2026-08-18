@@ -303,9 +303,14 @@ def small_talk_reply(*, event_label: str | None = None) -> str:
 
 
 def welcome_message() -> str:
+    from app.services import reply_pack
+
+    packed = reply_pack.get_reply("state1.welcome")
+    if packed:
+        return packed
     return (
         "Hello! Welcome to Srivatsanka Events and Services. ✨\n\n"
-        "Something special is brewing! We’d love to know who we’re chatting with. May I have your name, please?"
+        "May I have your name, please?"
     )
 
 
@@ -318,8 +323,16 @@ def name_confirm_prompt(name: str) -> str:
 
 
 def name_confirmed_event_ask(name: str) -> str:
+    from app.services import reply_pack
+
+    packed = reply_pack.get_reply("state1_2.name_confirmed_event_ask", name=name)
+    if packed:
+        return packed
     who = (name or "").strip() or "there"
-    return f"Thanks, {who}! What celebration is this for?"
+    return (
+        f"Thanks, {who}! Lovely to connect. 😊 "
+        "Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?"
+    )
 
 
 def name_reask_prompt() -> str:
@@ -423,24 +436,84 @@ def wants_straight_to_planning(text: str) -> bool:
 
 
 def wants_showcase_look(text: str) -> bool:
-    """Customer wants to see past setups / photos / cuisines first."""
+    """Customer wants to see past setups / photos / cuisines first (State 3 Intent A).
+
+    Kannan.rules.txt: Yes / Yeah / Sure after the showcase choice = accept showcase.
+    Ok / Okay remains Intent B (direct planning).
+    """
     t = normalize_customer_text(text)
+    if t in {
+        "yes",
+        "y",
+        "yeah",
+        "yep",
+        "yup",
+        "sure",
+        "haan",
+        "ha",
+        "show",
+        "please",
+        "yes please",
+        "yes sure",
+        "yeah sure",
+        "see",
+        "pics",
+        "pic",
+        "photos",
+        "photo",
+    }:
+        return True
     cues = (
         "look",
         "photo",
         "photos",
         "pic",
         "pics",
+        "picture",
+        "pictures",
+        "image",
+        "images",
         "showcase",
         "past setup",
         "past setups",
+        "past work",
+        "old work",
+        "old event",
         "signature cuisine",
         "show me",
+        "show some",
+        "show past",
+        "show pic",
+        "send pic",
         "see some",
+        "see your",
+        "see pic",
+        "want to see",
+        "like to see",
+        "let me see",
+        "can i see",
+        "wanna see",
+        "first look",
+        "setups",
         "gallery",
         "examples",
         "menu",
         "cuisine",
+        "send images",
+        "send photos",
+        "send portfolio",
+        "what do you have",
+        "nodu",
+        "nodona",
+        "kalisu",
+        "thorsi",
+        "torsi",
+        "about us",
+        "information about",
+        "need information",
+        "any information",
+        "tell me about you",
+        "know more about",
     )
     return any(c in t for c in cues)
 
@@ -549,7 +622,8 @@ def intent_b_planning_reply(
 
     if t in {"no", "nope", "skip", "nah"} or t.startswith("no "):
         return f"Got it! Let's jump straight into the planning details.\n\n{date_q}"
-    if t in {"ok", "okay", "k", "okk", "fine", "yes"}:
+    # Rules: Ok/Okay = Intent B. Yes/Sure are Intent A (showcase), not handled here.
+    if t in {"ok", "okay", "k", "okk", "fine"}:
         return f"Wonderful! Let's jump straight into the details.\n\n{date_q}"
     if who:
         return f"Perfect, {who}! Let's get right down to planning. 🗓️\n\n{date_q}"

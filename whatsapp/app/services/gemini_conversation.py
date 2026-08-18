@@ -307,72 +307,18 @@ def looks_like_question(text: str) -> bool:
 
 def _is_probable_date(text: str) -> bool:
     """True only when the message actually looks like a date, not any digit (e.g. mor3)."""
-    t = text.lower().strip()
-    if re.search(
-        r"\b(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\b|"
-        r"\b(?:early|mid|late)[\s-]*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next\s+month)\b|"
-        r"\b(?:this|next)\s+(?:week|month|weekend|year)\b",
-        t,
-    ):
-        return True
-    if re.search(
-        r"\b\d{1,2}([/-]\d{1,2})?([/-]\d{2,4})?\b|"
-        r"\b\d{1,2}(st|nd|rd|th)\b|"
-        r"\b(20\d{2}|19\d{2})\b",
-        t,
-    ):
-        # Reject if it's clearly "more" mistyped with a digit and asking for info
-        if re.search(r"\bmor\d\b|\bdetai", t) and not re.search(
-            r"\b\d{1,2}(st|nd|rd|th)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",
-            t,
-        ):
-            if any(w in t for w in ("detail", "info", "know", "tell", "about", "need")):
-                return False
-        return True
-    months = (
-        "january",
-        "february",
-        "march",
-        "april",
-        "may",
-        "june",
-        "july",
-        "august",
-        "september",
-        "october",
-        "november",
-        "december",
-        "jan",
-        "feb",
-        "mar",
-        "apr",
-        "jun",
-        "jul",
-        "aug",
-        "sep",
-        "oct",
-        "nov",
-        "dec",
-    )
-    if any(m in t for m in months):
-        return True
-    return any(
-        p in t
-        for p in (
-            "tomorrow",
-            "next week",
-            "this weekend",
-            "this month",
-            "next month",
-            "next year",
-        )
-    )
+    from app.services.event_date import looks_like_event_date
+
+    return looks_like_event_date(text)
 
 
 def is_likely_field_answer(text: str, field_key: str) -> bool:
-    from app.services.human_style import wants_more_info
+    from app.services.human_style import wants_more_info, wants_showcase_look
+    from app.services.website_gallery import customer_wants_photos
 
     if wants_more_info(text):
+        return False
+    if field_key == "event_date" and (wants_showcase_look(text) or customer_wants_photos(text)):
         return False
     if looks_like_question(text):
         if field_key == "event_date" and _is_probable_date(text):

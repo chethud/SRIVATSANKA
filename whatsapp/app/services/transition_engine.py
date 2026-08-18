@@ -57,4 +57,13 @@ def advance_from_slots(session: ConversationSession) -> None:
     if fields.event_type and session.guided_step == GuidedStep.AWAIT_EVENT_TYPE:
         move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
     if fields.event_date and session.guided_step == GuidedStep.AWAIT_POST_SHOWCASE:
-        move_to(session, GuidedStep.COLLECT_DETAILS)
+        from app.services.human_style import wants_showcase_look
+        from app.services.website_gallery import customer_wants_photos
+
+        last_user = ""
+        for msg in reversed(session.history):
+            if msg.get("role") == "user":
+                last_user = msg.get("content") or ""
+                break
+        if not (wants_showcase_look(last_user) or customer_wants_photos(last_user)):
+            move_to(session, GuidedStep.COLLECT_DETAILS)

@@ -488,6 +488,10 @@ export async function markEnquiryViewed(id: string): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}/viewed`, { method: 'POST' });
 }
 
+export async function deleteEnquiry(id: string): Promise<{ ok: boolean; id: string }> {
+  return apiFetch<{ ok: boolean; id: string }>(`/api/enquiries/${id}`, { method: 'DELETE' });
+}
+
 export async function seedExcelReferenceOrders(): Promise<{
   removed: number;
   created: number;

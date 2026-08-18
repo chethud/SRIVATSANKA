@@ -42,6 +42,12 @@ def customer_wants_photos(text: str) -> bool:
         "look like",
         "how it looks",
         "visual",
+        "setups",
+        "past work",
+        "want to see",
+        "let me see",
+        "nodu",
+        "kalisu",
     )
     return any(c in t for c in cues)
 

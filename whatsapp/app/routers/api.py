@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -10,7 +10,7 @@ from app.data.seed_demo_data import seed_demo_data
 from app.data.seed_excel_reference_orders import seed_excel_reference_orders
 from app.database import get_db
 from app.datetime_util import as_naive_utc
-from app.models import Dish, Enquiry, EnquiryPayment, EnquiryStatus, Expense, Notification, NotificationType, Vendor, Worker
+from app.models import Dish, Enquiry, EnquiryDish, EnquiryPayment, EnquiryStatus, Expense, InvoiceUpload, Notification, NotificationType, Vendor, Worker, WorkerAssignment
 from app.quantity_units import normalize_quantity, normalize_quantity_unit
 from app.schemas import (
     AIAssistantRequest,
@@ -347,6 +347,23 @@ async def update_enquiry(
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)
+
+
+@router.delete("/enquiries/{enquiry_id}")
+async def delete_enquiry(enquiry_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Permanently remove an order/enquiry and related menu, payments, docs, and assignments."""
+    enquiry = await db.get(Enquiry, enquiry_id)
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    await db.execute(delete(EnquiryDish).where(EnquiryDish.enquiryId == enquiry_id))
+    await db.execute(delete(EnquiryPayment).where(EnquiryPayment.enquiryId == enquiry_id))
+    await db.execute(delete(InvoiceUpload).where(InvoiceUpload.enquiryId == enquiry_id))
+    await db.execute(delete(WorkerAssignment).where(WorkerAssignment.enquiryId == enquiry_id))
+    await db.execute(delete(Notification).where(Notification.enquiryId == enquiry_id))
+    await db.delete(enquiry)
+    await db.commit()
+    return {"ok": True, "id": enquiry_id}
 
 
 @router.post("/enquiries/{enquiry_id}/delivered", response_model=EnquiryOut)

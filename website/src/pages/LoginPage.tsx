@@ -96,11 +96,11 @@ export default function LoginPage() {
           {mode === 'signin' ? (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-xs font-medium text-[var(--muted)] uppercase tracking-wide mb-1.5">
-                  {usesSupabase ? 'Email' : 'Username'}
+                <label htmlFor="login-id" className="block text-xs font-medium text-[var(--muted)] uppercase tracking-wide mb-1.5">
+                  {usesSupabase ? 'Email' : 'Username / ID'}
                 </label>
                 <input
-                  id="email"
+                  id="login-id"
                   type={usesSupabase ? 'email' : 'text'}
                   autoComplete={usesSupabase ? 'email' : 'username'}
                   value={email}

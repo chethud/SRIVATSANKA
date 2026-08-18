@@ -1,0 +1,316 @@
+{
+  "_meta": {
+    "source_of_truth": "D:\\Kannan.rules.txt",
+    "note": "Spoon-fed WhatsApp reply pack. The FSM in guided_flow.py looks these up FIRST. Gemini is only used when a reply_id is missing and the state has no catch-all. Placeholders: {name} {who} {event} {occasion} {special_request} {slot}. Never use em-dashes."
+  },
+
+  "replies": {
+    "state1.welcome": {
+      "variants": [
+        "Hello! Welcome to Srivatsanka Events and Services. \u2728\n\nMay I have your name, please?",
+        "Namaste and welcome to Srivatsanka Events! \ud83d\ude4f\n\nWho do we have the pleasure of speaking with today?",
+        "Hello! Thank you for reaching out to Srivatsanka Events and Services. \u2728\n\nWe're excited to help bring your celebration to life! May I know your name, please?"
+      ],
+      "next_state": "AWAIT_NAME",
+      "ask_slot": "customer_name"
+    },
+    "state1.ask_name_again": {
+      "variants": [
+        "Could I get your name?",
+        "Mind sharing your name?",
+        "One quick one, what's your name?"
+      ],
+      "ask_slot": "customer_name"
+    },
+    "state1.ask_name_again_soft": {
+      "variants": [
+        "No worries \ud83d\ude42 What's your name?",
+        "Sure, who should I say this is from?",
+        "Happy to help. May I know your name?"
+      ],
+      "ask_slot": "customer_name"
+    },
+    "state1.event_without_name": {
+      "text": "We'd love to help with your {occasion}! May I know your name first?",
+      "ask_slot": "customer_name"
+    },
+
+    "state1_2.name_confirm": {
+      "text": "Just checking, is your name {who}?\n\nReply *Yes* to confirm, or *No* if I got it wrong.",
+      "ask_slot": "customer_name"
+    },
+    "state1_2.name_reask": {
+      "text": "No problem! Please type your name again.",
+      "next_state": "AWAIT_NAME",
+      "ask_slot": "customer_name"
+    },
+    "state1_2.name_confirmed_event_ask": {
+      "text": "Thanks, {who}! Lovely to connect. \ud83d\ude0a Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?",
+      "next_state": "AWAIT_EVENT_TYPE",
+      "ask_slot": "event_type"
+    },
+
+    "state2.event_ask": {
+      "text": "Lovely to connect with you, {who}! \ud83d\ude0a How can we help bring your celebration to life today? Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?",
+      "ask_slot": "event_type"
+    },
+    "state2.event_ask_short": {
+      "variants": [
+        "Sure, wedding, house warming, birthday, or something else?",
+        "What type of event are you planning?",
+        "Is it a wedding or something else?"
+      ],
+      "ask_slot": "event_type"
+    },
+    "state2.event_reask": {
+      "variants": [
+        "Got it, is it a wedding, house warming, birthday, or something else?",
+        "What celebration is this for?"
+      ],
+      "ask_slot": "event_type"
+    },
+    "state2.catalog_variant_a": {
+      "text": "We specialize in crafting authentic, unforgettable traditional celebrations! \ud83c\udf1f\n\nHere are the key events we cater to:\n\u2728 Weddings, Engagements & Receptions\n\ud83c\udf83 Upanayanam, Housewarmings & Baby Showers (Seemantham)\n\ud83c\udf89 Birthdays, Anniversaries & Family Gatherings\n\ud83d\ude4f Traditional Ceremonies & Religious Poojas\n\nOur core expertise spans Pure Vegetarian South Indian Catering (Karnataka, Andhra, Tamil Nadu & Kerala cuisines), Stage & Theme Floral Decor, Pooja Setups, and End-to-End Event Planning.\n\nWhich of these special occasions are you planning today, {who}?",
+      "ask_slot": "event_type"
+    },
+    "state2.catalog_variant_b": {
+      "text": "We\u2019d love to share! Srivatsanka provides complete end-to-end event solutions tailored to your family's traditions. \u2728\n\nOur Core Services Include:\n\ud83c\udf71 Pure Vegetarian Regional Catering: Authentic South Indian feasts across Karnataka, Andhra, Tamil Nadu & Kerala recipes.\n\ud83c\udf38 Bespoke Decor: Stage, floral, mandap, and theme setups.\n\ud83e\ude94 Ritual & Pooja Support: Traditional pooja arrangements, sacred ceremony setups, and ritual coordination.\n\ud83c\udff0 Venue & Hospitality: Venue selection, venue planning, and guest management.\n\nAre you looking for full event planning or specific catering/decor services for your upcoming celebration, {who}?",
+      "ask_slot": "event_type"
+    },
+    "state2.unsupported_refusal": {
+      "text": "Thank you for reaching out, {who}! At Srivatsanka, we specialize exclusively in traditional, family, and cultural celebrations. We will notify the team to confirm regarding your request. Thank you and have a nice day!! \u2728"
+    },
+
+    "state3.showcase_choice": {
+      "text": "{validation}\n\nBefore we start planning the date and venue, do you need any information about us? I can share past setups, signature cuisines, and how we work, or we can go straight to your event details.",
+      "ask_slot": null
+    },
+    "state3.intent_a": {
+      "text": "We\u2019d love to show you! {showcase}\n\nYou can explore our portfolio anytime at **srivatsanka.com**.\n\n{date_ask}",
+      "next_state": "COLLECT_DETAILS",
+      "ask_slot": "event_date"
+    },
+    "state3.intent_b_no": {
+      "text": "Got it! Let's jump straight into the planning details.\n\n{date_only}",
+      "next_state": "COLLECT_DETAILS",
+      "ask_slot": "event_date"
+    },
+    "state3.intent_b_ok": {
+      "text": "Wonderful! Let's jump straight into the details.\n\n{date_only}",
+      "next_state": "COLLECT_DETAILS",
+      "ask_slot": "event_date"
+    },
+    "state3.intent_b_named": {
+      "text": "Perfect, {who}! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+      "next_state": "COLLECT_DETAILS",
+      "ask_slot": "event_date"
+    },
+    "state3.fallback_intent_b": {
+      "text": "Perfect! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+      "next_state": "COLLECT_DETAILS",
+      "ask_slot": "event_date"
+    },
+
+    "state4.urgent_fasttrack": {
+      "text": "Got it! Since your celebration is right around the corner, we are prioritizing your inquiry! Our senior event executive will call you immediately to confirm availability and discuss setups."
+    },
+    "state4.callback_pivot": {
+      "text": "Of course, {who}! We can discuss all the details directly on call. When would be the best time to give you a quick call?",
+      "ask_slot": "preferred_callback"
+    },
+    "state4.custom_request_ack": {
+      "text": "Yes, absolutely! Our chefs love crafting custom culinary experiences and interactive fusion counters. I've made a special note of your preference for {special_request} so our senior planner and head chef can walk you through our menu options during your call."
+    },
+    "state4.venue_help_generic": {
+      "text": "We'd be happy to help you find the perfect venue! What city or locality are you considering, and when would be a good time for a short callback?",
+      "ask_slot": "preferred_callback"
+    },
+    "state4.venue_help_located": {
+      "text": "We'd be happy to help you find the perfect venue in {slot}! What would be a good time for a short callback?",
+      "ask_slot": "preferred_callback"
+    },
+
+    "state5.callback_business_hours": {
+      "text": "Sounds great, {who}! Our senior event planner will give you a call during business hours today on this number."
+    },
+    "state5.callback_scheduled": {
+      "text": "Noted, {who}! We have scheduled your callback for {slot}. Our senior event planner will reach out to you on this number. \ud83d\uddd3\ufe0f"
+    },
+    "state5.callback_immediate": {
+      "text": "Got it, {who}! We have notified our lead planning team to give you a callback as soon as possible on this number. \ud83d\udcf1"
+    },
+    "state5.signoff": {
+      "text": "Thank you so much, {who}! It was lovely chatting with you. We\u2019re excited to help with your celebration. Talk to you soon! \u2728"
+    },
+    "state5.post_signoff_followup": {
+      "text": "Thanks for sharing that, {who}! We\u2019ve noted your additional details. Our team member will call you shortly to discuss everything.\n\nIf you\u2019d like to book another celebration, just type *book again*."
+    },
+    "state5.post_signoff_thanks": {
+      "text": "You\u2019re welcome! Our team will call you as planned."
+    },
+
+    "common.circuit_breaker": {
+      "text": "It looks like we got a little tangled up! Let's start fresh. \ud83c\udf3f\n\nYou can type *RESTART* at any time to kickstart our conversation from the beginning.\n\nHello! Welcome to Srivatsanka Events and Services. \u2728 May I have your name, please?",
+      "next_state": "AWAIT_NAME",
+      "ask_slot": "customer_name"
+    },
+    "common.thanks": {
+      "variants": [
+        "You're welcome!",
+        "Anytime \ud83d\ude42",
+        "Happy to help!",
+        "My pleasure!"
+      ]
+    },
+    "common.undecided": {
+      "variants": [
+        "No problem, take your time. Happy to answer any questions.",
+        "No rush at all. Ask me anything about our catering.",
+        "Of course. We're here whenever you're ready."
+      ]
+    },
+    "common.small_talk": {
+      "variants": [
+        "Doing well, thanks! How can I help with {occasion}?",
+        "Great, thanks for asking \ud83d\ude42 What would you like to know?"
+      ]
+    },
+
+    "generic.noted_continue": {
+      "text": "Noted, {who}! I've made a note of that for our planning team."
+    }
+  },
+
+  "catchall": {
+    "AWAIT_POST_SHOWCASE": "state3.fallback_intent_b",
+    "COLLECT_DETAILS": "generic.noted_continue"
+  },
+
+  "event_profiles": {
+    "wedding": {
+      "validation": "Oh, wonderful! A wedding is such a momentous milestone, full of love, family, and beautiful traditions. You\u2019re in the right hands with us. \u2764\ufe0f",
+      "showcase": "From traditional & contemporary mandap decor and stage floral decoration to authentic regional vegetarian feasts (Karnataka, Andhra, Tamil Nadu, Kerala), food and decor are the heart of every event we curate.",
+      "media_group": "wedding"
+    },
+    "engagement": {
+      "validation": "Congratulations! An engagement is the beautiful beginning of a brand-new journey together. \u2728",
+      "showcase": "From stage & ring ceremony decor and floral arrangements to custom vegetarian catering, we design every detail to be absolute perfection.",
+      "media_group": "engagement"
+    },
+    "reception": {
+      "validation": "How exciting! A wedding reception is all about hosting your grand circle of family and friends in style. \ud83c\udf1f",
+      "showcase": "From premium theme decor and stage illumination to multi-regional buffet feasts, we ensure your guests receive warm, memorable hospitality.",
+      "media_group": "reception"
+    },
+    "baby shower": {
+      "validation": "Ah, what beautiful news! Welcoming new life into the family through Seemantham is such a blessed and joyful occasion. \ud83d\ude4f",
+      "showcase": "From traditional Seemantham decor and ritual setup arrangements to authentic festive vegetarian meals, we handle every detail with love.",
+      "media_group": "baby_shower"
+    },
+    "seemantham": {
+      "validation": "Ah, what beautiful news! Welcoming new life into the family through Seemantham is such a blessed and joyful occasion. \ud83d\ude4f",
+      "showcase": "From traditional Seemantham decor and ritual setup arrangements to authentic festive vegetarian meals, we handle every detail with love.",
+      "media_group": "baby_shower"
+    },
+    "upanayanam": {
+      "validation": "Namaste! An Upanayanam is a deeply sacred Vedic milestone, and we take immense pride in supporting authentic ritual setups and pure vegetarian hospitality. \ud83d\ude4f",
+      "showcase": "From sacred ceremony & pooja setups and traditional floral decor to sattvic/authentic South Indian feasts, we specialize in pure traditional events.",
+      "media_group": "upanayanam"
+    },
+    "sacred thread ceremony": {
+      "validation": "Namaste! An Upanayanam is a deeply sacred Vedic milestone, and we take immense pride in supporting authentic ritual setups and pure vegetarian hospitality. \ud83d\ude4f",
+      "showcase": "From sacred ceremony & pooja setups and traditional floral decor to sattvic/authentic South Indian feasts, we specialize in pure traditional events.",
+      "media_group": "upanayanam"
+    },
+    "housewarming": {
+      "validation": "Congratulations on your new home! \ud83c\udfe1 Entering a new abode with a sacred Gruhapravesham is a deeply spiritual milestone.",
+      "showcase": "From sacred ceremony & pooja arrangements and traditional entrance/floral decor to guest hospitality and homely feasts, we celebrate your new beginning with warm traditions.",
+      "media_group": "housewarming"
+    },
+    "gruhapravesham": {
+      "validation": "Congratulations on your new home! \ud83c\udfe1 Entering a new abode with a sacred Gruhapravesham is a deeply spiritual milestone.",
+      "showcase": "From sacred ceremony & pooja arrangements and traditional entrance/floral decor to guest hospitality and homely feasts, we celebrate your new beginning with warm traditions.",
+      "media_group": "housewarming"
+    },
+    "birthday": {
+      "validation": "Awesome! Milestone birthdays deserve a fun, memorable gathering with great food and vibrant decor! \ud83c\udf89",
+      "showcase": "From vibrant theme decoration and stage setups to delicious vegetarian catering & dessert spreads, we make every birthday memorable.",
+      "media_group": "birthday"
+    },
+    "family gathering": {
+      "validation": "That sounds lovely! Gathering family together over authentic traditional food and warm hospitality is what we do best. \u2728",
+      "showcase": "From customized event solutions and traditional decor to authentic regional cuisines, family events are our absolute passion.",
+      "media_group": "family_gathering"
+    },
+    "traditional ceremony": {
+      "validation": "That sounds lovely! Gathering family together over authentic traditional food and warm hospitality is what we do best. \u2728",
+      "showcase": "From customized event solutions and traditional decor to authentic regional cuisines, family events are our absolute passion.",
+      "media_group": "family_gathering"
+    },
+    "anniversary": {
+      "validation": "Happy Anniversary in advance! Celebrating milestone years of togetherness with loved ones is so special. \u2728",
+      "showcase": "From customized decor and stage setup to special catering spreads, we craft warm family celebrations.",
+      "media_group": "family_gathering"
+    },
+    "corporate": {
+      "validation": "We'd be glad to support your gathering with authentic vegetarian dining spreads. \ud83c\udf1f",
+      "showcase": "Custom vegetarian buffets and high-tea counters for professional celebrations.",
+      "media_group": "default"
+    }
+  },
+
+  "default_event_profile": {
+    "validation": "Oh, wonderful! A celebration is such a momentous milestone, full of love, family, and beautiful traditions. You\u2019re in the right hands with us. \u2764\ufe0f",
+    "showcase": "From customized event solutions and traditional decor to authentic regional cuisines, we handle every detail with love.",
+    "media_group": "default"
+  },
+
+  "media_groups": {
+    "wedding": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/1620985900177-1.jpeg", "caption": "Past wedding: catering spread" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/Wedding-Pooja-Setup-img-scaled.jpg", "caption": "Past wedding: pooja / ritual setup" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/swing-img.png", "caption": "Past wedding: traditional swing decor" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20231229145338-scaled.jpg", "caption": "Past wedding work by Srivatsanka" }
+    ],
+    "engagement": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/Decor-for-Celebrations-img.jpg", "caption": "Past engagement: stage and floral decor" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240911195637-Copy-scaled.jpg", "caption": "Past engagement: celebration styling" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/1714968534703-1.png", "caption": "Past engagement: catering presentation" }
+    ],
+    "reception": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250209202303-scaled.jpg", "caption": "Past reception: venue and stage look" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/venues-for-celebration-img-scaled.jpg", "caption": "Past reception: celebration venue" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240828092141-Copy-scaled.jpg", "caption": "Past reception: live catering" }
+    ],
+    "baby_shower": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240911195637-Copy-scaled.jpg", "caption": "Past Seemantham / baby shower: decor" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240827170330-Copy-scaled.jpg", "caption": "Past baby shower: celebration setup" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250129201422-scaled.jpg", "caption": "Past baby shower: festive catering" }
+    ],
+    "upanayanam": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/Wedding-Pooja-Setup-img-scaled.jpg", "caption": "Past Upanayanam: sacred pooja setup" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250311203649-scaled.jpg", "caption": "Past Upanayanam: ceremony arrangements" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/05/banner-img-banana-leaf.jpg", "caption": "Past Upanayanam: sattvic banana-leaf feast" }
+    ],
+    "housewarming": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250216072908-Copy-scaled.jpg", "caption": "Past housewarming: pooja support" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20231229125945-scaled.jpg", "caption": "Past Gruhapravesham: hospitality" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/05/banner-img-banana-leaf.jpg", "caption": "Past housewarming: homely feast" }
+    ],
+    "birthday": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240827170330-Copy-scaled.jpg", "caption": "Past birthday: theme decor" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/Decor-for-Celebrations-img.jpg", "caption": "Past birthday: celebration styling" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250129201422-scaled.jpg", "caption": "Past birthday: dessert and catering" }
+    ],
+    "family_gathering": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/05/banner-img-banana-leaf.jpg", "caption": "Past family gathering: banana-leaf dining" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/1657811033159-1.png", "caption": "Past family gathering: guest hospitality" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250120130855-scaled.jpg", "caption": "Past family gathering: celebration dining" }
+    ],
+    "default": [
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/hero-img-scaled.jpg", "caption": "Past Srivatsanka celebration" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/1620985900177-1.jpeg", "caption": "Past event: catering" },
+      { "url": "https://srivatsanka.com/wp-content/uploads/2026/03/Decor-for-Celebrations-img.jpg", "caption": "Past event: decor" }
+    ]
+  }
+}

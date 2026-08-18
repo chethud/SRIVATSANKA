@@ -123,6 +123,16 @@ def _fallback_answer(
     if "service" in t or "offer" in t or "what do you" in t:
         return short_services_reply()
 
+    # Ultimate generic: JSON pack line (generic.noted_continue) so nothing goes out of the box.
+    from app.services import reply_pack
+
+    packed = reply_pack.get_reply(
+        "generic.noted_continue",
+        name=session.fields.customer_name,
+        event_type=session.fields.event_type,
+    )
+    if packed:
+        return f"{packed} {hint}".strip()
     return f"Happy to help, {name}! {hint}"
 
 
@@ -133,6 +143,14 @@ async def _gemini_or_fallback(
     next_detail_prompt: str | None = None,
     sharing_photos: bool = False,
 ) -> str:
+    """JSON-first open-question answer.
+
+    Scripted / website-knowledge replies (in-box) are tried first. Gemini is only
+    reached when no scripted answer matches. Any Gemini failure, empty output, or
+    leaked-prompt output degrades to the JSON pack (generic.noted_continue) via
+    _fallback_answer, so the bot never goes out of the box. Callers always append
+    the current slot question after this reply.
+    """
     # Prefer a solid website-based reply for "know more" / topic asks (typos included)
     from app.services.human_style import normalize_customer_text
 

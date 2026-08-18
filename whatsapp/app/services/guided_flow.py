@@ -77,8 +77,9 @@ from app.services.validation_layer import (
     slot_fail_count,
     track_question,
 )
-from app.services.website_gallery import customer_wants_photos, prepare_gallery_photos
+from app.services.website_gallery import customer_wants_photos, mark_gallery_sent, prepare_gallery_photos
 from app.services.whatsapp_client import normalize_phone
+from app.services import reply_pack
 
 logger = logging.getLogger(__name__)
 
@@ -409,12 +410,56 @@ def _start_name_confirmation(
 
 
 def _event_showcase_message(event_type: str, *, with_images: bool = False) -> str:
+    packed = reply_pack.get_reply("state3.showcase_choice", event_type=event_type)
+    if packed:
+        return packed
     profile = get_event_profile(event_type)
     validation = profile["validation"]
     return (
         f"{validation}\n\n"
-        "Before we jump into the details, would you like to take a quick look at some of our past setups and signature cuisines, or shall we dive straight into planning your event?"
+        "Before we start planning the date and venue, do you need any information about us? I can share past setups, signature cuisines, and how we work, or we can go straight to your event details."
     )
+
+
+def _intent_b_reply(text: str, session: ConversationSession) -> str:
+    """State 3 Intent B (direct planning) reply, JSON-first (Kannan.rules.txt)."""
+    from app.services.human_style import normalize_customer_text
+
+    t = normalize_customer_text(text)
+    name = session.fields.customer_name
+    event_type = session.fields.event_type
+    if t in {"no", "nope", "skip", "nah"} or t.startswith("no "):
+        reply_id = "state3.intent_b_no"
+    elif t in {"ok", "okay", "k", "okk", "fine"}:
+        reply_id = "state3.intent_b_ok"
+    elif (name or "").strip():
+        reply_id = "state3.intent_b_named"
+    else:
+        reply_id = "state3.fallback_intent_b"
+    packed = reply_pack.get_reply(reply_id, name=name, event_type=event_type)
+    if packed:
+        return packed
+    return intent_b_planning_reply(text=text, name=name, event_type=event_type)
+
+
+def _intent_a_showcase_payload(session: ConversationSession, text: str) -> tuple[str, list]:
+    """JSON showcase copy + grouped event photos (Kannan.rules.txt Intent A)."""
+    reply = reply_pack.get_reply("state3.intent_a", event_type=session.fields.event_type)
+    if not reply:
+        profile = get_event_profile(session.fields.event_type)
+        reply = (
+            f"We’d love to show you! {profile['showcase']}\n\n"
+            f"You can explore our portfolio anytime at **srivatsanka.com**.\n\n"
+            f"{showcase_followup_date_ask(event_type=session.fields.event_type)}"
+        )
+    reply = handle_custom_request(session, text, reply)
+    group_name = reply_pack.get_event_profile(session.fields.event_type).get("media_group")
+    media = reply_pack.get_media_group(group_name)
+    if media:
+        mark_gallery_sent(session, [m.url for m in media])
+    else:
+        media = prepare_gallery_photos(session, user_text=session.fields.event_type)
+    return reply, media
 
 
 def _detect_event(text: str, *, name: str | None = None) -> str | None:
@@ -440,8 +485,9 @@ def extract_date_entity(text: str) -> str:
         r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+next\s+month",
         r"next\s+month(?:\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+week)?",
         r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+(?:this\s+|next\s+)?\w+",
-        r"(?:early|mid|late)[\s-]*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month)",
-        r"(?:this|next)\s+(?:week|month|weekend|year)",
+        r"(?:early|mid|late|end of)\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month)",
+        r"(?:this|next|coming)\s+(?:week|month|weekend|year)",
+        r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?",
     )
     for pat in relative_patterns:
         match = re.search(pat, lower, re.I)
@@ -863,27 +909,17 @@ async def process_guided_flow(
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
-        if wants_straight_to_planning(text) or wants_to_move_further(text):
-            move_to(session, GuidedStep.COLLECT_DETAILS)
-            reply = intent_b_planning_reply(
-                text=text,
-                name=session.fields.customer_name,
-                event_type=session.fields.event_type,
-            )
-            reply = handle_custom_request(session, text, reply)
-            track_question(session, reply, slot_key="event_date")
-            record_exchange(session, text, reply)
-            return AgentTurnResult(reply=reply, fields=session.fields)
-
+        # Intent A first: Yes / Sure / show photos → past setups (Kannan.rules.txt)
         if wants_showcase_look(text) or customer_wants_photos(text):
             move_to(session, GuidedStep.COLLECT_DETAILS)
-            profile = get_event_profile(session.fields.event_type)
-            showcase = profile["showcase"]
-            reply = (
-                f"We’d love to show you! {showcase}\n\n"
-                f"You can explore our portfolio anytime at **srivatsanka.com**.\n\n"
-                f"{showcase_followup_date_ask(event_type=session.fields.event_type)}"
-            )
+            reply, media = _intent_a_showcase_payload(session, text)
+            track_question(session, reply, slot_key="event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+
+        if wants_straight_to_planning(text) or wants_to_move_further(text):
+            move_to(session, GuidedStep.COLLECT_DETAILS)
+            reply = _intent_b_reply(text, session)
             reply = handle_custom_request(session, text, reply)
             track_question(session, reply, slot_key="event_date")
             record_exchange(session, text, reply)
@@ -912,12 +948,8 @@ async def process_guided_flow(
                 answered = handle_custom_request(session, text, answered)
             reply = f"{answered}\n\n{date_ask}"
         else:
-            # Intent B fallback (ok / emoji / unclassifiable) — one reply only
-            reply = intent_b_planning_reply(
-                text=text,
-                name=session.fields.customer_name,
-                event_type=session.fields.event_type,
-            )
+            # Intent B fallback (ok / emoji / unclassifiable) — one reply only, JSON-first
+            reply = _intent_b_reply(text, session)
             reply = handle_custom_request(session, text, reply)
         track_question(session, reply, slot_key="event_date")
         record_exchange(session, text, reply)
@@ -927,6 +959,15 @@ async def process_guided_flow(
 
     if step == GuidedStep.COLLECT_DETAILS:
         _skip_inapplicable_fields(session)
+
+        if wants_showcase_look(text) or customer_wants_photos(text):
+            reply, media = _intent_a_showcase_payload(session, text)
+            pending = _next_detail_prompt(session)
+            if pending and session.fields.event_date:
+                reply = handle_custom_request(session, text, f"{reply}\n\n{pending}")
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
         if "event_date" in newly_collected and "guest_count" not in newly_collected:
             if is_urgent_event_date(str(session.fields.event_date or text)):
