@@ -1,15 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, Upload, X } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Trash2, Upload, X } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { OrderScheduleBadge } from '../components/OrderScheduleBadge';
 import { FilterChips } from '../components/ui';
 import { useAppData } from '../context/AppDataContext';
 import {
+  deleteEnquiry,
   formatDate,
   importOrderExcel,
   recognizeOrderExcel,
+  type Enquiry,
   type OrderExcelRecognizePreview,
 } from '../api/client';
 import { isUnviewedOrder, sortOrdersForAttention } from '../utils/attention';
@@ -37,6 +39,7 @@ export default function OrdersPage() {
   const [importMode, setImportMode] = useState<'new' | 'existing'>('new');
   const [existingOrderId, setExistingOrderId] = useState('');
   const [importError, setImportError] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   const allOrders = useMemo(
     () => enquiries.filter((e) => e.status === 'CONVERTED'),
@@ -76,6 +79,23 @@ export default function OrdersPage() {
     } finally {
       setRecognizing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleDeleteOrder(order: Enquiry) {
+    if (deletingId) return;
+    const ok = window.confirm(
+      `Delete this order for ${order.customerName}?\n\nThis permanently removes the order, menu, payments, and related files. This cannot be undone.`,
+    );
+    if (!ok) return;
+    setDeletingId(order.id);
+    try {
+      await deleteEnquiry(order.id);
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete the order. Please try again.');
+    } finally {
+      setDeletingId('');
     }
   }
 
@@ -299,34 +319,52 @@ export default function OrdersPage() {
             const unread = isUnviewedOrder(e);
             const serial = serialNumbers.get(e.id);
             const completed = isOrderCompleted(e.eventDate);
+            const deleting = deletingId === e.id;
             return (
-              <Link key={e.id} to={`/orders/${e.id}`} className="block">
-                <Card
-                  className={`relative p-5 hover:border-[var(--primary)] transition-colors flex items-center justify-between gap-4 ${
-                    unread ? 'attention-unread' : completed ? 'opacity-90' : ''
-                  }`}
-                >
-                  <OrderScheduleBadge
-                    eventDate={e.eventDate}
-                    className="absolute top-3 right-12 sm:right-14"
-                  />
-                  <div className="min-w-0 pr-24 sm:pr-28">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
-                      <h3 className="font-semibold">{e.customerName}</h3>
-                      {unread && <AttentionBadge label="New order" />}
-                    </div>
-                    <p className="text-sm text-[var(--muted)]">
-                      {e.eventType} · {formatDate(e.eventDate)}
-                    </p>
-                    <p className="text-xs text-[var(--muted)] mt-1">
-                      {(e.dishes?.length ?? 0)} menu items
-                      {unread ? ' · Not opened yet' : completed ? ' · Event finished' : ''}
-                    </p>
+              <Card
+                key={e.id}
+                className={`relative p-5 hover:border-[var(--primary)] transition-colors flex items-center gap-3 ${
+                  unread ? 'attention-unread' : completed ? 'opacity-90' : ''
+                }`}
+              >
+                <OrderScheduleBadge
+                  eventDate={e.eventDate}
+                  className="absolute top-3 right-28 sm:right-36"
+                />
+                <Link to={`/orders/${e.id}`} className="min-w-0 flex-1 pr-24 sm:pr-28 block">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
+                    <h3 className="font-semibold">{e.customerName}</h3>
+                    {unread && <AttentionBadge label="New order" />}
                   </div>
-                  <ChevronRight className="text-[var(--muted)] shrink-0" size={20} />
-                </Card>
-              </Link>
+                  <p className="text-sm text-[var(--muted)]">
+                    {e.eventType} · {formatDate(e.eventDate)}
+                  </p>
+                  <p className="text-xs text-[var(--muted)] mt-1">
+                    {(e.dishes?.length ?? 0)} menu items
+                    {unread ? ' · Not opened yet' : completed ? ' · Event finished' : ''}
+                  </p>
+                </Link>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    disabled={Boolean(deletingId)}
+                    onClick={() => void handleDeleteOrder(e)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 min-h-[2.5rem]"
+                    aria-label={`Delete order for ${e.customerName}`}
+                  >
+                    <Trash2 size={14} />
+                    <span className="hidden sm:inline">{deleting ? 'Deleting…' : 'Delete'}</span>
+                  </button>
+                  <Link
+                    to={`/orders/${e.id}`}
+                    className="p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+                    aria-label={`Open order for ${e.customerName}`}
+                  >
+                    <ChevronRight size={20} />
+                  </Link>
+                </div>
+              </Card>
             );
           })}
         </div>

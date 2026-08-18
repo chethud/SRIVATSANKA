@@ -2,12 +2,11 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ChefHat, Clock, MapPin, Phone, Pencil, FileText, UtensilsCrossed, Calendar,
-  FileSpreadsheet, Printer, RotateCcw, Trash2,
+  FileSpreadsheet, Printer, RotateCcw,
 } from 'lucide-react';
 import type { Dish, Enquiry, Worker } from '../../api/client';
 import {
   createEnquiry,
-  deleteEnquiry,
   formatDate,
   formatDateTime,
   markEnquiryDelivered,
@@ -83,7 +82,6 @@ export function OrderDetailView({
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [deliveryBusy, setDeliveryBusy] = useState(false);
   const [bookAgainBusy, setBookAgainBusy] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const { refresh } = useAppData();
   const navigate = useNavigate();
@@ -118,23 +116,6 @@ export function OrderDetailView({
       alert(err instanceof Error ? err.message : 'Could not book again. Please try again.');
     } finally {
       setBookAgainBusy(false);
-    }
-  }
-
-  async function handleDeleteOrder() {
-    const ok = window.confirm(
-      `Delete this order for ${order.customerName}?\n\nThis permanently removes the order, menu, payments, and related files. This cannot be undone.`,
-    );
-    if (!ok) return;
-    setDeleteBusy(true);
-    try {
-      await deleteEnquiry(order.id);
-      await refresh();
-      navigate('/orders');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not delete the order. Please try again.');
-    } finally {
-      setDeleteBusy(false);
     }
   }
 
@@ -319,21 +300,12 @@ export function OrderDetailView({
           <span className="order-status-badge">{statusLabel(order.status)}</span>
           <button
             type="button"
-            disabled={bookAgainBusy || deleteBusy}
+            disabled={bookAgainBusy}
             onClick={() => void handleBookAgain()}
             className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] disabled:opacity-60 min-h-[2.5rem]"
           >
             <RotateCcw size={14} />
             {bookAgainBusy ? 'Booking…' : 'Book again'}
-          </button>
-          <button
-            type="button"
-            disabled={deleteBusy || bookAgainBusy}
-            onClick={() => void handleDeleteOrder()}
-            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 min-h-[2.5rem]"
-          >
-            <Trash2 size={14} />
-            {deleteBusy ? 'Deleting…' : 'Delete order'}
           </button>
           {order.paymentReceived ? (
             <span className="text-xs font-medium text-[var(--success-text)]">Payment received</span>
