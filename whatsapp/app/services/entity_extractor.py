@@ -7,8 +7,14 @@ from dataclasses import dataclass
 
 from app.data.company_knowledge import is_known_event_type, match_event_type
 from app.services.callback_time import is_immediate_callback, normalize_callback_label
-from app.services.conversation_turns import extract_name
-from app.services.event_date import is_urgent_event_date, looks_like_event_date
+from app.services.conversation_turns import clean_person_name, extract_name
+from app.services.event_date import (
+    extract_date_snippet,
+    has_service_planning_intent,
+    is_ambiguous_date_phrase,
+    is_urgent_event_date,
+    looks_like_event_date,
+)
 from app.services.human_style import wants_discuss_on_call
 from app.services.location_normalize import extract_location_entity
 from app.services.session_store import ConversationSession
@@ -44,12 +50,7 @@ def _extract_event(text: str, name: str | None) -> str | None:
 def _sanitize_name(name: str | None) -> str | None:
     if not name:
         return None
-    cleaned = re.split(
-        r"\b(planning|looking|need|for|wedding|engagement|reception|birthday|housewarming|upanayanam|seemantham|baby shower)\b",
-        name,
-        maxsplit=1,
-        flags=re.I,
-    )[0].strip(" ,.-")
+    cleaned = clean_person_name(name)
     if not cleaned:
         return None
     reject = {
@@ -74,31 +75,15 @@ def _sanitize_name(name: str | None) -> str | None:
     return cleaned
 
 
-def _extract_date_entity(text: str) -> str:
-    raw = text.strip().rstrip(".,!?")
-    lower = raw.lower()
-    # Prefer fuller phrases like "next month 20th" / "20th of next month"
-    fuller = (
-        r"(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:next\s+month|this\s+month)",
-        r"(?:next\s+month|this\s+month)\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?",
-        r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+next\s+month",
-        r"next\s+month(?:\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+week)?",
-        r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+(?:this\s+|next\s+)?\w+",
-        r"(?:early|mid|late|end of)\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month|this\s+month)",
-        r"(?:this|next|coming)\s+(?:week|month|weekend|year)",
-        r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?",
-    )
-    for pat in fuller:
-        match = re.search(pat, lower, re.I)
-        if match:
-            return raw[match.start() : match.end()]
-    return raw
+def _extract_date_entity(text: str) -> str | None:
+    return extract_date_snippet(text)
 
 
 def _extract_guest_count(text: str) -> str | int:
     raw = text.strip()
-    if re.search(r"\b\d{1,2}(?:st|nd|rd|th)\b", raw, re.I) and re.search(r"\b(week|month|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|today|tomorrow)\b", raw, re.I):
-        return raw[:60] if raw else 100
+    people_match = re.search(r"(\d+)\s*(?:guests?|people|pax)\b", raw, re.I)
+    if people_match:
+        return int(people_match.group(1))
     scoped_range = re.search(
         r"(\d+)\s*(?:-|–|—|to|and)\s*(\d+)\s*(?:guests?|people|pax)",
         raw,
@@ -162,20 +147,25 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
         or re.search(r"\b(call|callback|ring me|speak|talk)\b", lower)
     )
     photoish = wants_showcase_look(raw) or customer_wants_photos(raw)
-    if photoish:
-        pass
-    elif is_urgent_event_date(raw) and not callbackish:
-        entities.event_date = _extract_date_entity(raw)
-        entities.urgent_date = True
-    elif (not callbackish) and looks_like_event_date(raw):
-        date_entity = _extract_date_entity(raw)
-        if date_entity and date_entity != raw[:3]:
-            entities.event_date = date_entity
 
-    if re.search(r"\bguests?\b|\bpeople\b|\bpax\b", lower):
+    if (not callbackish) and looks_like_event_date(raw):
+        date_entity = _extract_date_entity(raw)
+        if date_entity and not is_ambiguous_date_phrase(date_entity):
+            entities.event_date = date_entity
+            if is_urgent_event_date(raw):
+                entities.urgent_date = True
+
+    if re.search(r"\b(guests?|people|pax)\b", lower):
+        entities.guest_count = _extract_guest_count(raw)
+    elif re.search(r"\bfor\s+\d+\b", lower) and looks_like_event_date(raw):
         entities.guest_count = _extract_guest_count(raw)
 
-    if re.search(r"\b(venue|location|hall|area|city|locality|mysore|mysuru|bangalore|bengaluru|hunsur|hundur)\b", lower):
+    if has_service_planning_intent(raw):
+        entities.event_location = "Customer managed venue"
+        if re.search(r"\b(catering|decor|decoration)\b", lower):
+            entities.special_requests = raw
+
+    if re.search(r"\b(venue|location|hall|area|city|locality|mysore|mysuru|bangalore|bengaluru|benglore|banglore|bengalore|hunsur|hundur)\b", lower):
         entities.event_location = extract_location_entity(raw)
 
     meal = _extract_meal_from_text(raw)
@@ -193,6 +183,8 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
         and re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night|am|pm)\b", lower)
     ):
         entities.preferred_callback = normalize_callback_label(raw)
+    elif re.search(r"\b(today|tomorrow)\s+(morning|evening|afternoon|night)\b", lower):
+        entities.preferred_callback = raw.strip().title()
     elif re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night)\b", lower) and re.search(
         r"\b(call|callback|ring|speak|talk)\b",
         lower,
@@ -202,5 +194,8 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
     if re.search(r"\b(fusion|custom|italian|chinese|dessert|live counter|pan asian|mocktail|gelato)\b", lower):
         if not re.search(r"\b(cocktail party|alcohol|alcoholic|conference|exhibition|expo)\b", lower):
             entities.special_requests = raw
+
+    if re.search(r"\b(pure\s*veg|pure\s*vegetarian|vegetarian catering|veg only|sattvic|satvik)\b", lower):
+        entities.special_requests = (entities.special_requests or "Pure vegetarian catering").strip()
 
     return entities

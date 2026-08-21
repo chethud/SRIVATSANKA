@@ -16,6 +16,7 @@ __all__ = [
     "record_exchange",
     "is_greeting_only",
     "customer_wants_to_proceed",
+    "clean_person_name",
     "extract_name",
     "natural_field_ack",
     "natural_continue_hint",
@@ -99,6 +100,69 @@ def customer_wants_to_proceed(text: str) -> bool:
     )
 
 
+NAME_STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "am",
+        "call",
+        "from",
+        "hello",
+        "hey",
+        "hi",
+        "hii",
+        "hiii",
+        "here",
+        "i",
+        "im",
+        "i'm",
+        "is",
+        "its",
+        "it's",
+        "me",
+        "my",
+        "name",
+        "namaste",
+        "speaking",
+        "the",
+        "this",
+        "vanakkam",
+    }
+)
+
+NAME_INTRO_PATTERNS = (
+    r"^(?:(?:hi|hello|hey|hii|hiii|namaste|vanakkam)[,!\s]+)+",
+    r"^(?:(?:my|the)\s+)?name\s+is\s+",
+    r"^(?:i'?m|i am|this is|call me|it'?s|its)\s+",
+)
+
+NAME_TRAILING_SPLIT = re.compile(
+    r"\b(planning|looking|need|want|for|wedding|engagement|reception|birthday|housewarming|upanayanam|seemantham|baby shower)\b",
+    re.I,
+)
+
+
+def clean_person_name(text: str) -> str:
+    """Strip intro phrases and stop words; return a title-cased personal name."""
+    t = (text or "").strip().strip(".,!?")
+    if not t:
+        return ""
+    for _ in range(4):
+        prev = t
+        for pat in NAME_INTRO_PATTERNS:
+            t = re.sub(pat, "", t, flags=re.I).strip()
+        if t == prev:
+            break
+    t = NAME_TRAILING_SPLIT.split(t, maxsplit=1)[0].strip(" ,.-")
+    words = [w.strip(".,!'\"()") for w in t.split() if w.strip(".,!'\"()")]
+    words = [w for w in words if w.lower() not in NAME_STOP_WORDS]
+    if not words:
+        return ""
+    if len(words) > 4:
+        words = words[:4]
+    return " ".join(words).title()[:80]
+
+
 def extract_name(text: str) -> str:
     """Pull a name from casual WhatsApp phrasing. Never treat questions as names."""
     from app.services.gemini_conversation import looks_like_question
@@ -111,6 +175,7 @@ def extract_name(text: str) -> str:
         return ""
     if "?" in t:
         return ""
+
     # Never treat polite fillers / intents as a personal name
     reject_names = {
         "hi",
@@ -155,16 +220,23 @@ def extract_name(text: str) -> str:
         "planning",
     }
     for pat in (
-        r"(?:hi\s+i\s+am|hello\s+i\s+am|i'?m|i am|my name is|this is|call me|it's|its|hello)\s+([A-Za-z][A-Za-z\s'.-]{0,40}?)"
-        r"(?=\s+(?:i\s+am|looking|planning|need|for|and|with|on|wedding|engagement|reception|birthday|housewarming|upanayanam|seemantham|baby\s+shower)\b|[,.!?]|$)",
-        r"^(?:hi|hello|hey|hii)[,!\s]+(?:i'?m|i am|this is)?\s*([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30})?)",
-        r"^([A-Za-z][A-Za-z\s'.-]{1,40}),?\s+(?:here|speaking)",
+        r"(?:my\s+)?name\s+is\s+([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30}){0,2})",
+        r"(?:i'?m|i am|this is|call me|it'?s|its)\s+([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30}){0,2})",
+        r"^(?:hi|hello|hey|hii)[,!\s]+(?:my\s+)?name\s+is\s+([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30}){0,2})",
+        r"^(?:hi|hello|hey|hii)[,!\s]+(?:i'?m|i am|this is|call me)\s+([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30}){0,2})",
+        r"^([A-Za-z][A-Za-z'.-]{1,30}(?:\s+[A-Za-z][A-Za-z'.-]{1,30}){0,2}),?\s+(?:here|speaking)",
     ):
         m = re.search(pat, t, re.I)
         if m:
-            name = m.group(1).strip().strip(".,").title()
-            if name.lower() not in GREETING_ONLY and name.lower() not in reject_names and len(name) >= 2:
-                return name[:80]
+            name = clean_person_name(m.group(1))
+            if name and name.lower() not in GREETING_ONLY and name.lower() not in reject_names and len(name) >= 2:
+                return name
+
+    if re.search(r"\b(my\s+name\s+is|name\s+is|i\s+am|i'?m|this\s+is|call\s+me)\b", t, re.I):
+        name = clean_person_name(t)
+        if name and name.lower() not in GREETING_ONLY and name.lower() not in reject_names and len(name) >= 2:
+            return name
+
     words = [w.strip(".,!") for w in t.split() if w.strip(".,!")]
     # Reject sentence-like or intent-heavy messages
     intent_words = {
@@ -197,18 +269,22 @@ def extract_name(text: str) -> str:
     }
     if any(w.lower() in intent_words for w in words):
         # Still allow "I am Tejasvi planning a wedding" via regex above
-        if not re.search(r"\b(i'?m|i am|my name is|this is|call me)\b", t, re.I):
+        if not re.search(r"\b(i'?m|i am|my name is|name is|this is|call me)\b", t, re.I):
             return ""
-    if 1 <= len(words) <= 3 and all(w.isalpha() or "'" in w for w in words):
-        joined = " ".join(words)
+    filtered = [w for w in words if w.lower() not in NAME_STOP_WORDS]
+    if 1 <= len(filtered) <= 3 and all(w.isalpha() or "'" in w for w in filtered):
+        joined = clean_person_name(" ".join(filtered))
         if (
-            joined.lower() not in GREETING_ONLY
+            joined
+            and joined.lower() not in GREETING_ONLY
             and joined.lower() not in reject_names
             and not is_greeting_only(joined)
         ):
-            return joined.title()[:80]
-    if len(words) == 1 and len(t) >= 2 and t.lower() not in GREETING_ONLY and t.lower() not in reject_names:
-        return t[:80]
+            return joined
+    if len(filtered) == 1 and len(filtered[0]) >= 2 and filtered[0].lower() not in GREETING_ONLY and filtered[0].lower() not in reject_names:
+        if filtered[0].isdigit():
+            return ""
+        return clean_person_name(filtered[0])
     return ""
 
 

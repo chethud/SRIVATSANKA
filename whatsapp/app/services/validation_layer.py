@@ -99,6 +99,8 @@ def reset_session_to_greeting(session: ConversationSession) -> None:
     session.showcase_prompted = False
     session.pending_name = None
     session.name_confirmed = False
+    session.pending_date_confirm = None
+    session.pending_event_type_switch = None
     session.consecutive_loop_count = 0
     session.last_assistant_question = None
     session.last_asked_slot = None
@@ -108,6 +110,52 @@ def reset_session_to_greeting(session: ConversationSession) -> None:
         slot.value = None
         slot.confidence = 0.0
         slot.collected = False
+
+
+def soft_reset_session(session: ConversationSession) -> str:
+    """RESTART: keep confirmed name and known details; restart the guided flow."""
+    preserved = session.fields.model_dump()
+    name = preserved.get("customer_name") if session.name_confirmed else None
+    reset_session_to_greeting(session)
+    if name:
+        session.fields = EnquiryFields(
+            customer_name=name,
+            event_type=preserved.get("event_type"),
+            event_date=preserved.get("event_date"),
+            event_location=preserved.get("event_location"),
+            guest_count=preserved.get("guest_count"),
+            meal_preference=preserved.get("meal_preference"),
+            notes=preserved.get("notes"),
+        )
+        session.name_confirmed = True
+        if session.fields.event_type and session.fields.event_date:
+            session.guided_step = GuidedStep.COLLECT_DETAILS
+            from app.services.guided_flow import _next_detail_prompt
+
+            next_prompt = _next_detail_prompt(session)
+            return (
+                f"Of course, {name}. We can start fresh. I still have your basic details, "
+                f"but I'll confirm anything that has changed.\n\n{next_prompt or 'How can I help with your event?'}"
+            )
+        session.guided_step = (
+            GuidedStep.AWAIT_POST_SHOWCASE
+            if session.fields.event_type
+            else GuidedStep.AWAIT_EVENT_TYPE
+        )
+        return (
+            f"Of course, {name}. We can start fresh. I still have your basic details, "
+            "but I'll confirm anything that has changed.\n\n"
+            + (
+                "What celebration would you like to plan?"
+                if not session.fields.event_type
+                else "Would you like a quick look at past setups, or shall we continue with your event details?"
+            )
+        )
+    session.guided_step = GuidedStep.AWAIT_NAME
+    return (
+        "Of course. We can start fresh.\n\n"
+        "Hello! Welcome to Srivatsanka Events and Services. ✨ May I have your name, please?"
+    )
 
 
 def circuit_breaker_reply() -> str:

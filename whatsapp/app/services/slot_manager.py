@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.schemas import EnquiryFields
+from app.services.conversation_turns import clean_person_name
 from app.services.entity_extractor import ExtractedEntities
 from app.services.session_store import ConversationSession, GuidedStep, SlotValue
 
@@ -33,6 +34,13 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
     """Gate entity writes by current step so off-topic text cannot fill future slots."""
     step = session.guided_step
     allowed: set[str] = set()
+    early_steps = {
+        GuidedStep.AWAIT_HI,
+        GuidedStep.AWAIT_NAME,
+        GuidedStep.AWAIT_NAME_CONFIRM,
+        GuidedStep.AWAIT_EVENT_TYPE,
+        GuidedStep.AWAIT_POST_SHOWCASE,
+    }
 
     if step in {GuidedStep.AWAIT_HI, GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_NAME_CONFIRM}:
         allowed.add("customer_name")
@@ -40,9 +48,6 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
     elif step == GuidedStep.AWAIT_EVENT_TYPE:
         allowed.add("event_type")
     elif step == GuidedStep.AWAIT_POST_SHOWCASE:
-        # Showcase turn may mention date casually; only keep strong explicit date/callback.
-        if entities.urgent_date:
-            allowed.add("event_date")
         if entities.callback_requested:
             allowed.add("preferred_callback")
         allowed.add("special_requests")
@@ -61,6 +66,16 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
         if entities.callback_requested:
             allowed.add("preferred_callback")
     elif step == GuidedStep.DONE:
+        allowed.add("special_requests")
+
+    # Capture details whenever the customer volunteers them, even before detail collection.
+    if step in early_steps:
+        if entities.event_date:
+            allowed.add("event_date")
+        if entities.guest_count is not None:
+            allowed.add("guest_count")
+        if entities.event_location:
+            allowed.add("event_location")
         allowed.add("special_requests")
 
     # Never overwrite an already-confirmed name/event from noisy later text
@@ -90,7 +105,7 @@ def apply_entities(session: ConversationSession, entities: ExtractedEntities) ->
             continue
         # Name stays pending until Yes confirmation (STATE 1.2)
         if key == "customer_name" and not session.name_confirmed:
-            session.pending_name = str(value).strip()
+            session.pending_name = clean_person_name(str(value)) or str(value).strip()
             continue
         if data.get(key) in (None, ""):
             data[key] = value

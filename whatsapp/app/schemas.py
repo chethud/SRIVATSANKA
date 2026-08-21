@@ -167,6 +167,13 @@ class DishIn(BaseModel):
     description: str | None = None
 
 
+class DishUpdateIn(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    price: float | None = None
+    description: str | None = None
+
+
 class InvoiceRecognizeOut(BaseModel):
     pendingId: str
     fileName: str
@@ -217,6 +224,7 @@ class EnquiryCreateIn(BaseModel):
 
 class EnquiryUpdateIn(BaseModel):
     notes: str | None = None
+    customerName: str | None = None
 
 
 class EnquiryPaymentIn(BaseModel):

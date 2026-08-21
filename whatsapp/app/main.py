@@ -2,8 +2,9 @@ import logging
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import SessionLocal, init_db
@@ -74,14 +75,23 @@ async def lifespan(_app: FastAPI):
             "GEMINI_API_KEY not configured — WhatsApp will use template replies. "
             "Set GEMINI_API_KEY in whatsapp/.env"
         )
+    if settings.is_production:
+        log.info("Running in PRODUCTION mode (dev routes and OpenAPI docs disabled)")
     yield
 
+
+_docs_url = None if settings.is_production else "/docs"
+_redoc_url = None if settings.is_production else "/redoc"
+_openapi_url = None if settings.is_production else "/openapi.json"
 
 app = FastAPI(
     title="SRIVATSANKA EVENTS API",
     description="WhatsApp AI agent and owner dashboard API",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
 )
 
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
@@ -102,13 +112,23 @@ app.include_router(api.router)
 app.include_router(chat.router)
 app.include_router(orders.router)
 app.include_router(resources.router)
-app.include_router(dev.router)
+if not settings.is_production:
+    app.include_router(dev.router)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    logging.getLogger(__name__).exception("Unhandled error: %s", exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/")
 async def root() -> dict:
-    return {
+    payload = {
         "service": "Kannans WhatsApp AI Agent",
-        "docs": "/docs",
         "health": "/api/health",
+        "environment": settings.environment,
     }
+    if not settings.is_production:
+        payload["docs"] = "/docs"
+    return payload

@@ -1,0 +1,15 @@
+[Unit]
+Description=Kannans WhatsApp API (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/srivatsanka/whatsapp
+EnvironmentFile=/home/ubuntu/srivatsanka/whatsapp/.env
+ExecStart=/home/ubuntu/srivatsanka/whatsapp/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

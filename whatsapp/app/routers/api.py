@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import delete, func, select
+from fastapi.responses import JSONResponse
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -31,13 +32,20 @@ from app.schemas import (
     OwnerPhoneIn,
     UpdateEnquiryStatus,
 )
+from app.config import settings
 from app.services.dashboard_assistant import answer_dashboard_query
+from app.services.gemini_conversation import is_gemini_configured
 from app.services.order_excel_import import import_normalized_order, parse_order_excel_bytes
 from app.services.order_billing import billing_total_from_notes
 from app.services.profit import order_amount
 from app.services.whatsapp_client import is_whatsapp_configured
 
 router = APIRouter(prefix="/api", tags=["api"])
+
+
+def _block_in_production() -> None:
+    if settings.is_production:
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 def _enquiry_billing_figures(e: Enquiry, menu_prices: dict[str, float] | None = None) -> tuple[float, float, float]:
@@ -108,14 +116,31 @@ def _enquiry_load_options():
     return (selectinload(Enquiry.dish_items), selectinload(Enquiry.payments))
 
 
-@router.get("/health")
-async def health() -> dict:
-    return {"status": "ok", "service": "kannans-api"}
+@router.get("/health", response_model=None)
+async def health(db: AsyncSession = Depends(get_db)):
+    db_ok = False
+    try:
+        await db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    payload = {
+        "status": "ok" if db_ok else "degraded",
+        "service": "kannans-api",
+        "environment": settings.environment,
+        "checks": {
+            "database": db_ok,
+            "whatsapp": is_whatsapp_configured(),
+            "gemini": is_gemini_configured(),
+        },
+    }
+    if not db_ok:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
 
 
 @router.get("/whatsapp/status")
 async def whatsapp_status(db: AsyncSession = Depends(get_db)) -> dict:
-    from app.config import settings
     from app.services.app_settings import get_owner_phone
 
     phone_id = settings.whatsapp_phone_number_id.strip()
@@ -125,7 +150,6 @@ async def whatsapp_status(db: AsyncSession = Depends(get_db)) -> dict:
         "phone_number_id_set": bool(phone_id),
         "phone_number_id_suffix": phone_id[-6:] if len(phone_id) >= 6 else phone_id,
         "token_set": bool(settings.whatsapp_token.strip()),
-        "verify_token": settings.whatsapp_verify_token,
         "webhook_path": "/webhook",
         "owner_phone": owner,
     }
@@ -344,6 +368,11 @@ async def update_enquiry(
         raise HTTPException(status_code=404, detail="Enquiry not found")
     if payload.notes is not None:
         enquiry.notes = payload.notes
+    if payload.customerName is not None:
+        cleaned = payload.customerName.strip()
+        if not cleaned:
+            raise HTTPException(status_code=400, detail="Customer name cannot be empty")
+        enquiry.customerName = cleaned
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)
@@ -504,12 +533,14 @@ async def mark_enquiry_viewed(
 @router.post("/seed-excel-refs")
 async def seed_excel_reference_orders_api(db: AsyncSession = Depends(get_db)) -> dict:
     """Load 4 Excel-reference CONVERTED orders (Nithin, Muralidharan, Casagrand, RA)."""
+    _block_in_production()
     return await seed_excel_reference_orders(db, replace=True)
 
 
 @router.post("/seed-demo")
 async def seed_demo_dashboard(db: AsyncSession = Depends(get_db)) -> dict:
     """Load demo enquiries, vendors, workers, expenses, and notifications."""
+    _block_in_production()
     return await seed_demo_data(db, force=True)
 
 

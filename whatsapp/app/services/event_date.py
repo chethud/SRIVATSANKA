@@ -150,10 +150,49 @@ def is_urgent_event_date(text: str, now: datetime | None = None) -> bool:
     return 0 <= delta <= 7
 
 
+def has_service_planning_intent(text: str) -> bool:
+    """True when the customer is describing services/venue scope, not giving a date."""
+    t = (text or "").lower().strip()
+    if not t:
+        return False
+    if re.search(
+        r"\b(don'?t need|do not need|no need|not need|without)\b.{0,40}\b(venue|location)\b",
+        t,
+    ):
+        return True
+    if re.search(r"\b(i will|i'll|ill)\s+handle\b.{0,30}\bvenue\b", t):
+        return True
+    return False
+
+
+def _month_token_in_text(t: str) -> bool:
+    """Match month names with word boundaries (avoids 'decorations' -> dec)."""
+    long_months = (
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    )
+    if any(re.search(rf"\b{m}\b", t) for m in long_months):
+        return True
+    short_months = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec")
+    return any(re.search(rf"\b{m}\b", t) for m in short_months)
+
+
 def looks_like_event_date(text: str) -> bool:
     """True when the message is a date / month / relative window, not a random digit."""
     t = (text or "").lower().strip()
     if not t:
+        return False
+    if has_service_planning_intent(t):
         return False
     if re.search(
         r"\b(?:the\s+)?(?:\d+(?:st|nd|rd|th)|first|second|third|fourth|1st|2nd|3rd|4th)\s+week\b|"
@@ -177,33 +216,116 @@ def looks_like_event_date(text: str) -> bool:
             if any(w in t for w in ("detail", "info", "know", "tell", "about", "need")):
                 return False
         return True
-    months = (
-        "january",
-        "february",
-        "march",
-        "april",
-        "may",
-        "june",
-        "july",
-        "august",
-        "september",
-        "october",
-        "november",
-        "december",
-        "jan",
-        "feb",
-        "mar",
-        "apr",
-        "jun",
-        "jul",
-        "aug",
-        "sep",
-        "sept",
-        "oct",
-        "nov",
-        "dec",
+    return _month_token_in_text(t)
+
+
+def extract_date_snippet(text: str) -> str | None:
+    """Pull a date phrase from free text, or None when no real date is present."""
+    raw = (text or "").strip().rstrip(".,!?")
+    if not raw or has_service_planning_intent(raw) or not looks_like_event_date(raw):
+        return None
+    lower = raw.lower()
+
+    relative_patterns = (
+        r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+next\s+month",
+        r"next\s+month(?:\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+week)?",
+        r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+(?:this\s+|next\s+)?\w+",
+        r"(?:early|mid|late|end of)\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month|this\s+month)",
+        r"(?:this|next|coming)\s+(?:week|month|weekend|year)",
+        r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?",
     )
-    return any(m in t for m in months)
+    for pat in relative_patterns:
+        match = re.search(pat, lower, re.I)
+        if match:
+            return raw[match.start() : match.end()]
+
+    months_pat = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
+    days_pat = r"\d+(?:st|nd|rd|th)?"
+
+    match = re.search(rf"\b{months_pat}\s+{days_pat}(?:\s*(?:or|and|to|-)\s*{days_pat})?(?:\s+\d{{4}})?\b", lower, re.I)
+    if match:
+        return raw[match.start() : match.end()]
+
+    match = re.search(
+        rf"\bnext\s+{months_pat}\s+{days_pat}(?:\s+\d{{4}})?\b",
+        lower,
+        re.I,
+    )
+    if match:
+        return raw[match.start() : match.end()]
+
+    match = re.search(rf"\b{days_pat}\s+{months_pat}(?:\s+\d{{4}})?\b", lower, re.I)
+    if match:
+        return raw[match.start() : match.end()]
+
+    match = re.search(rf"\b{months_pat}\b", lower, re.I)
+    if match:
+        return raw[match.start() : match.end()]
+
+    match = re.search(rf"\b{days_pat}\b", lower, re.I)
+    if match:
+        return raw[match.start() : match.end()]
+
+    if re.search(r"\b(week|month|next|early|mid|late|today|tomorrow)\b", lower):
+        words = raw.split()
+        if len(words) <= 8:
+            return raw
+
+    return None
+
+
+_MONTH_NAMES = (
+    "",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
+def is_ambiguous_date_phrase(text: str) -> bool:
+    """True when the customer gave a date that needs confirmation before storing."""
+    t = (text or "").lower().strip()
+    if not t:
+        return False
+    if re.fullmatch(r"\d{1,5}", t):
+        return False
+    if re.search(r"\bnext month\s+\d{1,2}(?:st|nd|rd|th)?\b", t):
+        return not _month_token_in_text(t)
+    if re.fullmatch(r"\d{1,2}(?:st|nd|rd|th)?", t):
+        return True
+    return False
+
+
+def suggest_ambiguous_date(text: str, now: datetime | None = None) -> str | None:
+    """Best-effort interpretation for phrases like 'next month 2'."""
+    reference = now or datetime.now()
+    lower = (text or "").lower().strip()
+    match = re.search(r"\bnext month\s+(\d{1,2})(?:st|nd|rd|th)?\b", lower)
+    if match:
+        day = int(match.group(1))
+        if reference.month == 12:
+            year, month = reference.year + 1, 1
+        else:
+            year, month = reference.year, reference.month + 1
+        return f"{day} {_MONTH_NAMES[month]} {year}"
+    return None
+
+
+def ambiguous_date_confirm_prompt(text: str, *, event_type: str | None = None) -> str:
+    suggested = suggest_ambiguous_date(text)
+    label = (event_type or "event").lower()
+    if suggested:
+        return f"Just to confirm, do you mean {suggested} for your {label}?"
+    return f"Could you please confirm the exact date for your {label}?"
 
 
 def parse_event_date(text: str, now: datetime | None = None) -> datetime:

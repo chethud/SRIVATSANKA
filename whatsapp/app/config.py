@@ -122,11 +122,48 @@ class Settings(BaseSettings):
     seed_excel_refs_on_startup: bool = True
     dev_seed_token: str = ""  # optional X-Dev-Seed-Token header when set
 
+    # development | production
+    environment: str = "development"
+
     # Owner dashboard login (JWT — multiple members can sign in at once)
     dashboard_username: str = "Admin"
     dashboard_password: str = "Admin@123"
     jwt_secret: str = "kannans-change-this-secret-in-production"
     jwt_expire_hours: int = 168  # 7 days per session
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in {"production", "prod"}
+
+
+_INSECURE_JWT = "kannans-change-this-secret-in-production"
+_INSECURE_PASSWORD = "Admin@123"
+
+
+def validate_production_settings(s: Settings) -> None:
+    """Log critical misconfigurations when running in production."""
+    if not s.is_production:
+        return
+    issues: list[str] = []
+    if s.jwt_secret == _INSECURE_JWT:
+        issues.append("JWT_SECRET is still the default — set a strong random secret in whatsapp/.env")
+    if s.dashboard_password == _INSECURE_PASSWORD:
+        issues.append("DASHBOARD_PASSWORD is still the default — change it in whatsapp/.env")
+    if not s.meta_app_secret.strip():
+        issues.append("META_APP_SECRET is unset — WhatsApp webhook signatures are not verified")
+    if not s.gemini_api_key.strip():
+        issues.append("GEMINI_API_KEY is unset — bot will use template-only replies")
+    if not is_whatsapp_configured_static(s):
+        issues.append("WhatsApp Cloud API tokens are not configured")
+    for msg in issues:
+        logger.warning("PRODUCTION CONFIG: %s", msg)
+
+
+def is_whatsapp_configured_static(s: Settings) -> bool:
+    token = s.whatsapp_token.strip()
+    phone_id = s.whatsapp_phone_number_id.strip()
+    placeholders = {"", "your-whatsapp-cloud-api-token", "your-phone-number-id"}
+    return token not in placeholders and phone_id not in placeholders
 
 
 def _load_settings() -> Settings:
@@ -151,6 +188,7 @@ def _load_settings() -> Settings:
             setattr(s, attr, val.strip().strip('"').strip("'"))
     if not s.whatsapp_verify_token.strip():
         s.whatsapp_verify_token = "kannans-verify-token"
+    validate_production_settings(s)
     return s
 
 

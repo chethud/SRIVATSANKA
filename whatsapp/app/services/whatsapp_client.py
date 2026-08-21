@@ -40,9 +40,12 @@ def is_whatsapp_configured() -> bool:
 
 
 def verify_webhook_signature(payload: bytes, signature_header: str | None) -> bool:
-    """Verify X-Hub-Signature-256 from Meta. Skipped if META_APP_SECRET is not set."""
+    """Verify X-Hub-Signature-256 from Meta."""
     secret = settings.meta_app_secret.strip()
     if not secret:
+        if settings.is_production:
+            logger.warning("META_APP_SECRET unset in production — rejecting unsigned webhook")
+            return False
         return True
     if not signature_header or not signature_header.startswith("sha256="):
         return False
@@ -58,6 +61,9 @@ async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
         return False, "Invalid phone number"
 
     if not is_whatsapp_configured():
+        if settings.is_production:
+            logger.error("WhatsApp not configured — cannot send message in production")
+            return False, "WhatsApp API not configured"
         logger.info("[WhatsApp Mock] To: %s | %s", to, text[:120])
         return True, None
 

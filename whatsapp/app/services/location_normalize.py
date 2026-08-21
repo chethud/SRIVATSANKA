@@ -5,6 +5,13 @@ from __future__ import annotations
 import re
 
 AREA_ALIASES: dict[str, str] = {
+    "bengaluru": "Bengaluru",
+    "bangalore": "Bengaluru",
+    "banglore": "Bengaluru",
+    "benglore": "Bengaluru",
+    "bengalore": "Bengaluru",
+    "mysuru": "Mysuru",
+    "mysore": "Mysuru",
     "hsr": "HSR Layout",
     "hsr layout": "HSR Layout",
     "hsr laytout": "HSR Layout",
@@ -40,8 +47,8 @@ def normalize_location(text: str) -> str:
     key = raw.lower()
     if key in AREA_ALIASES:
         return AREA_ALIASES[key]
-    for alias, canonical in AREA_ALIASES.items():
-        if alias in key or key in alias:
+    for alias, canonical in sorted(AREA_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+        if re.search(rf"\b{re.escape(alias)}\b", key):
             return canonical
     return raw.title()
 

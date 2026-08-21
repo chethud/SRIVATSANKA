@@ -1,15 +1,29 @@
 {
   "_meta": {
     "source_of_truth": "D:\\Kannan.rules.txt",
-    "note": "Spoon-fed WhatsApp reply pack. The FSM in guided_flow.py looks these up FIRST. Gemini is only used when a reply_id is missing and the state has no catch-all. Placeholders: {name} {who} {event} {occasion} {special_request} {slot}. Never use em-dashes."
+    "note": "Spoon-fed WhatsApp reply pack. The FSM in guided_flow.py looks these up FIRST. Gemini is only used when a reply_id is missing and the state has no catch-all. Placeholders: {name} {who} {event} {occasion} {special_request} {slot} {dishes} {phone} {email} {hours} {company} {established}. Never use em-dashes.",
+    "redeploy": {
+      "when_user_says": ["redeploy", "deploy to aws"],
+      "backup_first": true,
+      "never_delete_live_data": true,
+      "keep_forever_on_server": [
+        "whatsapp/kannans.db",
+        "whatsapp/.env",
+        "whatsapp/uploads",
+        "website/.env.production"
+      ],
+      "before_replace": "Copy live files into /home/ubuntu/srivatsanka-backups/<timestamp>/ then overlay new code. Never rm the live database, .env, or uploads. Overlay website/dist only after the current dist is copied into that backup folder.",
+      "script": "whatsapp/scripts/aws-redeploy.ps1"
+    }
   },
 
   "replies": {
     "state1.welcome": {
       "variants": [
-        "Hello! Welcome to Srivatsanka Events and Services. \u2728\n\nMay I have your name, please?",
-        "Namaste and welcome to Srivatsanka Events! \ud83d\ude4f\n\nWho do we have the pleasure of speaking with today?",
-        "Hello! Thank you for reaching out to Srivatsanka Events and Services. \u2728\n\nWe're excited to help bring your celebration to life! May I know your name, please?"
+        "Hello! Welcome to Srivatsanka Events and Services. \u2728\n\nSomething special is brewing! We'd love to know who we're chatting with. May I have your name, please?",
+        "Namaste and welcome to Srivatsanka Events! \ud83d\ude4f\n\nA great celebration starts with a warm connection. Who do we have the pleasure of speaking with today?",
+        "Hello! Thank you for reaching out to Srivatsanka Events and Services. \u2728\n\nWe're excited to help bring your celebration to life! May I know your name, please?",
+        "Hello! Welcome to Srivatsanka Events and Services. \u2728\n\nMay I have your name, please?"
       ],
       "next_state": "AWAIT_NAME",
       "ask_slot": "customer_name"
@@ -18,7 +32,10 @@
       "variants": [
         "Could I get your name?",
         "Mind sharing your name?",
-        "One quick one, what's your name?"
+        "One quick one, what's your name?",
+        "May I have your name, please?",
+        "Who do we have the pleasure of speaking with today?",
+        "May I know your name, please?"
       ],
       "ask_slot": "customer_name"
     },
@@ -26,46 +43,78 @@
       "variants": [
         "No worries \ud83d\ude42 What's your name?",
         "Sure, who should I say this is from?",
-        "Happy to help. May I know your name?"
+        "Happy to help. May I know your name?",
+        "Of course. Who are we speaking with?"
       ],
       "ask_slot": "customer_name"
     },
     "state1.event_without_name": {
-      "text": "We'd love to help with your {occasion}! May I know your name first?",
+      "variants": [
+        "We'd love to help with your {occasion}! May I know your name first?",
+        "Lovely, a {occasion}! Before we go further, may I have your name?",
+        "Happy to help with your {occasion}. Who should I say this is from?",
+        "A {occasion}, wonderful! May I have your name first so we can continue?"
+      ],
       "ask_slot": "customer_name"
     },
 
     "state1_2.name_confirm": {
-      "text": "Just checking, is your name {who}?\n\nReply *Yes* to confirm, or *No* if I got it wrong.",
+      "variants": [
+        "Just checking, is your name {who}?\n\nReply *Yes* to confirm, or *No* if I got it wrong.",
+        "Is it {who}?\n\nReply *Yes* to confirm, or *No* if I got it wrong.",
+        "Wanted to confirm, your name is {who}?\n\nReply *Yes* or *No*."
+      ],
       "ask_slot": "customer_name"
     },
     "state1_2.name_reask": {
-      "text": "No problem! Please type your name again.",
+      "variants": [
+        "No problem! Please type your name again.",
+        "All good, please share your name once more.",
+        "Sure, type your correct name and I'll use that."
+      ],
       "next_state": "AWAIT_NAME",
       "ask_slot": "customer_name"
     },
     "state1_2.name_confirmed_event_ask": {
-      "text": "Thanks, {who}! Lovely to connect. \ud83d\ude0a Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?",
+      "variants": [
+        "Thanks, {who}! Lovely to connect. \ud83d\ude0a Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?",
+        "Thanks, {who}! What celebration is this for?",
+        "Lovely to connect with you, {who}! \ud83d\ude0a How can we help bring your celebration to life today? Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?"
+      ],
       "next_state": "AWAIT_EVENT_TYPE",
       "ask_slot": "event_type"
     },
 
     "state2.event_ask": {
-      "text": "Lovely to connect with you, {who}! \ud83d\ude0a How can we help bring your celebration to life today? Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?",
+      "variants": [
+        "Lovely to connect with you, {who}! \ud83d\ude0a How can we help bring your celebration to life today? Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?",
+        "Thanks, {who}! What celebration is this for? A wedding, an Upanayanam, a housewarming, or something else?",
+        "Thanks, {who}! What celebration is this for?",
+        "How can we help bring your celebration to life today, {who}? A wedding, an Upanayanam, a housewarming, or another special occasion?"
+      ],
       "ask_slot": "event_type"
     },
     "state2.event_ask_short": {
       "variants": [
         "Sure, wedding, house warming, birthday, or something else?",
         "What type of event are you planning?",
-        "Is it a wedding or something else?"
+        "Is it a wedding or something else?",
+        "What celebration is this for?"
       ],
       "ask_slot": "event_type"
     },
     "state2.event_reask": {
       "variants": [
         "Got it, is it a wedding, house warming, birthday, or something else?",
-        "What celebration is this for?"
+        "What celebration is this for?",
+        "Which occasion are we planning, {who}?"
+      ],
+      "ask_slot": "event_type"
+    },
+    "state2.catalog": {
+      "variants": [
+        "We specialize in crafting authentic, unforgettable traditional celebrations! \ud83c\udf1f\n\nHere are the key events we cater to:\n\u2728 **Weddings, Engagements & Receptions**\n\ud83c\udf43 **Upanayanam, Housewarmings & Baby Showers (Seemantham)**\n\ud83c\udf89 **Birthdays, Anniversaries & Family Gatherings**\n\ud83d\ude4f **Traditional Ceremonies & Religious Poojas**\n\nOur core expertise spans **Pure Vegetarian South Indian Catering** (Karnataka, Andhra, Tamil Nadu & Kerala cuisines), **Stage & Theme Floral Decor**, **Pooja Setups**, and **End-to-End Event Planning**.\n\nWhich of these special occasions are you planning today, {who}?",
+        "We'd love to share! Srivatsanka provides complete end-to-end event solutions tailored to your family's traditions. \u2728\n\n**Our Core Services Include:**\n\ud83c\udf71 **Pure Vegetarian Regional Catering:** Authentic South Indian feasts across Karnataka, Andhra, Tamil Nadu & Kerala recipes.\n\ud83c\udf38 **Bespoke Decor:** Stage, floral, mandap, and theme setups.\n\ud83e\ude94 **Ritual & Pooja Support:** Traditional pooja arrangements, sacred ceremony setups, and ritual coordination.\n\ud83c\udff0 **Venue & Hospitality:** Venue selection, venue planning, and guest management.\n\nAre you looking for full event planning or specific catering/decor services for your upcoming celebration, {who}?"
       ],
       "ask_slot": "event_type"
     },
@@ -78,79 +127,228 @@
       "ask_slot": "event_type"
     },
     "state2.unsupported_refusal": {
-      "text": "Thank you for reaching out, {who}! At Srivatsanka, we specialize exclusively in traditional, family, and cultural celebrations. We will notify the team to confirm regarding your request. Thank you and have a nice day!! \u2728"
+      "variants": [
+        "Thank you for reaching out, {who}! At Srivatsanka, we specialize exclusively in traditional, family, and cultural celebrations. We will notify the team to confirm regarding your request. Thank you and have a nice day!! \u2728",
+        "Thank you for reaching out, {who}! At Srivatsanka, we specialize exclusively in traditional, family, and cultural celebrations. We do not cater cocktail or alcohol-related events. Thank you and have a wonderful day! \u2728"
+      ]
+    },
+    "state2.namakarana_custom": {
+      "text": "Ah, what beautiful news, {who}! Welcoming a newborn into the family with a Namakarana ceremony is such a joyful milestone. \ud83d\ude4f\n\nSince naming ceremonies involve custom family rituals and tailored menu spreads, I've noted this down as a bespoke request for our senior planning team!\n\nTo help them prepare for your call, what is your tentative date or month for the celebration?",
+      "ask_slot": "event_date"
+    },
+    "state2.anniversary_custom": {
+      "text": "Happy Anniversary in advance, {who}! Celebrating milestone years of togetherness with loved ones is so special. \u2728\n\nWe curate custom anniversary setups and family feasts. I've logged this as a special request for our lead planner!\n\nTo help us check availability, what is your tentative date for the celebration?",
+      "ask_slot": "event_date"
+    },
+    "state2.corporate_custom": {
+      "text": "Thank you for reaching out, {who}! We craft premium, authentic vegetarian dining spreads and high-tea counters for custom corporate gatherings. \ud83c\udf1f\n\nI've logged your corporate event inquiry for our senior team so they can share customized menu options with you.\n\nRoughly how many guests are you looking to host, and do you have a tentative date in mind?",
+      "ask_slot": "guest_count"
     },
 
     "state3.showcase_choice": {
-      "text": "{validation}\n\nBefore we start planning the date and venue, do you need any information about us? I can share past setups, signature cuisines, and how we work, or we can go straight to your event details.",
+      "variants": [
+        "{validation}\n\nBefore we start planning the date and venue, do you need any information about us? I can share past setups, signature cuisines, and how we work, or we can go straight to your event details.",
+        "{validation}\n\nBefore we jump into the details, would you like to take a quick look at some of our past {occasion} setups and signature cuisines, or shall we dive straight into planning your event?",
+        "{validation}\n\nWould you like a quick look at past setups and signature menus, or shall we dive straight into planning your {occasion}?",
+        "{validation}\n\nI can share past {occasion} setups and how we work, or we can go straight to your event details. What would you prefer?"
+      ],
       "ask_slot": null
     },
     "state3.intent_a": {
-      "text": "We\u2019d love to show you! {showcase}\n\nYou can explore our portfolio anytime at **srivatsanka.com**.\n\n{date_ask}",
+      "variants": [
+        "We'd love to show you! {showcase}\n\nYou can explore our portfolio anytime at **srivatsanka.com**.\n\n{date_ask}",
+        "We'd love to show you, {who}! {showcase}\n\nYou can view our complete gallery at **srivatsanka.com**.\n\n{date_ask}",
+        "We'd love to show you! From traditional South Indian banana-leaf feasts (Karnataka, Andhra, Tamil Nadu, and Kerala specialties) to live counters and bespoke stage or mandap decor, we craft every detail with care. \u2728\n\nYou can explore our complete photo portfolio and menu gallery anytime at **srivatsanka.com**.\n\n{date_ask}",
+        "Happy to share, {who}! {showcase}\n\nFull gallery: **srivatsanka.com**\n\n{date_ask}"
+      ],
       "next_state": "COLLECT_DETAILS",
       "ask_slot": "event_date"
     },
     "state3.intent_b_no": {
-      "text": "Got it! Let's jump straight into the planning details.\n\n{date_only}",
+      "variants": [
+        "Got it! Let's jump straight into the planning details.\n\n{date_only}",
+        "Got it! Let me help you plan directly.\n\n{date_only}",
+        "Got it! Let's jump straight into the planning details. \ud83c\udfe1\n\n{date_only}"
+      ],
       "next_state": "COLLECT_DETAILS",
       "ask_slot": "event_date"
     },
     "state3.intent_b_ok": {
-      "text": "Wonderful! Let's jump straight into the details.\n\n{date_only}",
+      "variants": [
+        "Wonderful! Let's jump straight into the details.\n\n{date_only}",
+        "Wonderful, {who}! Let's jump straight into the details.\n\n{date_only}"
+      ],
       "next_state": "COLLECT_DETAILS",
       "ask_slot": "event_date"
     },
     "state3.intent_b_named": {
-      "text": "Perfect, {who}! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+      "variants": [
+        "Perfect, {who}! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+        "Perfect! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+        "Perfect, {who}! Let's get right down to planning.\n\n{date_only}"
+      ],
       "next_state": "COLLECT_DETAILS",
       "ask_slot": "event_date"
     },
     "state3.fallback_intent_b": {
-      "text": "Perfect! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+      "variants": [
+        "Perfect! Let's get right down to planning. \ud83d\uddd3\ufe0f\n\n{date_only}",
+        "Got it! Let's jump straight into the planning details.\n\n{date_only}"
+      ],
       "next_state": "COLLECT_DETAILS",
       "ask_slot": "event_date"
     },
 
     "state4.urgent_fasttrack": {
-      "text": "Got it! Since your celebration is right around the corner, we are prioritizing your inquiry! Our senior event executive will call you immediately to confirm availability and discuss setups."
+      "variants": [
+        "Got it, {who}! Since your celebration is right around the corner, we are prioritizing your inquiry! Our senior event executive will call you immediately to confirm availability and discuss setups.",
+        "Got it! Since your celebration is right around the corner, we are prioritizing your inquiry! Our senior event executive will call you immediately to confirm availability and discuss setups."
+      ]
     },
     "state4.callback_pivot": {
-      "text": "Of course, {who}! We can discuss all the details directly on call. When would be the best time to give you a quick call?",
+      "variants": [
+        "Of course, {who}! We can discuss all the details directly on call. When would be the best time to give you a quick call?",
+        "Of course, {who}! We can discuss all your custom requirements directly on call. \ud83d\udcf1\n\nWhat would be the best time to give you a quick call?"
+      ],
       "ask_slot": "preferred_callback"
     },
     "state4.custom_request_ack": {
-      "text": "Yes, absolutely! Our chefs love crafting custom culinary experiences and interactive fusion counters. I've made a special note of your preference for {special_request} so our senior planner and head chef can walk you through our menu options during your call."
+      "variants": [
+        "Yes, absolutely! Our chefs love crafting custom culinary experiences and interactive fusion counters. I've made a special note of your preference for {special_request} so our senior planner and head chef can walk you through our menu options during your call.",
+        "Yes, absolutely! Our chefs and setup teams love crafting bespoke experiences. I've made a special note of your request for {special_request} so our lead planner can walk you through options during your call."
+      ]
+    },
+    "state4.ask_date": {
+      "variants": [
+        "What is your tentative date or month for the {occasion}?",
+        "To help us check availability, what is your tentative date or month for the {occasion}?",
+        "To help us check venue and catering availability for your grand day, what is your tentative date or month for the {occasion}?",
+        "To help us check availability for your big day, what is your tentative date or month for the {occasion}?"
+      ],
+      "ask_slot": "event_date"
+    },
+    "state4.ask_pax": {
+      "variants": [
+        "Roughly how many guests are you expecting to host?",
+        "About how many guests are we expecting for the {occasion}?",
+        "Roughly how many guests are you expecting to host for the {occasion}?",
+        "What guest count should we plan for?"
+      ],
+      "ask_slot": "guest_count"
+    },
+    "state4.ask_venue": {
+      "variants": [
+        "Do you already have a venue booked for the celebration, or are you looking for help with venue selection? If it is fixed, please share the venue name and area. If not, just let us know your preferred city or locality.",
+        "For your {occasion}, is the venue already fixed? If yes, please share the venue name and area. If not yet, just tell us your preferred city or locality and we can help from there.",
+        "Do you already have a venue booked, or would you like help with venue selection in a specific city or area?",
+        "Where will the {occasion} be hosted? Share the venue name and area if it is fixed, or just the city if you need help."
+      ],
+      "ask_slot": "event_location"
+    },
+    "state4.ask_meal": {
+      "variants": [
+        "Are you planning a lunch feast, an evening dinner, or high tea snacks?",
+        "For the {occasion}, is it a lunch feast, evening dinner, or high tea snacks?",
+        "Would you like lunch, dinner, or high tea snacks?"
+      ],
+      "ask_slot": "meal_preference"
+    },
+    "state4.ask_callback": {
+      "variants": [
+        "We'd love to connect you with our senior planner so we can share custom proposals and discuss venues and menu tastings.\n\nWhen would be the best time to give you a quick call? (e.g., today evening, tomorrow after 6 PM, or weekend morning?)",
+        "When works for a short callback?",
+        "What would be the best time to give you a quick call?",
+        "When would be a good time for our senior planner to call you on this number?"
+      ],
+      "ask_slot": "preferred_callback"
     },
     "state4.venue_help_generic": {
-      "text": "We'd be happy to help you find the perfect venue! What city or locality are you considering, and when would be a good time for a short callback?",
+      "variants": [
+        "We'd be happy to help you find the perfect venue! What city or locality are you considering, and when would be a good time for a short callback?",
+        "Happy to help with venue selection! Which city or area are you considering, and when should we call?"
+      ],
       "ask_slot": "preferred_callback"
     },
     "state4.venue_help_located": {
-      "text": "We'd be happy to help you find the perfect venue in {slot}! What would be a good time for a short callback?",
+      "variants": [
+        "We'd be happy to help you find the perfect venue in {slot}! What would be a good time for a short callback?",
+        "Noted, {slot}! We'll help with venue options there. When is a good time for a short callback?"
+      ],
       "ask_slot": "preferred_callback"
+    },
+    "state4.ack_date": {
+      "variants": [
+        "{slot} is a fantastic time for a celebration! \ud83c\udf42",
+        "{slot} is a wonderful time for a {occasion}!",
+        "Got it, {slot} works well for the {occasion}."
+      ]
+    },
+    "state4.ack_pax": {
+      "variants": [
+        "Got it! A celebration with {slot} guests sounds wonderful.",
+        "Got it! An intimate celebration with {slot} guests sounds wonderful.",
+        "Noted, {slot} guests. We'll plan hospitality around that."
+      ]
+    },
+    "state4.ack_venue": {
+      "variants": [
+        "Got it, {slot}! We have noted down the location details.",
+        "Got it, {slot}! We have noted down the location.",
+        "Noted, {slot} for the {occasion}."
+      ]
+    },
+    "state4.ack_meal": {
+      "variants": [
+        "Got it! We'll plan for the {slot} service.",
+        "Perfect, {slot} it is.",
+        "Noted, we'll plan the {slot} spread."
+      ]
     },
 
     "state5.callback_business_hours": {
-      "text": "Sounds great, {who}! Our senior event planner will give you a call during business hours today on this number."
+      "variants": [
+        "Sounds great, {who}! Our senior event planner will give you a call during business hours today on this number.",
+        "Perfect, {who}! We'll call during business hours today on this number."
+      ]
     },
     "state5.callback_scheduled": {
-      "text": "Noted, {who}! We have scheduled your callback for {slot}. Our senior event planner will reach out to you on this number. \ud83d\uddd3\ufe0f"
+      "variants": [
+        "Noted, {who}! We have scheduled your callback for {slot}. Our senior event planner will reach out to you on this number. \ud83d\uddd3\ufe0f",
+        "Noted, {who}! Callback is set for {slot}. Our senior event planner will reach out on this number. \ud83d\uddd3\ufe0f"
+      ]
     },
     "state5.callback_immediate": {
-      "text": "Got it, {who}! We have notified our lead planning team to give you a callback as soon as possible on this number. \ud83d\udcf1"
+      "variants": [
+        "Got it, {who}! We have notified our lead planning team to give you a callback as soon as possible on this number. \ud83d\udcf1",
+        "Got it, {who}! Our lead planning team will call you as soon as possible on this number. \ud83d\udcf1"
+      ]
     },
     "state5.signoff": {
-      "text": "Thank you so much, {who}! It was lovely chatting with you. We\u2019re excited to help with your celebration. Talk to you soon! \u2728"
+      "variants": [
+        "Thank you so much, {who}! It was lovely chatting with you. We're excited to help with your celebration. Talk to you soon! \u2728",
+        "Thank you so much, {who}! It was an absolute pleasure chatting with you. We're excited to make your celebration truly unforgettable. \u2728\n\nHave a wonderful rest of your day, and talk to you soon!",
+        "Thank you so much for reaching out, {who}! It was an absolute pleasure chatting with you. We're excited to make your celebration truly unforgettable. Have a wonderful rest of your day! \u2728",
+        "Thank you so much, {who}! We look forward to helping you create a lovely {occasion}. Have a wonderful rest of your day! \u2728"
+      ]
     },
     "state5.post_signoff_followup": {
-      "text": "Thanks for sharing that, {who}! We\u2019ve noted your additional details. Our team member will call you shortly to discuss everything.\n\nIf you\u2019d like to book another celebration, just type *book again*."
+      "variants": [
+        "Thanks for sharing that, {who}! We've noted your additional details. Our team member will call you shortly to discuss everything.\n\nIf you'd like to book another celebration, just type *book again*.",
+        "Noted, {who}! We've added those details for the call. Our team member will discuss everything with you shortly.\n\nIf you'd like to book another celebration, just type *book again*."
+      ]
     },
     "state5.post_signoff_thanks": {
-      "text": "You\u2019re welcome! Our team will call you as planned."
+      "variants": [
+        "You're welcome! Our team will call you as planned.",
+        "My pleasure! We'll call you as planned."
+      ]
     },
 
     "common.circuit_breaker": {
-      "text": "It looks like we got a little tangled up! Let's start fresh. \ud83c\udf3f\n\nYou can type *RESTART* at any time to kickstart our conversation from the beginning.\n\nHello! Welcome to Srivatsanka Events and Services. \u2728 May I have your name, please?",
+      "variants": [
+        "It looks like we got a little tangled up! Let's start fresh. \ud83c\udf3f\n\nYou can type *RESTART* at any time to kickstart our conversation from the beginning.\n\nHello! Welcome to Srivatsanka Events and Services. \u2728 May I have your name, please?",
+        "It looks like we got a little tangled up! Let's start fresh. \ud83c\udf3f\n\nWelcome to Srivatsanka Events and Services! \u2728 Something special is brewing! We'd love to know who we're chatting with. May I have your name, please?"
+      ],
       "next_state": "AWAIT_NAME",
       "ask_slot": "customer_name"
     },
@@ -159,25 +357,101 @@
         "You're welcome!",
         "Anytime \ud83d\ude42",
         "Happy to help!",
-        "My pleasure!"
+        "My pleasure!",
+        "Glad I could help!",
+        "You're most welcome!"
       ]
     },
     "common.undecided": {
       "variants": [
         "No problem, take your time. Happy to answer any questions.",
         "No rush at all. Ask me anything about our catering.",
-        "Of course. We're here whenever you're ready."
+        "Of course. We're here whenever you're ready.",
+        "Take your time. I'm right here when you're ready to plan."
       ]
     },
     "common.small_talk": {
       "variants": [
         "Doing well, thanks! How can I help with {occasion}?",
-        "Great, thanks for asking \ud83d\ude42 What would you like to know?"
+        "Great, thanks for asking \ud83d\ude42 What would you like to know?",
+        "All good here! How can we help with your {occasion}?"
       ]
+    },
+    "common.more_info": {
+      "variants": [
+        "For your {occasion}, we handle catering, decor, pooja setup, venue help, and guest hospitality, all pure veg.",
+        "Sure, we cover food, decor, rituals, venues, and hospitality for your {occasion}.",
+        "Of course. End-to-end {occasion} support: catering, decor, pooja, and venues."
+      ]
+    },
+    "common.food": {
+      "variants": [
+        "For food, we do pure-veg South Indian menus across Karnataka, Andhra, Tamil Nadu, and Kerala styles, with live counters too.",
+        "Happy to focus on food, authentic vegetarian catering for your {occasion}, including {dishes}.",
+        "Sure, food is our main strength. Custom pure-veg menus and live stations for your {occasion}.",
+        "Pure vegetarian South Indian catering is our core, Karnataka, Andhra, Tamil Nadu, and Kerala styles, with live counters if you'd like."
+      ]
+    },
+    "common.photos": {
+      "variants": [
+        "Sure, sharing a few photos from our site \ud83d\udc47",
+        "Happy to share a few past setups \ud83d\udc47",
+        "Here are a few photos from our work \ud83d\udc47"
+      ]
+    },
+    "common.soft_ack": {
+      "variants": [
+        "Got it.",
+        "Sounds good.",
+        "Absolutely.",
+        "Perfect.",
+        "Noted.",
+        "Thanks for sharing.",
+        "Great.",
+        "Sure."
+      ]
+    },
+    "common.about": {
+      "variants": [
+        "We're {company}, catering and celebration services in Bengaluru since {established}. Happy to tell you more.",
+        "{company} in Bengaluru. We handle traditional family celebrations with pure veg catering, decor, and pooja support."
+      ]
+    },
+    "common.eat_rep": {
+      "variants": [
+        "That's Eat Rep Eat, our vegetarian experience center at N R Colony. Open {hours}.",
+        "Eat Rep Eat is our vegetarian dining space at N R Colony. Hours: {hours}."
+      ]
+    },
+    "common.experience": {
+      "variants": [
+        "We've supported many celebrations in Bengaluru, including large gatherings (1000+).",
+        "We've hosted everything from intimate poojas to large family feasts in Bengaluru."
+      ]
+    },
+    "common.price": {
+      "variants": [
+        "Pricing depends on menu and guest count for your {occasion}, easiest on a quick call.",
+        "Quotes depend on pax and menu for the {occasion}. Our planner can share options on the call."
+      ]
+    },
+    "common.contact": {
+      "variants": [
+        "You can call {phone} or email {email}.",
+        "Reach us at {phone} or {email}."
+      ]
+    },
+    "common.custom_unsupported": {
+      "text": "Thank you for reaching out, {who}! We will notify our senior team regarding your specific request so they can review feasibility and discuss details with you during your consultation call. Thank you and have a wonderful day! \u2728"
     },
 
     "generic.noted_continue": {
-      "text": "Noted, {who}! I've made a note of that for our planning team."
+      "variants": [
+        "Noted, {who}! I've made a note of that for our planning team.",
+        "Got it, {who}! I've noted that for the planning team.",
+        "Thanks, {who}! That's noted for your call.",
+        "Happy to help, {who}! I've noted that for the planning team."
+      ]
     }
   },
 
@@ -256,6 +530,16 @@
       "validation": "We'd be glad to support your gathering with authentic vegetarian dining spreads. \ud83c\udf1f",
       "showcase": "Custom vegetarian buffets and high-tea counters for professional celebrations.",
       "media_group": "default"
+    },
+    "namakarana": {
+      "validation": "Ah, what beautiful news! Welcoming a newborn into the family with a Namakarana ceremony is such a joyful milestone. \ud83d\ude4f",
+      "showcase": "Custom family rituals and tailored vegetarian menu spreads, reviewed by our senior planning team.",
+      "media_group": "family_gathering"
+    },
+    "naming ceremony": {
+      "validation": "Ah, what beautiful news! Welcoming a newborn into the family with a Namakarana ceremony is such a joyful milestone. \ud83d\ude4f",
+      "showcase": "Custom family rituals and tailored vegetarian menu spreads, reviewed by our senior planning team.",
+      "media_group": "family_gathering"
     }
   },
 

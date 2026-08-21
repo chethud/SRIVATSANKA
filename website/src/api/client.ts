@@ -394,7 +394,10 @@ export async function createEnquiry(data: {
   });
 }
 
-export async function updateEnquiry(id: string, data: { notes?: string | null }): Promise<Enquiry> {
+export async function updateEnquiry(
+  id: string,
+  data: { notes?: string | null; customerName?: string | null },
+): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -520,6 +523,21 @@ export async function createDish(data: { name: string; category: string; price: 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
+}
+
+export async function updateDish(
+  id: string,
+  data: { name?: string; category?: string; price?: number; description?: string | null },
+) {
+  return apiFetch<Dish>(`/api/dishes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDish(id: string) {
+  return apiFetch<{ ok: boolean; id: string }>(`/api/dishes/${id}`, { method: 'DELETE' });
 }
 
 export async function addOrderDish(

@@ -38,6 +38,11 @@ def _wants_more_info(text: str) -> bool:
 
 
 def _more_info_reply(session: ConversationSession) -> str:
+    from app.services import reply_pack
+
+    packed = reply_pack.get_reply("common.more_info", event_type=session.fields.event_type)
+    if packed:
+        return packed
     occasion = (session.fields.event_type or "celebration").lower()
     if occasion == "general":
         occasion = "celebration"
@@ -53,6 +58,11 @@ def _more_info_reply(session: ConversationSession) -> str:
 
 
 def _food_reply(session: ConversationSession) -> str:
+    from app.services import reply_pack
+
+    packed = reply_pack.get_reply("common.food", event_type=session.fields.event_type)
+    if packed:
+        return packed
     occasion = (session.fields.event_type or "celebration").lower()
     if occasion == "general":
         occasion = "celebration"
@@ -75,6 +85,7 @@ def _fallback_answer(
     sharing_photos: bool = False,
 ) -> str:
     from app.services.human_style import normalize_customer_text
+    from app.services import reply_pack
 
     name = session.fields.customer_name or "there"
     event = session.fields.event_type or "celebration"
@@ -83,7 +94,8 @@ def _fallback_answer(
     hint = natural_continue_hint(event_type=session.fields.event_type)
 
     if sharing_photos or customer_wants_photos(user_text):
-        return "Sure, sharing a few photos from our site 👇"
+        packed = reply_pack.get_reply("common.photos")
+        return packed or "Sure, sharing a few photos from our site 👇"
 
     # Focus on the topic they asked about
     if any(w in t for w in ("food", "menu", "dish", "cuisine", "veg", "live counter", "live station", "cater")):
@@ -97,34 +109,46 @@ def _fallback_answer(
         return service_answer(service_key)
 
     if any(w in t for w in ("company", "about", "who are", "your team", "srivatsanka", "kannan")):
+        packed = reply_pack.get_reply("common.about")
+        if packed:
+            return packed
         return (
             f"We're {COMPANY['legal_name']}, catering & celebration services in Bengaluru "
             f"since {COMPANY['established']}. Happy to tell you more."
         )
 
     if any(w in t for w in ("eat rep", "eat repeat", "restaurant", "dining")):
+        packed = reply_pack.get_reply("common.eat_rep")
+        if packed:
+            return packed
         return (
             f"That's Eat Rep Eat, our vegetarian experience center at N R Colony. "
             f"Open {COMPANY['eat_rep_eat_hours']}."
         )
 
     if any(w in t for w in ("how many", "work", "done", "experience", "portfolio", "1000")):
+        packed = reply_pack.get_reply("common.experience")
+        if packed:
+            return f"{packed} {hint}".strip()
         return f"We've supported many celebrations in Bengaluru, including large gatherings (1000+). {hint}"
 
     if any(w in t for w in ("price", "cost", "charge", "budget", "rate", "quote")):
+        packed = reply_pack.get_reply("common.price", event_type=session.fields.event_type)
+        if packed:
+            return f"{packed} {hint}".strip()
         return (
             f"Pricing depends on menu & guest count for your {occasion.lower()}, "
             f"easiest on a quick call. {hint}"
         )
 
     if any(w in t for w in ("contact", "phone", "number", "email", "address", "location of")):
+        packed = reply_pack.get_reply("common.contact")
+        if packed:
+            return packed
         return f"You can call {COMPANY['phone']} or email {COMPANY['email']}."
 
     if "service" in t or "offer" in t or "what do you" in t:
         return short_services_reply()
-
-    # Ultimate generic: JSON pack line (generic.noted_continue) so nothing goes out of the box.
-    from app.services import reply_pack
 
     packed = reply_pack.get_reply(
         "generic.noted_continue",

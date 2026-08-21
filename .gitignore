@@ -14,6 +14,12 @@ node_modules/
 .env
 .env.local
 .env.*.local
+website/.env.production
+
+# Deploy archives
+website-dist-deploy.tar
+backend-deploy.tar
+srivatsanka.tar.gz
 
 # SQLite
 *.db

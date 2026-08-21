@@ -1,0 +1,16 @@
+---
+description: AWS redeploy must backup live files and never delete them
+alwaysApply: true
+---
+
+# AWS redeploy: backup first, never delete live data
+
+When the user says **redeploy** or **deploy to aws**:
+
+1. Run `whatsapp/scripts/aws-redeploy.ps1` (or the same steps by hand).
+2. **Backup first** on EC2 to `/home/ubuntu/srivatsanka-backups/<timestamp>/`.
+3. **Never delete** live data: `whatsapp/kannans.db`, `whatsapp/.env`, `whatsapp/uploads`, `website/.env.production`.
+4. Overlay new code only. Copy current `website/dist` into the backup folder, then replace dist. Do not `rm` the database or uploads.
+5. Keep previous backups. Do not wipe `/home/ubuntu/srivatsanka-backups`.
+
+Policy is also stored in `whatsapp/app/data/replies.json` under `_meta.redeploy`.

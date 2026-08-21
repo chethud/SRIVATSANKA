@@ -20,6 +20,7 @@ from app.models import Dish, DishCategory, Enquiry, EnquiryDish, EnquiryStatus, 
 from app.schemas import (
     DishIn,
     DishOut,
+    DishUpdateIn,
     EnquiryDishOut,
     EnquiryOut,
     InvoiceConfirmIn,
@@ -95,6 +96,50 @@ async def create_dish(payload: DishIn, db: AsyncSession = Depends(get_db)) -> Di
         price=dish.price,
         description=dish.description,
     )
+
+
+@router.patch("/dishes/{dish_id}", response_model=DishOut)
+async def update_dish(
+    dish_id: str,
+    payload: DishUpdateIn,
+    db: AsyncSession = Depends(get_db),
+) -> DishOut:
+    dish = await db.get(Dish, dish_id)
+    if not dish or not dish.isActive:
+        raise HTTPException(status_code=404, detail="Dish not found")
+    if payload.name is not None:
+        cleaned = payload.name.strip()
+        if not cleaned:
+            raise HTTPException(status_code=400, detail="Dish name cannot be empty")
+        dish.name = cleaned
+    if payload.category is not None:
+        label = normalize_meal_session_label(payload.category)
+        if not label:
+            raise HTTPException(status_code=400, detail="Invalid meal session — use Breakfast, Lunch, or a custom name")
+        dish.category = label
+    if payload.price is not None:
+        dish.price = payload.price
+    if payload.description is not None:
+        dish.description = payload.description or None
+    await db.commit()
+    await db.refresh(dish)
+    return DishOut(
+        id=dish.id,
+        name=dish.name,
+        category=dish_category_label(dish.category),
+        price=dish.price,
+        description=dish.description,
+    )
+
+
+@router.delete("/dishes/{dish_id}")
+async def delete_dish(dish_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    dish = await db.get(Dish, dish_id)
+    if not dish or not dish.isActive:
+        raise HTTPException(status_code=404, detail="Dish not found")
+    dish.isActive = False
+    await db.commit()
+    return {"ok": True, "id": dish_id}
 
 
 @router.post("/enquiries/{enquiry_id}/dishes", response_model=EnquiryOut)

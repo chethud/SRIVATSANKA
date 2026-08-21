@@ -10,6 +10,7 @@ from app.data.company_knowledge import (
 )
 from app.schemas import AgentTurnResult, EnquiryFields, MediaAttachment
 from app.services.conversation_turns import (
+    clean_person_name,
     customer_wants_to_proceed,
     extract_name,
     is_greeting_only,
@@ -35,6 +36,9 @@ from app.services.human_style import (
     is_name_confirm_no,
     is_name_confirm_yes,
     is_portfolio_inquiry,
+    customer_says_already_provided,
+    is_food_menu_question,
+    is_short_planning_ack,
     is_service_topic_reply,
     is_small_talk,
     is_thanks_only,
@@ -59,7 +63,14 @@ from app.services.human_style import (
     welcome_message,
 )
 from app.services.session_store import ConversationSession, GuidedStep, SlotValue
-from app.services.event_date import is_urgent_event_date
+from app.services.event_date import (
+    ambiguous_date_confirm_prompt,
+    extract_date_snippet,
+    has_service_planning_intent,
+    is_ambiguous_date_phrase,
+    is_urgent_event_date,
+    suggest_ambiguous_date,
+)
 from app.services.location_normalize import extract_location_entity
 from app.services.callback_time import is_immediate_callback, normalize_callback_label
 from app.services.entity_extractor import extract_entities
@@ -75,6 +86,7 @@ from app.services.validation_layer import (
     reset_session_to_greeting,
     should_trip_circuit_breaker,
     slot_fail_count,
+    soft_reset_session,
     track_question,
 )
 from app.services.website_gallery import customer_wants_photos, mark_gallery_sent, prepare_gallery_photos
@@ -327,6 +339,7 @@ def _complete_enquiry_reply(
     *,
     lead: str | None = None,
 ) -> AgentTurnResult:
+    _fill_pending_for_callback(session)
     phone = normalize_phone(whatsapp_id)
     session.fields = EnquiryFields(
         **{**session.fields.model_dump(), "phone_number": session.fields.phone_number or phone}
@@ -359,7 +372,7 @@ def _company_intro_message(name: str) -> str:
 
 
 def _confirm_and_store_name(session: ConversationSession, name: str) -> None:
-    cleaned = (name or "").strip()
+    cleaned = clean_person_name(name) or (name or "").strip()
     session.fields = EnquiryFields(**{**session.fields.model_dump(), "customer_name": cleaned})
     session.pending_name = None
     session.name_confirmed = True
@@ -395,7 +408,7 @@ def _start_name_confirmation(
     *,
     event_type: str | None = None,
 ) -> AgentTurnResult:
-    session.pending_name = name.strip()
+    session.pending_name = clean_person_name(name) or extract_name(user_text) or name.strip()
     session.name_confirmed = False
     # Keep name pending until Yes — do not finalize customer_name yet
     if session.fields.customer_name:
@@ -442,6 +455,19 @@ def _intent_b_reply(text: str, session: ConversationSession) -> str:
     return intent_b_planning_reply(text=text, name=name, event_type=event_type)
 
 
+def _showcase_followup_text(session: ConversationSession) -> str:
+    """Follow-up after photos/showcase — never re-ask for a date already provided."""
+    if session.fields.event_date:
+        next_prompt = _next_detail_prompt(session)
+        name = session.fields.customer_name or "there"
+        noted = (
+            f"Your date of {session.fields.event_date} is already noted, {name}. "
+            "Sorry if we asked again."
+        )
+        return f"{noted}\n\n{next_prompt}" if next_prompt else noted
+    return showcase_followup_date_ask(event_type=session.fields.event_type)
+
+
 def _intent_a_showcase_payload(session: ConversationSession, text: str) -> tuple[str, list]:
     """JSON showcase copy + grouped event photos (Kannan.rules.txt Intent A)."""
     reply = reply_pack.get_reply("state3.intent_a", event_type=session.fields.event_type)
@@ -450,15 +476,24 @@ def _intent_a_showcase_payload(session: ConversationSession, text: str) -> tuple
         reply = (
             f"We’d love to show you! {profile['showcase']}\n\n"
             f"You can explore our portfolio anytime at **srivatsanka.com**.\n\n"
-            f"{showcase_followup_date_ask(event_type=session.fields.event_type)}"
+            f"{_showcase_followup_text(session)}"
+        )
+    elif session.fields.event_date and "tentative date" in reply.lower():
+        reply = re.sub(
+            r"\n*To help us.*tentative date.*\?",
+            f"\n\n{_showcase_followup_text(session)}",
+            reply,
+            flags=re.I | re.S,
         )
     reply = handle_custom_request(session, text, reply)
-    group_name = reply_pack.get_event_profile(session.fields.event_type).get("media_group")
-    media = reply_pack.get_media_group(group_name)
-    if media:
-        mark_gallery_sent(session, [m.url for m in media])
-    else:
-        media = prepare_gallery_photos(session, user_text=session.fields.event_type)
+    media: list[MediaAttachment] = []
+    if not session.sent_gallery_urls or customer_wants_photos(text):
+        group_name = reply_pack.get_event_profile(session.fields.event_type).get("media_group")
+        media = reply_pack.get_media_group(group_name)
+        if media:
+            mark_gallery_sent(session, [m.url for m in media])
+        else:
+            media = prepare_gallery_photos(session, user_text=session.fields.event_type)
     return reply, media
 
 
@@ -476,58 +511,16 @@ def _detect_event(text: str, *, name: str | None = None) -> str | None:
     return et
 
 
-def extract_date_entity(text: str) -> str:
-    raw = text.strip().rstrip(".,!?")
-    lower = raw.lower()
-
-    # Prefer full relative timeframe phrases before bare ordinals like "3rd"
-    relative_patterns = (
-        r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+next\s+month",
-        r"next\s+month(?:\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+week)?",
-        r"(?:the\s+)?\d+(?:st|nd|rd|th)\s+week\s+of\s+(?:this\s+|next\s+)?\w+",
-        r"(?:early|mid|late|end of)\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month)",
-        r"(?:this|next|coming)\s+(?:week|month|weekend|year)",
-        r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?",
-    )
-    for pat in relative_patterns:
-        match = re.search(pat, lower, re.I)
-        if match:
-            return raw[match.start() : match.end()]
-
-    months_pat = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
-    days_pat = r"\d+(?:st|nd|rd|th)?"
-
-    match = re.search(rf"\b{months_pat}\s+{days_pat}(?:\s*(?:or|and|to|-)\s*{days_pat})?\b", lower, re.I)
-    if match:
-        return raw[match.start() : match.end()]
-
-    match = re.search(rf"\b{days_pat}\s+{months_pat}(?:\s+\d{{4}})?\b", lower, re.I)
-    if match:
-        return raw[match.start() : match.end()]
-
-    match = re.search(rf"\b{months_pat}\b", lower, re.I)
-    if match:
-        return raw[match.start() : match.end()]
-
-    # Keep richer context when the message is already a short relative date answer
-    if re.search(r"\b(week|month|next|early|mid|late)\b", lower):
-        words = raw.split()
-        if len(words) <= 8:
-            return raw
-
-    match = re.search(rf"\b{days_pat}\b", lower, re.I)
-    if match:
-        return raw[match.start() : match.end()]
-
-    words = raw.split()
-    if len(words) <= 4:
-        return raw
-    return " ".join(words[:3]).strip().rstrip(".,!?")
+def extract_date_entity(text: str) -> str | None:
+    return extract_date_snippet(text)
 
 
 def extract_guest_count(text: str) -> str | int:
     """Preserve guest ranges like 30-50 / 200 to 300; otherwise store a single number."""
     raw = text.strip()
+    people_match = re.search(r"(\d+)\s*(?:guests?|people|pax)\b", raw, re.I)
+    if people_match:
+        return int(people_match.group(1))
     scoped_range = re.search(
         r"(\d+)\s*(?:-|–|—|to|and)\s*(\d+)\s*(?:guests?|people|pax)",
         raw,
@@ -577,8 +570,15 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
         return False
     if key == "event_date":
         value = extract_date_entity(user_text)
+        if not value:
+            return False
+        if is_ambiguous_date_phrase(str(value)):
+            session.pending_date_confirm = str(value)
+            return False
     if key == "guest_count":
         value = extract_guest_count(user_text)
+        if isinstance(value, str) and len(value.split()) > 6:
+            return False
     if key == "meal_preference":
         lower = user_text.lower()
         selected = []
@@ -642,10 +642,30 @@ async def process_guided_flow(
     before_fields = session.fields.model_dump()
 
     # 1) RECOVERY CHECK (Kannan.rules.txt Global FSM + State 5 circuit breaker)
-    if is_reset_message(text) or should_trip_circuit_breaker(session):
+    if is_reset_message(text):
+        reply = soft_reset_session(session)
+        track_question(session, reply, slot_key="customer_name" if not session.name_confirmed else "event_type")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if should_trip_circuit_breaker(session):
         reset_session_to_greeting(session)
         reply = circuit_breaker_reply()
         track_question(session, reply, slot_key="customer_name")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if session.pending_date_confirm and is_name_confirm_yes(text):
+        confirmed = suggest_ambiguous_date(session.pending_date_confirm) or session.pending_date_confirm
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_date": confirmed})
+        session.pending_date_confirm = None
+        clear_slot_failures(session, "event_date")
+        next_prompt = _next_detail_prompt(session)
+        name = session.fields.customer_name or "there"
+        reply = f"Perfect, {name}. I've noted {confirmed}."
+        if next_prompt:
+            reply = f"{reply}\n\n{next_prompt}"
+        track_question(session, reply, slot_key=_next_detail_key(session))
         record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
 
@@ -849,12 +869,38 @@ async def process_guided_flow(
             return AgentTurnResult(reply=reply, fields=session.fields)
 
         event_type = _detect_event(text, name=session.fields.customer_name)
+        if (
+            session.fields.event_type
+            and event_type
+            and event_type.lower() != session.fields.event_type.lower()
+            and not session.pending_event_type_switch
+        ):
+            session.pending_event_type_switch = event_type
+            reply = (
+                f"Of course. Just to confirm, is this a new enquiry for {event_type.lower()} "
+                f"instead of the {session.fields.event_type.lower()} enquiry you mentioned earlier?"
+            )
+            track_question(session, reply, slot_key="event_type")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if session.pending_event_type_switch and is_name_confirm_yes(text):
+            event_type = session.pending_event_type_switch
+            session.pending_event_type_switch = None
+            clear_slot_failures(session, "event_type")
+            session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
+            move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
+            reply = _event_showcase_message(event_type, with_images=False)
+            session.showcase_prompted = True
+            track_question(session, reply)
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields, media=[])
+
         if not event_type:
             record_slot_failure(session, slot_key="event_type")
             fails = slot_fail_count(session, "event_type")
             if fails >= 2:
                 move_to(session, GuidedStep.COLLECT_DETAILS)
-                _fill_pending_for_callback(session)
                 reply = callback_pivot_prompt(name=session.fields.customer_name)
             else:
                 reply = random.choice(
@@ -902,7 +948,6 @@ async def process_guided_flow(
 
         if wants_discuss_on_call(text):
             move_to(session, GuidedStep.COLLECT_DETAILS)
-            _fill_pending_for_callback(session)
             reply = callback_pivot_prompt(name=session.fields.customer_name)
             reply = handle_custom_request(session, text, reply)
             track_question(session, reply, slot_key="preferred_callback")
@@ -913,9 +958,30 @@ async def process_guided_flow(
         if wants_showcase_look(text) or customer_wants_photos(text):
             move_to(session, GuidedStep.COLLECT_DETAILS)
             reply, media = _intent_a_showcase_payload(session, text)
-            track_question(session, reply, slot_key="event_date")
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+
+        if customer_says_already_provided(text):
+            move_to(session, GuidedStep.COLLECT_DETAILS)
+            name = session.fields.customer_name or "there"
+            if session.fields.event_date:
+                reply = (
+                    f"You're right, {name}. You already mentioned {session.fields.event_date}. "
+                    "Sorry about that — I've noted it and won't ask again."
+                )
+                next_prompt = _next_detail_prompt(session)
+                if next_prompt:
+                    reply = f"{reply}\n\n{next_prompt}"
+            else:
+                reply = f"Sorry about that, {name}. Could you share your tentative date once more?"
+            if wants_showcase_look(text) or customer_wants_photos(text):
+                showcase_reply, media = _intent_a_showcase_payload(session, text)
+                reply = f"{reply}\n\n{showcase_reply}"
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
 
         if wants_straight_to_planning(text) or wants_to_move_further(text):
             move_to(session, GuidedStep.COLLECT_DETAILS)
@@ -927,13 +993,18 @@ async def process_guided_flow(
 
         # Info / "more details" / topic asks → answer once (no second question), then date
         move_to(session, GuidedStep.COLLECT_DETAILS)
-        date_ask = ask_event_date_only(event_type=session.fields.event_type)
+        date_ask = "" if session.fields.event_date else ask_event_date_only(event_type=session.fields.event_type)
         if (
             looks_like_question(text)
             or wants_more_info(text)
             or is_service_topic_reply(text)
             or _is_custom_request(text)
         ):
+            if wants_showcase_look(text) or customer_wants_photos(text):
+                reply, media = _intent_a_showcase_payload(session, text)
+                track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields, media=media)
             if wants_more_info(text) and not is_service_topic_reply(text):
                 # Broad "more details" → Intent A style summary, then date (rules State 3)
                 profile = get_event_profile(session.fields.event_type)
@@ -941,24 +1012,97 @@ async def process_guided_flow(
                     f"Absolutely! {profile['showcase']} "
                     f"You can also browse menus and setups at **srivatsanka.com**."
                 )
-                date_ask = showcase_followup_date_ask(event_type=session.fields.event_type)
+                date_ask = _showcase_followup_text(session) if session.fields.event_date else showcase_followup_date_ask(
+                    event_type=session.fields.event_type
+                )
             else:
                 answered = await answer_showcase_question(session, text)
             if _is_custom_request(text):
                 answered = handle_custom_request(session, text, answered)
-            reply = f"{answered}\n\n{date_ask}"
+            reply = f"{answered}\n\n{date_ask}".strip() if date_ask else answered
         else:
             # Intent B fallback (ok / emoji / unclassifiable) — one reply only, JSON-first
             reply = _intent_b_reply(text, session)
             reply = handle_custom_request(session, text, reply)
-        track_question(session, reply, slot_key="event_date")
-        record_exchange(session, text, reply)
+        track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+        if not repeated_question(session, reply):
+            record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
 
 
 
     if step == GuidedStep.COLLECT_DETAILS:
         _skip_inapplicable_fields(session)
+
+        if customer_says_already_provided(text):
+            name = session.fields.customer_name or "there"
+            if session.fields.event_date:
+                reply = (
+                    f"You're right, {name}. You already mentioned {session.fields.event_date}. "
+                    "Sorry about that — I've noted it."
+                )
+                next_prompt = _next_detail_prompt(session)
+                if next_prompt:
+                    reply = f"{reply}\n\n{next_prompt}"
+            else:
+                reply = f"Sorry about that, {name}. Could you share your tentative date once more?"
+            if wants_showcase_look(text) or customer_wants_photos(text):
+                showcase_reply, media = _intent_a_showcase_payload(session, text)
+                reply = f"{reply}\n\n{showcase_reply}"
+                track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if is_short_planning_ack(text):
+            next_prompt = _next_detail_prompt(session)
+            if next_prompt:
+                reply = next_prompt
+                clear_slot_failures(session, _next_detail_key(session))
+                track_question(session, reply, slot_key=_next_detail_key(session))
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
+        from app.services.human_style import normalize_customer_text
+
+        if normalize_customer_text(text) in {"no", "nope", "nah"}:
+            next_prompt = _next_detail_prompt(session)
+            if next_prompt:
+                reply = f"Sure, no problem. {next_prompt}"
+                clear_slot_failures(session, _next_detail_key(session))
+                track_question(session, reply, slot_key=_next_detail_key(session))
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if session.pending_date_confirm is None and is_ambiguous_date_phrase(text) and _next_detail_key(session) == "event_date":
+            session.pending_date_confirm = text.strip()
+            reply = ambiguous_date_confirm_prompt(text, event_type=session.fields.event_type)
+            track_question(session, reply, slot_key="event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if is_food_menu_question(text):
+            pending = _next_detail_prompt(session)
+            answered = await answer_details_question(session, text, None)
+            reply = f"{answered}\n\n{pending}".strip() if pending else answered
+            reply = handle_custom_request(session, text, reply)
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if has_service_planning_intent(text):
+            pending = _next_detail_prompt(session)
+            reply = (
+                "Got it — we'll focus on catering and decorations for you, and you can manage the venue side."
+            )
+            reply = handle_custom_request(session, text, reply)
+            if pending:
+                reply = f"{reply}\n\n{pending}"
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
 
         if wants_showcase_look(text) or customer_wants_photos(text):
             reply, media = _intent_a_showcase_payload(session, text)
@@ -971,7 +1115,6 @@ async def process_guided_flow(
 
         if "event_date" in newly_collected and "guest_count" not in newly_collected:
             if is_urgent_event_date(str(session.fields.event_date or text)):
-                _fill_pending_for_callback(session)
                 session.fields = EnquiryFields(
                     **{**session.fields.model_dump(), "preferred_callback": "Immediately"}
                 )
@@ -1020,12 +1163,21 @@ async def process_guided_flow(
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
         if wants_discuss_on_call(text) and session.fields.preferred_callback is None:
-            _fill_pending_for_callback(session)
             reply = callback_pivot_prompt(name=session.fields.customer_name)
             reply = handle_custom_request(session, text, reply)
             track_question(session, reply, slot_key="preferred_callback")
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if "preferred_callback" in newly_collected:
+            next_prompt = _next_detail_prompt(session)
+            callback_label = str(session.fields.preferred_callback or text)
+            if next_prompt:
+                reply = f"Noted! I've noted your callback preference as {callback_label}.\n\n{next_prompt}"
+                track_question(session, reply, slot_key=_next_detail_key(session))
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+            return _complete_enquiry_reply(session, whatsapp_id, text)
 
         for key in DETAIL_KEYS:
             if getattr(session.fields, key) is not None:
@@ -1085,7 +1237,6 @@ async def process_guided_flow(
                     record_exchange(session, text, reply)
                     return AgentTurnResult(reply=reply, fields=session.fields)
                 if slot_fails >= 2:
-                    _fill_pending_for_callback(session)
                     reply = callback_pivot_prompt(name=session.fields.customer_name)
                     reply = handle_custom_request(session, text, reply)
                     track_question(session, reply, slot_key="preferred_callback")
@@ -1108,7 +1259,6 @@ async def process_guided_flow(
                     record_exchange(session, text, reply)
                     return AgentTurnResult(reply=reply, fields=session.fields)
                 if slot_fail_count(session, key) >= 2:
-                    _fill_pending_for_callback(session)
                     reply = callback_pivot_prompt(name=session.fields.customer_name)
                     track_question(session, reply, slot_key="preferred_callback")
                     record_exchange(session, text, reply)
@@ -1122,7 +1272,6 @@ async def process_guided_flow(
             clear_slot_failures(session, key)
             # Urgent timeline: skip remaining details and complete with immediate callback
             if key == "event_date" and is_urgent_event_date(str(session.fields.event_date or text)):
-                _fill_pending_for_callback(session)
                 session.fields = EnquiryFields(
                     **{**session.fields.model_dump(), "preferred_callback": "Immediately"}
                 )

@@ -313,8 +313,12 @@ def _is_probable_date(text: str) -> bool:
 
 
 def is_likely_field_answer(text: str, field_key: str) -> bool:
+    from app.services.event_date import has_service_planning_intent
     from app.services.human_style import wants_more_info, wants_showcase_look
     from app.services.website_gallery import customer_wants_photos
+
+    if has_service_planning_intent(text):
+        return False
 
     if wants_more_info(text):
         return False

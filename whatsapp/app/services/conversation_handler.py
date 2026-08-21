@@ -66,10 +66,25 @@ async def handle_conversation(
     if user_text.strip().lower() in {"new", "start over", "restart", "reset", "begin again"} or (
         session.completed and session._saved and wants_book_again(user_text)
     ):
-        session_store.reset(whatsapp_id)
+        from app.services.validation_layer import soft_reset_session
+
+        soft_reset_session(session)
         await resume_bot_for_phone(db, whatsapp_id)
-        session = session_store.get(whatsapp_id)
-        user_text = "Hi"
+        reply = (
+            f"Of course, {session.fields.customer_name}. We can start fresh."
+            if session.name_confirmed and session.fields.customer_name
+            else "Of course. We can start fresh."
+        )
+        if session.fields.event_type:
+            reply += " Would you like a quick look at past setups, or shall we continue with your event details?"
+        elif session.name_confirmed:
+            reply += " What celebration would you like to plan?"
+        else:
+            reply += " May I have your name, please?"
+        return (
+            AgentTurnResult(reply=reply, fields=session.fields),
+            False,
+        )
 
     if session.completed and session._saved:
         # Post thank-you: note any extra specs; tell them a team member will call.

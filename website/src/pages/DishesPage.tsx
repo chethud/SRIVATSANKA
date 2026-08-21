@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
-import { createDish } from '../api/client';
+import { createDish, deleteDish, updateDish, type Dish } from '../api/client';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { usePageSearch } from '../context/PageSearchContext';
 import { MEAL_SESSIONS, isPresetMealSession, resolveSessionTabs } from '../utils/mealSessions';
@@ -25,6 +25,8 @@ export default function DishesPage() {
   });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingDishId, setEditingDishId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   useCreateActionListener('dish', () => {
     openAddDishForSession(cat !== 'ALL' ? cat : 'Breakfast');
@@ -41,7 +43,10 @@ export default function DishesPage() {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setShowForm(false);
+      if (e.key === 'Escape') {
+        setShowForm(false);
+        setEditingDishId('');
+      }
     }
     document.addEventListener('keydown', onKey);
     return () => {
@@ -84,6 +89,7 @@ export default function DishesPage() {
         : CUSTOM_OPTION;
 
   function openAddDishForSession(session: string) {
+    setEditingDishId('');
     setForm({
       name: '',
       category: session,
@@ -92,6 +98,35 @@ export default function DishesPage() {
     });
     setShowForm(true);
     setFormError('');
+  }
+
+  function openEditDish(dish: Dish) {
+    setEditingDishId(dish.id);
+    setForm({
+      name: dish.name,
+      category: isPresetMealSession(dish.category) ? dish.category : CUSTOM_OPTION,
+      customCategory: isPresetMealSession(dish.category) ? '' : dish.category,
+      description: dish.description ?? '',
+    });
+    setShowForm(true);
+    setFormError('');
+  }
+
+  async function handleDeleteDish(dish: Dish) {
+    if (deletingId) return;
+    const ok = window.confirm(
+      `Delete "${dish.name}" from the menu?\n\nExisting orders keep their saved copies. This removes the dish from the catalog.`,
+    );
+    if (!ok) return;
+    setDeletingId(dish.id);
+    try {
+      await deleteDish(dish.id);
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete the dish.');
+    } finally {
+      setDeletingId('');
+    }
   }
 
   function handleAddSession() {
@@ -123,12 +158,20 @@ export default function DishesPage() {
     }
     setSaving(true);
     try {
-      await createDish({
-        name: form.name,
-        category,
-        price: 0,
-        description: form.description || undefined,
-      });
+      if (editingDishId) {
+        await updateDish(editingDishId, {
+          name: form.name,
+          category,
+          description: form.description || null,
+        });
+      } else {
+        await createDish({
+          name: form.name,
+          category,
+          price: 0,
+          description: form.description || undefined,
+        });
+      }
       if (!isPresetMealSession(category)) {
         setExtraSessions((prev) =>
           prev.some((s) => s.toLowerCase() === category.toLowerCase()) ? prev : [...prev, category],
@@ -136,6 +179,7 @@ export default function DishesPage() {
       }
       setCat(category);
       setForm({ name: '', category: 'Breakfast', customCategory: '', description: '' });
+      setEditingDishId('');
       setShowForm(false);
       refresh();
     } catch (err) {
@@ -229,13 +273,16 @@ export default function DishesPage() {
             type="button"
             className="absolute inset-0 bg-black/40 border-0 cursor-pointer"
             aria-label="Close add dish"
-            onClick={() => setShowForm(false)}
+            onClick={() => {
+              setShowForm(false);
+              setEditingDishId('');
+            }}
           />
           <Card className="relative z-10 w-full max-w-lg p-6 shadow-[var(--shadow-lg)]">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
                 <h2 id="add-dish-title" className="text-lg font-semibold text-[var(--foreground)]">
-                  Add dish
+                  {editingDishId ? 'Edit dish' : 'Add dish'}
                 </h2>
                 <p className="text-sm text-[var(--muted)] mt-0.5">
                   {categorySelectValue === CUSTOM_OPTION
@@ -245,7 +292,10 @@ export default function DishesPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+              setShowForm(false);
+              setEditingDishId('');
+            }}
                 className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
                 aria-label="Close"
               >
@@ -306,13 +356,16 @@ export default function DishesPage() {
               <div className="flex gap-2 justify-end pt-1">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => {
+              setShowForm(false);
+              setEditingDishId('');
+            }}
                   className="px-4 py-2.5 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)]"
                 >
                   Cancel
                 </button>
                 <Button type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save to menu'}
+                  {saving ? 'Saving…' : editingDishId ? 'Save changes' : 'Save to menu'}
                 </Button>
               </div>
             </form>
@@ -347,11 +400,35 @@ export default function DishesPage() {
               ) : (
                 <ul className="space-y-2">
                   {items.map((d) => (
-                    <li key={d.id} className="text-sm py-1 border-b border-[var(--border)] last:border-0">
-                      {d.name}
-                      {d.description && (
-                        <span className="block text-xs text-[var(--muted)] mt-0.5">{d.description}</span>
-                      )}
+                    <li
+                      key={d.id}
+                      className="flex items-start justify-between gap-2 text-sm py-1 border-b border-[var(--border)] last:border-0"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="break-words">{d.name}</span>
+                        {d.description && (
+                          <span className="block text-xs text-[var(--muted)] mt-0.5">{d.description}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openEditDish(d)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
+                          aria-label={`Edit ${d.name}`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === d.id}
+                          onClick={() => void handleDeleteDish(d)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-60"
+                          aria-label={`Delete ${d.name}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

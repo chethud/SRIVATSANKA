@@ -53,6 +53,8 @@ class ConversationSession:
     showcase_prompted: bool = False
     pending_name: str | None = None
     name_confirmed: bool = False
+    pending_date_confirm: str | None = None
+    pending_event_type_switch: str | None = None
     slots: dict[str, SlotValue] = field(
         default_factory=lambda: {
             "customer_name": SlotValue(),

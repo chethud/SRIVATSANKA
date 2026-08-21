@@ -113,7 +113,16 @@ def is_small_talk(text: str) -> bool:
     return any(c in t for c in SMALL_TALK_CUES) or t in {"how are you?", "how are you"}
 
 
+def _pack(reply_id: str, **kwargs) -> str | None:
+    from app.services import reply_pack
+
+    return reply_pack.get_reply(reply_id, **kwargs)
+
+
 def soft_ack() -> str:
+    packed = _pack("common.soft_ack")
+    if packed:
+        return packed
     return random.choice(
         (
             "Got it.",
@@ -272,6 +281,9 @@ def wants_to_move_further(text: str) -> bool:
 
 
 def thanks_reply() -> str:
+    packed = _pack("common.thanks")
+    if packed:
+        return packed
     return random.choice(
         (
             "You're welcome!",
@@ -283,6 +295,9 @@ def thanks_reply() -> str:
 
 
 def undecided_reply() -> str:
+    packed = _pack("common.undecided")
+    if packed:
+        return packed
     return random.choice(
         (
             "No problem, take your time. Happy to answer any questions.",
@@ -293,6 +308,9 @@ def undecided_reply() -> str:
 
 
 def small_talk_reply(*, event_label: str | None = None) -> str:
+    packed = _pack("common.small_talk", event_type=event_label)
+    if packed:
+        return packed
     occasion = (event_label or "your celebration").lower()
     return random.choice(
         (
@@ -315,6 +333,9 @@ def welcome_message() -> str:
 
 
 def name_confirm_prompt(name: str) -> str:
+    packed = _pack("state1_2.name_confirm", name=name)
+    if packed:
+        return packed
     who = (name or "").strip() or "that"
     return (
         f"Just checking, is your name {who}?\n\n"
@@ -336,6 +357,9 @@ def name_confirmed_event_ask(name: str) -> str:
 
 
 def name_reask_prompt() -> str:
+    packed = _pack("state1_2.name_reask")
+    if packed:
+        return packed
     return "No problem! Please type your name again."
 
 
@@ -435,12 +459,60 @@ def wants_straight_to_planning(text: str) -> bool:
     return t in {"planning", "plan", "further", "move", "yes move", "yes further", "yes continue", "dive"}
 
 
+def is_food_menu_question(text: str) -> bool:
+    """Customer is asking about dishes/menu — not requesting setup photos."""
+    t = normalize_customer_text(text)
+    if any(
+        c in t
+        for c in (
+            "photo",
+            "photos",
+            "pics",
+            "pic",
+            "gallery",
+            "portfolio",
+            "setup",
+            "setups",
+            "show me",
+            "please show",
+            "show pictures",
+            "show photos",
+            "show picture",
+            "see your",
+            "past event",
+            "past work",
+            "past wedding",
+            "weddings have",
+            "have you done",
+        )
+    ):
+        return False
+    return any(
+        c in t
+        for c in (
+            "dish",
+            "dishes",
+            "menu",
+            "food",
+            "cuisine",
+            "catering",
+            "what kind of",
+            "what dishes",
+            "what food",
+            "what do you serve",
+            "what can you serve",
+        )
+    )
+
+
 def wants_showcase_look(text: str) -> bool:
     """Customer wants to see past setups / photos / cuisines first (State 3 Intent A).
 
     Kannan.rules.txt: Yes / Yeah / Sure after the showcase choice = accept showcase.
     Ok / Okay remains Intent B (direct planning).
     """
+    if is_food_menu_question(text):
+        return False
     t = normalize_customer_text(text)
     if t in {
         "yes",
@@ -514,12 +586,52 @@ def wants_showcase_look(text: str) -> bool:
         "any information",
         "tell me about you",
         "know more about",
+        "please show",
+        "show pictures",
+        "show picture",
+        "show photos",
+        "what kind of",
+        "what kinds of",
+        "kind of wedding",
+        "weddings have you",
+        "have you done",
+        "previous wedding",
+        "past wedding",
+        "past weddings",
+        "done before",
+        "pictures",
+    )
+    return any(c in t for c in cues)
+
+
+def is_short_planning_ack(text: str) -> bool:
+    """Short continue replies like Ok/Okay during detail collection."""
+    t = normalize_customer_text(text).strip().rstrip("!.,")
+    return t in {"ok", "okay", "k", "okk", "fine", "sure", "alright", "got it", "cool", "yes"}
+
+
+def customer_says_already_provided(text: str) -> bool:
+    """Customer is frustrated about repeating information."""
+    t = normalize_customer_text(text)
+    cues = (
+        "already told",
+        "already gave",
+        "already mentioned",
+        "already shared",
+        "i told you",
+        "i already told",
+        "told the date",
+        "gave you the date",
+        "gave the date",
     )
     return any(c in t for c in cues)
 
 
 def warm_enquiry_signoff(*, name: str | None = None, event_type: str | None = None) -> str:
     """Warm close after callback — moderate length (not too long, not too short)."""
+    packed = _pack("state5.signoff", name=name, event_type=event_type)
+    if packed:
+        return packed
     who = (name or "there").strip() or "there"
     return (
         f"Thank you so much, {who}! It was lovely chatting with you. "
@@ -529,6 +641,9 @@ def warm_enquiry_signoff(*, name: str | None = None, event_type: str | None = No
 
 def post_signoff_followup_reply(*, name: str | None = None) -> str:
     """After thank-you: customer shares extra specs — note them, team will call."""
+    packed = _pack("state5.post_signoff_followup", name=name)
+    if packed:
+        return packed
     who = (name or "there").strip() or "there"
     return (
         f"Thanks for sharing that, {who}! We’ve noted your additional details. "
@@ -559,10 +674,16 @@ def wants_book_again(text: str) -> bool:
 
 
 def post_signoff_thanks_reply(*, name: str | None = None) -> str:
+    packed = _pack("state5.post_signoff_thanks", name=name)
+    if packed:
+        return packed
     return "You’re welcome! Our team will call you as planned."
 
 
 def urgent_timeline_reply() -> str:
+    packed = _pack("state4.urgent_fasttrack")
+    if packed:
+        return packed
     return (
         "Got it! Since your celebration is right around the corner, we are prioritizing your inquiry! "
         "Our senior event executive will call you immediately to confirm availability and discuss setups."
@@ -570,6 +691,9 @@ def urgent_timeline_reply() -> str:
 
 
 def immediate_callback_reply(*, name: str | None = None) -> str:
+    packed = _pack("state5.callback_immediate", name=name)
+    if packed:
+        return packed
     who = (name or "there").strip() or "there"
     return f"Got it, {who}! We have notified our lead planning team to give you a callback as soon as possible on this number. 📱"
 
@@ -634,6 +758,9 @@ def callback_confirmation_reply(*, name: str | None = None, callback_label: str 
     who = (name or "there").strip() or "there"
     label = (callback_label or "").strip().lower()
     if not label or label in {"anytime", "whenever", "you decide", "when free", "any time today"}:
+        packed = _pack("state5.callback_business_hours", name=name)
+        if packed:
+            return packed
         return f"Sounds great, {who}! Our senior event planner will give you a call during business hours today on this number."
     if "today evening after 7" in label:
         slot = "today after 7:00 PM"
@@ -645,10 +772,16 @@ def callback_confirmation_reply(*, name: str | None = None, callback_label: str 
         slot = "this weekend morning"
     else:
         slot = callback_label or "the requested time"
+    packed = _pack("state5.callback_scheduled", name=name, slot=slot)
+    if packed:
+        return packed
     return f"Noted, {who}! We have scheduled your callback for {slot}. Our senior event planner will reach out to you on this number. 🗓️"
 
 
 def callback_pivot_prompt(*, name: str | None = None) -> str:
+    packed = _pack("state4.callback_pivot", name=name)
+    if packed:
+        return packed
     who = (name or "there").strip() or "there"
     return (
         f"Of course, {who}! We can discuss all the details directly on call. "
@@ -670,6 +803,9 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
         profile = get_event_profile(event_type)
         return profile["pax_question"]
     if field_key == "event_location":
+        packed = _pack("state4.ask_venue", event_type=event_type)
+        if packed:
+            return packed
         return random.choice(
             (
                 "Do you already have a venue booked for the celebration, or are you looking for help with venue selection? If it is fixed, please share the venue name and area. If not, just let us know your preferred city or locality.",
@@ -677,6 +813,9 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
             )
         )
     if field_key == "preferred_callback":
+        packed = _pack("state4.ask_callback", event_type=event_type)
+        if packed:
+            return packed
         return random.choice(
             (
                 "We’d love to connect you with our senior planner so we can share custom proposals and discuss venues and menu tastings.\n\nWhen would be the best time to give you a quick call? (e.g., today evening, tomorrow after 6 PM, or weekend morning?)",
@@ -684,6 +823,9 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
             )
         )
     if field_key == "meal_preference":
+        packed = _pack("state4.ask_meal", event_type=event_type)
+        if packed:
+            return packed
         return "Are you planning a lunch feast, an evening dinner, or high tea snacks?"
     return "Could you share a bit more?"
 
@@ -694,12 +836,24 @@ def acknowledge_field(field_key: str, value: str, *, event_type: str | None = No
     if len(v) > 20 or len(v.split()) > 3 or re.search(r"[?]|(need|more|detail|know|tell)", v, re.I):
         return soft_ack()
     if field_key == "event_date":
+        packed = _pack("state4.ack_date", event_type=event_type, slot=value)
+        if packed:
+            return packed
         return random.choice(("Got it.", "Perfect.", "Thanks!", "Noted."))
     if field_key == "guest_count":
+        packed = _pack("state4.ack_pax", event_type=event_type, slot=value)
+        if packed:
+            return packed
         return random.choice(("Got it.", "Perfect.", "Thanks!", "Noted."))
     if field_key == "meal_preference":
+        packed = _pack("state4.ack_meal", event_type=event_type, slot=value)
+        if packed:
+            return packed
         return random.choice(("Got it.", "Perfect.", "Sounds good."))
     if field_key == "event_location":
+        packed = _pack("state4.ack_venue", event_type=event_type, slot=v)
+        if packed:
+            return packed
         return f"Got it, {v}! We have noted down the location."
     if field_key == "preferred_callback":
         return random.choice(("Perfect.", "Sounds good.", "Absolutely.", "Got it."))
@@ -727,10 +881,16 @@ def natural_field_ack(
             display = f"The {display}"
         elif display and display[0].islower():
             display = display[0].upper() + display[1:]
+        packed = _pack("state4.ack_date", event_type=event_type, slot=display)
+        if packed:
+            return f"{packed}\n\n{next_prompt}"
         return f"{display} is a wonderful time for {_occasion_phrase(event_type)}!\n\n{next_prompt}"
     if field_key == "guest_count":
         display = re.sub(r"\s*[-–—]\s*", " to ", str(value).strip(), count=1)
         display = re.sub(r"\s+", " ", display)
+        packed = _pack("state4.ack_pax", event_type=event_type, slot=display)
+        if packed:
+            return f"{packed}\n\n{next_prompt}"
         low_match = re.search(r"(\d+)", display)
         low = int(low_match.group(1)) if low_match else 100
         style = "intimate celebration" if low <= 80 else "celebration"
@@ -738,8 +898,14 @@ def natural_field_ack(
         return f"Got it! {article} {style} with {display} guests sounds wonderful.\n\n{next_prompt}"
     if field_key == "event_location":
         place = (value or "").strip()
+        packed = _pack("state4.ack_venue", event_type=event_type, slot=place)
+        if packed:
+            return f"{packed}\n\n{next_prompt}"
         return f"Got it, {place}! We have noted down the location.\n\n{next_prompt}"
     if field_key == "meal_preference":
+        packed = _pack("state4.ack_meal", event_type=event_type, slot=value)
+        if packed:
+            return f"{packed}\n\n{next_prompt}"
         return f"Got it! We'll plan for the {value} service.\n\n{next_prompt}"
     ack = acknowledge_field(field_key, value, event_type=event_type)
     if random.random() < 0.5:
@@ -858,6 +1024,9 @@ def is_portfolio_inquiry(text: str) -> bool:
 
 def catalog_portfolio_reply(*, customer_name: str | None = None) -> str:
     """Exact catalog variants from Kannan.rules.txt State 2 §4."""
+    packed = _pack("state2.catalog", name=customer_name)
+    if packed:
+        return packed
     name = (customer_name or "").strip() or "there"
     variant_a = (
         "We specialize in crafting authentic, unforgettable traditional celebrations! 🌟\n\n"
@@ -898,6 +1067,9 @@ def is_unsupported_event_request(text: str) -> bool:
 
 
 def unsupported_event_refusal(*, customer_name: str | None = None) -> str:
+    packed = _pack("state2.unsupported_refusal", name=customer_name)
+    if packed:
+        return packed
     name = (customer_name or "").strip() or "there"
     return (
         f"Thank you for reaching out, {name}! At Srivatsanka, we specialize exclusively in "

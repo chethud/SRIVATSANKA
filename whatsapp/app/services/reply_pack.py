@@ -106,12 +106,14 @@ def _build_context(
     slot: str | None,
 ) -> dict:
     # Local import avoids a circular import at module load time.
+    from app.data.company_knowledge import COMPANY, POPULAR_DISHES
     from app.services.human_style import (
         ask_event_date_only,
         showcase_followup_date_ask,
     )
 
     who = (name or "").strip() or "there"
+    dishes = ", ".join(POPULAR_DISHES[:3])
     occasion = (event_type or "celebration").strip().lower()
     if not occasion or occasion == "general":
         occasion = "celebration"
@@ -125,6 +127,12 @@ def _build_context(
         "occasion": occasion,
         "special_request": special_request or "your request",
         "slot": slot or "",
+        "dishes": dishes,
+        "phone": COMPANY.get("phone", ""),
+        "email": COMPANY.get("email", ""),
+        "hours": COMPANY.get("eat_rep_eat_hours", ""),
+        "company": COMPANY.get("legal_name", "Srivatsanka Events and Services"),
+        "established": str(COMPANY.get("established", "")),
         "validation": profile.get("validation", ""),
         "showcase": profile.get("showcase", ""),
         "date_ask": showcase_followup_date_ask(event_type=event_type),
@@ -163,3 +171,14 @@ def get_reply(
         slot=slot,
     )
     return _fill(template, ctx)
+
+
+if __name__ == "__main__":
+    reload_pack()
+    pack = _load_pack()
+    replies = pack.get("replies") or {}
+    assert replies, "replies.json has no replies"
+    assert pack.get("_meta", {}).get("redeploy", {}).get("never_delete_live_data") is True
+    sample = get_reply("state1.welcome")
+    assert sample and "Srivatsanka" in sample
+    print(f"ok {len(replies)} replies")

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, Pencil, Trash2, Upload, X } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { OrderScheduleBadge } from '../components/OrderScheduleBadge';
@@ -11,6 +11,7 @@ import {
   formatDate,
   importOrderExcel,
   recognizeOrderExcel,
+  updateEnquiry,
   type Enquiry,
   type OrderExcelRecognizePreview,
 } from '../api/client';
@@ -40,6 +41,9 @@ export default function OrdersPage() {
   const [existingOrderId, setExistingOrderId] = useState('');
   const [importError, setImportError] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [editingId, setEditingId] = useState('');
+  const [editingName, setEditingName] = useState('');
+  const [savingNameId, setSavingNameId] = useState('');
 
   const allOrders = useMemo(
     () => enquiries.filter((e) => e.status === 'CONVERTED'),
@@ -96,6 +100,35 @@ export default function OrdersPage() {
       alert(err instanceof Error ? err.message : 'Could not delete the order. Please try again.');
     } finally {
       setDeletingId('');
+    }
+  }
+
+  function startEditingName(order: Enquiry) {
+    setEditingId(order.id);
+    setEditingName(order.customerName);
+  }
+
+  function cancelEditingName() {
+    setEditingId('');
+    setEditingName('');
+  }
+
+  async function handleSaveName(order: Enquiry) {
+    const trimmed = editingName.trim();
+    if (!trimmed || savingNameId) return;
+    if (trimmed === order.customerName) {
+      cancelEditingName();
+      return;
+    }
+    setSavingNameId(order.id);
+    try {
+      await updateEnquiry(order.id, { customerName: trimmed });
+      await refresh();
+      cancelEditingName();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not update the order name. Please try again.');
+    } finally {
+      setSavingNameId('');
     }
   }
 
@@ -320,10 +353,12 @@ export default function OrdersPage() {
             const serial = serialNumbers.get(e.id);
             const completed = isOrderCompleted(e.eventDate);
             const deleting = deletingId === e.id;
+            const editing = editingId === e.id;
+            const savingName = savingNameId === e.id;
             return (
               <Card
                 key={e.id}
-                className={`relative p-5 hover:border-[var(--primary)] transition-colors flex items-center gap-3 ${
+                className={`relative w-full self-stretch p-5 hover:border-[var(--primary)] transition-colors flex items-center justify-between gap-4 ${
                   unread ? 'attention-unread' : completed ? 'opacity-90' : ''
                 }`}
               >
@@ -331,20 +366,73 @@ export default function OrdersPage() {
                   eventDate={e.eventDate}
                   className="absolute top-3 right-28 sm:right-36"
                 />
-                <Link to={`/orders/${e.id}`} className="min-w-0 flex-1 pr-24 sm:pr-28 block">
+                <div className="min-w-0 flex-1 pr-24 sm:pr-28">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
-                    <h3 className="font-semibold">{e.customerName}</h3>
+                    {editing ? (
+                      <div
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(ev) => setEditingName(ev.target.value)}
+                          onKeyDown={(ev) => {
+                            if (ev.key === 'Enter') void handleSaveName(e);
+                            if (ev.key === 'Escape') cancelEditingName();
+                          }}
+                          disabled={savingName}
+                          autoFocus
+                          className="form-input flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm font-semibold"
+                          aria-label={`Edit order name for ${e.customerName}`}
+                        />
+                        <button
+                          type="button"
+                          disabled={savingName || !editingName.trim()}
+                          onClick={() => void handleSaveName(e)}
+                          className="inline-flex items-center justify-center p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] disabled:opacity-60"
+                          aria-label="Save order name"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingName}
+                          onClick={cancelEditingName}
+                          className="inline-flex items-center justify-center p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--muted)] hover:bg-[var(--sidebar-hover)] disabled:opacity-60"
+                          aria-label="Cancel editing order name"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Link to={`/orders/${e.id}`} className="font-semibold hover:text-[var(--primary)] break-words">
+                          {e.customerName}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => startEditingName(e)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
+                          aria-label={`Edit order name for ${e.customerName}`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </>
+                    )}
                     {unread && <AttentionBadge label="New order" />}
                   </div>
-                  <p className="text-sm text-[var(--muted)]">
-                    {e.eventType} · {formatDate(e.eventDate)}
-                  </p>
-                  <p className="text-xs text-[var(--muted)] mt-1">
-                    {(e.dishes?.length ?? 0)} menu items
-                    {unread ? ' · Not opened yet' : completed ? ' · Event finished' : ''}
-                  </p>
-                </Link>
+                  <Link to={`/orders/${e.id}`} className="block">
+                    <p className="text-sm text-[var(--muted)]">
+                      {e.eventType} · {formatDate(e.eventDate)}
+                    </p>
+                    <p className="text-xs text-[var(--muted)] mt-1">
+                      {(e.dishes?.length ?? 0)} menu items
+                      {unread ? ' · Not opened yet' : completed ? ' · Event finished' : ''}
+                    </p>
+                  </Link>
+                </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
