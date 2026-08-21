@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from app.data.company_knowledge import match_event_type
+
 AREA_ALIASES: dict[str, str] = {
     "bengaluru": "Bengaluru",
     "bangalore": "Bengaluru",
@@ -40,6 +42,30 @@ AREA_ALIASES: dict[str, str] = {
 }
 
 
+_REJECT_LOCATION_TOKENS = frozenset(
+    {
+        "yes",
+        "no",
+        "hey",
+        "hi",
+        "hello",
+        "ok",
+        "okay",
+        "sure",
+        "fine",
+        "thanks",
+        "thank you",
+        "skip",
+        "none",
+    }
+)
+
+
+def _is_rejected_location(text: str) -> bool:
+    key = re.sub(r"\s+", " ", (text or "").strip().lower())
+    return not key or key in _REJECT_LOCATION_TOKENS
+
+
 def normalize_location(text: str) -> str:
     raw = re.sub(r"\s+", " ", (text or "").strip())
     if not raw:
@@ -56,8 +82,10 @@ def normalize_location(text: str) -> str:
 def extract_location_entity(text: str) -> str:
     """Pull a clean venue/area name out of conversational replies like 'Yes Hundur'."""
     raw = re.sub(r"\s+", " ", (text or "").strip())
-    if not raw:
-        return raw
+    if not raw or _is_rejected_location(raw):
+        return ""
+    if match_event_type(raw):
+        return ""
     lower = raw.lower()
     if "help" in lower and "venue" in lower:
         city_match = re.search(r"\b(?:in|at|around|near)\s+([A-Za-z][A-Za-z\s.-]{1,40})", raw, re.I)
@@ -82,4 +110,5 @@ def extract_location_entity(text: str) -> str:
         flags=re.I,
     )
     cleaned = cleaned.strip(" ,.-!")
-    return normalize_location(cleaned or raw)
+    result = normalize_location(cleaned or raw)
+    return "" if _is_rejected_location(result) else result

@@ -72,6 +72,17 @@ class ConversationSession:
 class SessionStore:
     def __init__(self) -> None:
         self._sessions: dict[str, ConversationSession] = {}
+        self._seen_message_ids: set[str] = set()
+
+    def is_duplicate_message(self, message_id: str) -> bool:
+        if not message_id:
+            return False
+        if message_id in self._seen_message_ids:
+            return True
+        self._seen_message_ids.add(message_id)
+        if len(self._seen_message_ids) > 5000:
+            self._seen_message_ids = set(list(self._seen_message_ids)[-2500:])
+        return False
 
     def get(self, whatsapp_id: str) -> ConversationSession:
         if whatsapp_id not in self._sessions:

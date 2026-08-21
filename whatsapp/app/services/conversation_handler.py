@@ -9,6 +9,8 @@ from app.services.guided_flow import process_guided_flow
 from app.services.dish_flow import handle_dish_flow, start_dish_flow
 from app.services.enquiry_service import append_followup_note_for_phone, save_enquiry
 from app.services.human_style import (
+    asks_callback_timing,
+    callback_timing_reply,
     is_thanks_only,
     post_signoff_followup_reply,
     post_signoff_thanks_reply,
@@ -87,6 +89,19 @@ async def handle_conversation(
         )
 
     if session.completed and session._saved:
+        if asks_callback_timing(user_text):
+            reply = callback_timing_reply(
+                preferred_callback=session.fields.preferred_callback,
+                name=session.fields.customer_name,
+            )
+            return (
+                AgentTurnResult(
+                    reply=reply,
+                    fields=session.fields,
+                    is_complete=True,
+                ),
+                False,
+            )
         # Post thank-you: note any extra specs; tell them a team member will call.
         if is_thanks_only(user_text):
             reply = post_signoff_thanks_reply(name=session.fields.customer_name)

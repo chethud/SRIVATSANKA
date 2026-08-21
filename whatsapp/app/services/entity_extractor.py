@@ -15,7 +15,13 @@ from app.services.event_date import (
     is_urgent_event_date,
     looks_like_event_date,
 )
-from app.services.human_style import wants_discuss_on_call
+from app.services.human_style import (
+    asks_callback_timing,
+    has_callback_intent,
+    is_meal_type_answer,
+    normalize_meal_label,
+    wants_discuss_on_call,
+)
 from app.services.location_normalize import extract_location_entity
 from app.services.session_store import ConversationSession
 
@@ -108,6 +114,8 @@ def _extract_guest_count(text: str) -> str | int:
 
 
 def _extract_meal_from_text(text: str) -> str | None:
+    if is_meal_type_answer(text):
+        return normalize_meal_label(text)
     lower = text.lower()
     selected: list[str] = []
     if "breakfast" in lower:
@@ -166,7 +174,13 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
             entities.special_requests = raw
 
     if re.search(r"\b(venue|location|hall|area|city|locality|mysore|mysuru|bangalore|bengaluru|benglore|banglore|bengalore|hunsur|hundur)\b", lower):
-        entities.event_location = extract_location_entity(raw)
+        loc = extract_location_entity(raw)
+        if loc:
+            entities.event_location = loc
+    elif not entities.event_location:
+        loc = extract_location_entity(raw)
+        if loc and len(loc.split()) <= 4 and len(raw) <= 80:
+            entities.event_location = loc
 
     meal = _extract_meal_from_text(raw)
     if meal:
@@ -178,18 +192,26 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
         elif "lunch" in history_text:
             entities.meal_preference = "Lunch"
 
-    if is_immediate_callback(raw) or (
-        entities.callback_requested
-        and re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night|am|pm)\b", lower)
+    if is_meal_type_answer(raw):
+        entities.meal_preference = normalize_meal_label(raw)
+    elif not asks_callback_timing(raw) and (
+        session.last_asked_slot == "preferred_callback"
+        and re.search(r"\b(today|tomorrow|morning|afternoon|evening|night)\b", lower)
     ):
-        entities.preferred_callback = normalize_callback_label(raw)
-    elif re.search(r"\b(today|tomorrow)\s+(morning|evening|afternoon|night)\b", lower):
-        entities.preferred_callback = raw.strip().title()
-    elif re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night)\b", lower) and re.search(
-        r"\b(call|callback|ring|speak|talk)\b",
-        lower,
-    ):
-        entities.preferred_callback = normalize_callback_label(raw)
+        if is_immediate_callback(raw) or (
+            entities.callback_requested
+            and re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night|am|pm)\b", lower)
+        ):
+            entities.preferred_callback = normalize_callback_label(raw)
+        elif re.search(r"\b(today|tomorrow)\s+(morning|evening|afternoon|night)\b", lower):
+            entities.preferred_callback = raw.strip().title()
+        elif re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night)\b", lower) and re.search(
+            r"\b(call|callback|ring|speak|talk)\b",
+            lower,
+        ):
+            entities.preferred_callback = normalize_callback_label(raw)
+        elif session.last_asked_slot == "preferred_callback":
+            entities.preferred_callback = normalize_callback_label(raw)
 
     if re.search(r"\b(fusion|custom|italian|chinese|dessert|live counter|pan asian|mocktail|gelato)\b", lower):
         if not re.search(r"\b(cocktail party|alcohol|alcoholic|conference|exhibition|expo)\b", lower):
@@ -197,5 +219,13 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
 
     if re.search(r"\b(pure\s*veg|pure\s*vegetarian|vegetarian catering|veg only|sattvic|satvik)\b", lower):
         entities.special_requests = (entities.special_requests or "Pure vegetarian catering").strip()
+
+    if entities.event_location:
+        cname = (entities.customer_name or session.fields.customer_name or session.pending_name or "").strip().lower()
+        if cname and entities.event_location.strip().lower() == cname:
+            entities.event_location = None
+        etype = (entities.event_type or session.fields.event_type or "").strip().lower()
+        if etype and (entities.event_location or "").strip().lower() == etype:
+            entities.event_location = None
 
     return entities

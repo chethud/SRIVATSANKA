@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.schemas import EnquiryFields
 from app.services.conversation_turns import clean_person_name
+from app.services.human_style import has_callback_intent, is_meal_type_answer
 from app.services.entity_extractor import ExtractedEntities
 from app.services.session_store import ConversationSession, GuidedStep, SlotValue
 
@@ -97,16 +98,30 @@ def apply_entities(session: ConversationSession, entities: ExtractedEntities) ->
         value = getattr(entities, key, None)
         if value in (None, ""):
             continue
-        # Callback phrases like "call me" alone must not invent a callback slot early
-        if key == "preferred_callback" and not (
-            entities.callback_requested
-            or session.guided_step == GuidedStep.COLLECT_DETAILS
-        ):
-            continue
+        if key == "preferred_callback":
+            if is_meal_type_answer(str(value)):
+                continue
+            if not (
+                entities.callback_requested
+                or session.last_asked_slot == "preferred_callback"
+                or has_callback_intent(str(value))
+            ):
+                continue
+            if session.guided_step not in {
+                GuidedStep.COLLECT_DETAILS,
+                GuidedStep.AWAIT_POST_SHOWCASE,
+            } and not entities.callback_requested:
+                continue
         # Name stays pending until Yes confirmation (STATE 1.2)
         if key == "customer_name" and not session.name_confirmed:
             session.pending_name = clean_person_name(str(value)) or str(value).strip()
             continue
+        if key == "event_location":
+            cname = (data.get("customer_name") or session.pending_name or "").strip().lower()
+            etype = (data.get("event_type") or "").strip().lower()
+            val = str(value).strip().lower()
+            if (cname and val == cname) or (etype and val == etype):
+                continue
         if data.get(key) in (None, ""):
             data[key] = value
         slot = session.slots.setdefault(key, SlotValue())

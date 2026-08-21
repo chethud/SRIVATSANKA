@@ -325,16 +325,15 @@
     },
     "state5.signoff": {
       "variants": [
-        "Thank you so much, {who}! It was lovely chatting with you. We're excited to help with your celebration. Talk to you soon! \u2728",
-        "Thank you so much, {who}! It was an absolute pleasure chatting with you. We're excited to make your celebration truly unforgettable. \u2728\n\nHave a wonderful rest of your day, and talk to you soon!",
-        "Thank you so much for reaching out, {who}! It was an absolute pleasure chatting with you. We're excited to make your celebration truly unforgettable. Have a wonderful rest of your day! \u2728",
-        "Thank you so much, {who}! We look forward to helping you create a lovely {occasion}. Have a wonderful rest of your day! \u2728"
+        "Thank you so much, {who}! I've noted your event details and passed them to our senior event planner. Talk to you soon!",
+        "Thanks, {who}! Our team has your details and will reach out on this number. Have a wonderful day!",
+        "Thank you for reaching out, {who}! Our senior planner will connect with you shortly. Have a lovely day!"
       ]
     },
     "state5.post_signoff_followup": {
       "variants": [
         "Thanks for sharing that, {who}! We've noted your additional details. Our team member will call you shortly to discuss everything.\n\nIf you'd like to book another celebration, just type *book again*.",
-        "Noted, {who}! We've added those details for the call. Our team member will discuss everything with you shortly.\n\nIf you'd like to book another celebration, just type *book again*."
+        "Noted, {who}! I've added those details. Our planner will discuss everything with you on the call.\n\nIf you'd like to book another celebration, just type *book again*."
       ]
     },
     "state5.post_signoff_thanks": {

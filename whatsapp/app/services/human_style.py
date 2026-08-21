@@ -627,6 +627,158 @@ def customer_says_already_provided(text: str) -> bool:
     return any(c in t for c in cues)
 
 
+_MEAL_TYPE_CUES = (
+    "evening dinner",
+    "lunch feast",
+    "high tea",
+    "breakfast",
+    "brunch",
+    "lunch",
+    "dinner",
+    "snacks",
+    "high-tea",
+)
+
+_CALLBACK_INTENT_CUES = (
+    "call me",
+    "callback",
+    "call back",
+    "ring me",
+    "speak to",
+    "talk to",
+    "planner call",
+    "give me a call",
+    "someone call",
+    "can you call",
+    "please call",
+)
+
+
+def is_meal_type_answer(text: str) -> bool:
+    """True when the message is a meal service choice, not a callback time."""
+    lower = normalize_customer_text(text)
+    if not lower:
+        return False
+    if has_callback_intent(text):
+        return False
+    if any(c in lower for c in _MEAL_TYPE_CUES):
+        return True
+    if re.search(r"\b(lunch|dinner|breakfast|snacks|brunch|feast|high\s*tea)\b", lower):
+        if re.search(r"\b(today|tomorrow)\s+(morning|afternoon|evening|night)\b", lower):
+            return False
+        return True
+    return False
+
+
+def has_callback_intent(text: str) -> bool:
+    if asks_callback_timing(text):
+        return False
+    lower = normalize_customer_text(text)
+    if any(c in lower for c in _CALLBACK_INTENT_CUES):
+        return True
+    if re.search(r"\b(today|tomorrow)\s+(morning|afternoon|evening|night)\b", lower):
+        return True
+    if re.search(r"\b(after\s+\d|around\s+\d|@\s*\d|:\d{2}\s*(am|pm))\b", lower):
+        return True
+    return wants_discuss_on_call(text)
+
+
+def asks_callback_timing(text: str) -> bool:
+    """Customer wants to know when the planner will call."""
+    t = normalize_customer_text(text)
+    cues = (
+        "when will they call",
+        "when will you call",
+        "when can i expect",
+        "what time will they call",
+        "what time will you call",
+        "are they calling today",
+        "when will the call",
+        "when is the call",
+        "when are they calling",
+    )
+    return any(c in t for c in cues)
+
+
+def callback_timing_reply(
+    *,
+    preferred_callback: str | None = None,
+    name: str | None = None,
+) -> str:
+    """Answer 'when will they call?' without inventing a time."""
+    from app.services.callback_time import is_immediate_callback
+
+    label = (preferred_callback or "").strip()
+    who = (name or "there").strip() or "there"
+    if not label or is_meal_type_answer(label):
+        return (
+            f"I haven't scheduled a callback yet, {who}. "
+            "What time would be convenient for our senior event planner to call you?"
+        )
+    if is_immediate_callback(label):
+        return (
+            f"Your callback request is with our team, {who}. "
+            "They will call you as soon as possible on this number."
+        )
+    return (
+        f"I've noted your callback preference as {label}, {who}. "
+        "Our senior event planner will reach out on this number."
+    )
+
+
+def normalize_meal_label(text: str) -> str:
+    lower = normalize_customer_text(text)
+    if "evening dinner" in lower or ("evening" in lower and "dinner" in lower):
+        return "Evening Dinner"
+    if "high tea" in lower:
+        return "High Tea"
+    if "lunch" in lower:
+        return "Lunch"
+    if "dinner" in lower:
+        return "Dinner"
+    if "breakfast" in lower:
+        return "Breakfast"
+    if "snacks" in lower:
+        return "Snacks"
+    return text.strip().title() or text
+
+
+def sanitize_customer_reply(text: str, *, last_bot_message: str | None = None) -> str:
+    """Strip quoted bot copy and keep the customer's actual answer."""
+    raw = (text or "").strip()
+    if not raw:
+        return raw
+    if last_bot_message:
+        bot = last_bot_message.strip()
+        if bot and raw.startswith(bot[: min(len(bot), 80)]):
+            raw = raw[len(bot) :].strip()
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+    if len(lines) > 1:
+        bot_markers = (
+            "srivatsanka",
+            "how many guests",
+            "tentative date",
+            "venue already fixed",
+            "lunch feast",
+            "evening dinner",
+            "high tea",
+            "may i know your name",
+            "what celebration",
+            "past birthday",
+            "got it!",
+            "sounds wonderful",
+            "could you share that again",
+        )
+        filtered = [
+            ln
+            for ln in lines
+            if not (len(ln) > 50 and any(m in ln.lower() for m in bot_markers))
+        ]
+        if filtered:
+            raw = filtered[-1]
+    return raw.strip()
+
+
 def warm_enquiry_signoff(*, name: str | None = None, event_type: str | None = None) -> str:
     """Warm close after callback — moderate length (not too long, not too short)."""
     packed = _pack("state5.signoff", name=name, event_type=event_type)
@@ -756,19 +908,22 @@ def intent_b_planning_reply(
 
 def callback_confirmation_reply(*, name: str | None = None, callback_label: str | None = None) -> str:
     who = (name or "there").strip() or "there"
-    label = (callback_label or "").strip().lower()
-    if not label or label in {"anytime", "whenever", "you decide", "when free", "any time today"}:
+    label = (callback_label or "").strip()
+    if is_meal_type_answer(label):
+        return callback_pivot_prompt(name=name)
+    label_lower = label.lower()
+    if not label_lower or label_lower in {"anytime", "whenever", "you decide", "when free", "any time today"}:
         packed = _pack("state5.callback_business_hours", name=name)
         if packed:
             return packed
         return f"Sounds great, {who}! Our senior event planner will give you a call during business hours today on this number."
-    if "today evening after 7" in label:
+    if "today evening after 7" in label_lower:
         slot = "today after 7:00 PM"
-    elif "tomorrow morning around 11" in label:
+    elif "tomorrow morning around 11" in label_lower:
         slot = "tomorrow around 11:00 AM"
-    elif "day after around tea time" in label or "day after tea time" in label:
+    elif "day after around tea time" in label_lower or "day after tea time" in label_lower:
         slot = "day after tomorrow between 4:00 PM and 5:00 PM"
-    elif "weekend morning" in label:
+    elif "weekend morning" in label_lower:
         slot = "this weekend morning"
     else:
         slot = callback_label or "the requested time"

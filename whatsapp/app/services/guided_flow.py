@@ -27,8 +27,10 @@ from app.services.human_style import (
     acknowledge_opening_without_name,
     ask_event_date_only,
     ask_move_further_prompt,
+    asks_callback_timing,
     callback_confirmation_reply,
     callback_pivot_prompt,
+    callback_timing_reply,
     catalog_portfolio_reply,
     detail_question,
     immediate_callback_reply,
@@ -38,6 +40,7 @@ from app.services.human_style import (
     is_portfolio_inquiry,
     customer_says_already_provided,
     is_food_menu_question,
+    is_meal_type_answer,
     is_short_planning_ack,
     is_service_topic_reply,
     is_small_talk,
@@ -48,6 +51,8 @@ from app.services.human_style import (
     name_confirm_prompt,
     name_confirmed_event_ask,
     name_reask_prompt,
+    normalize_meal_label,
+    sanitize_customer_reply,
     showcase_followup_date_ask,
     small_talk_reply,
     thanks_reply,
@@ -218,6 +223,16 @@ def _event_label(session: ConversationSession) -> str | None:
 
 def _next_detail_key(session: ConversationSession) -> str | None:
     _skip_inapplicable_fields(session)
+    data = session.fields.model_dump()
+    cname = (data.get("customer_name") or session.pending_name or "").strip().lower()
+    loc = str(data.get("event_location") or "").strip()
+    if loc and (
+        loc.lower() == cname
+        or loc.lower() in {"yes", "no", "hey", "hi", "hello"}
+        or loc.lower() == str(data.get("event_type") or "").strip().lower()
+    ):
+        session.fields = EnquiryFields(**{**data, "event_location": None})
+        data = session.fields.model_dump()
     for key in DETAIL_KEYS:
         if getattr(session.fields, key) is not None:
             continue
@@ -241,7 +256,13 @@ def _next_detail_prompt(session: ConversationSession) -> str | None:
 
 def _details_complete(session: ConversationSession) -> bool:
     _skip_inapplicable_fields(session)
-    return all(getattr(session.fields, key) is not None for key in DETAIL_KEYS)
+    for key in DETAIL_KEYS:
+        value = getattr(session.fields, key)
+        if value is None:
+            return False
+        if key == "preferred_callback" and is_meal_type_answer(str(value)):
+            return False
+    return True
 
 
 def _ask_name_again(text: str) -> str:
@@ -350,6 +371,18 @@ def _complete_enquiry_reply(
         event_type=session.fields.event_type,
     )
     callback_label = (session.fields.preferred_callback or "").strip()
+    if is_meal_type_answer(callback_label):
+        data = session.fields.model_dump()
+        if data.get("meal_preference") in (None, ""):
+            data["meal_preference"] = normalize_meal_label(callback_label)
+        data["preferred_callback"] = None
+        session.fields = EnquiryFields(**data)
+        move_to(session, GuidedStep.COLLECT_DETAILS)
+        prompt = callback_pivot_prompt(name=session.fields.customer_name)
+        reply = f"Perfect. I've noted {data['meal_preference']} for your event.\n\n{prompt}"
+        track_question(session, reply, slot_key="preferred_callback")
+        record_exchange(session, user_text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
     if lead:
         reply = f"{lead}\n\n{signoff}"
     elif is_immediate_callback(callback_label or user_text):
@@ -580,25 +613,30 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
         if isinstance(value, str) and len(value.split()) > 6:
             return False
     if key == "meal_preference":
-        lower = user_text.lower()
-        selected = []
-        if "dinner" in lower:
-            selected.append("Dinner")
-            selected.append("Dessert")
-        if "lunch" in lower:
-            selected.append("Lunch")
-        if "breakfast" in lower:
-            selected.append("Breakfast")
-        if "snacks" in lower or "tea" in lower or "coffee" in lower:
-            selected.append("Snacks")
-            selected.append("Tea")
-        if not selected:
-            selected = ["Lunch", "Dinner"]
-        session.selected_dishes = _preferences_to_items(selected)
-        value = ", ".join(selected)
+        if is_meal_type_answer(user_text):
+            value = normalize_meal_label(user_text)
+        else:
+            lower = user_text.lower()
+            selected = []
+            if "dinner" in lower:
+                selected.append("Dinner")
+                selected.append("Dessert")
+            if "lunch" in lower:
+                selected.append("Lunch")
+            if "breakfast" in lower:
+                selected.append("Breakfast")
+            if "snacks" in lower or "tea" in lower or "coffee" in lower:
+                selected.append("Snacks")
+                selected.append("Tea")
+            if not selected:
+                selected = ["Lunch", "Dinner"]
+            session.selected_dishes = _preferences_to_items(selected)
+            value = ", ".join(selected)
     if key == "event_location":
         value = extract_location_entity(str(value))
     if key == "preferred_callback":
+        if is_meal_type_answer(str(value)):
+            return False
         value = normalize_callback_label(str(value))
     session.fields = EnquiryFields(**{**session.fields.model_dump(), key: value})
     return True
@@ -637,7 +675,7 @@ async def process_guided_flow(
     whatsapp_id: str,
     user_text: str,
 ) -> AgentTurnResult | None:
-    text = user_text.strip()
+    text = sanitize_customer_reply(user_text, last_bot_message=session.last_assistant_question)
     hydrate_memory(session)
     before_fields = session.fields.model_dump()
 
@@ -1034,6 +1072,15 @@ async def process_guided_flow(
     if step == GuidedStep.COLLECT_DETAILS:
         _skip_inapplicable_fields(session)
 
+        if asks_callback_timing(text):
+            reply = callback_timing_reply(
+                preferred_callback=session.fields.preferred_callback,
+                name=session.fields.customer_name,
+            )
+            track_question(session, reply, slot_key="preferred_callback")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
         if customer_says_already_provided(text):
             name = session.fields.customer_name or "there"
             if session.fields.event_date:
@@ -1161,6 +1208,30 @@ async def process_guided_flow(
                 track_question(session, reply, slot_key="preferred_callback")
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
+            next_prompt = _next_detail_prompt(session)
+            if next_prompt:
+                reply = natural_field_ack(
+                    "event_location",
+                    location_value,
+                    next_prompt,
+                    event_type=session.fields.event_type,
+                )
+                track_question(session, reply, slot_key=_next_detail_key(session))
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if "meal_preference" in newly_collected and "preferred_callback" not in newly_collected:
+            next_prompt = _next_detail_prompt(session)
+            if next_prompt:
+                reply = natural_field_ack(
+                    "meal_preference",
+                    str(session.fields.meal_preference or text),
+                    next_prompt,
+                    event_type=session.fields.event_type,
+                )
+                track_question(session, reply, slot_key=_next_detail_key(session))
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
 
         if wants_discuss_on_call(text) and session.fields.preferred_callback is None:
             reply = callback_pivot_prompt(name=session.fields.customer_name)
@@ -1210,7 +1281,7 @@ async def process_guided_flow(
             if (
                 wants_more_info(text)
                 or is_service_topic_reply(text)
-                or (looks_like_question(text) and not is_likely_field_answer(text, key))
+                or (looks_like_question(text) and not is_likely_field_answer(text, key, last_asked_slot=session.last_asked_slot))
                 or _is_custom_request(text)
             ):
                 if _is_custom_request(text):
@@ -1226,7 +1297,17 @@ async def process_guided_flow(
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
-            if not is_likely_field_answer(text, key):
+            if not is_likely_field_answer(text, key, last_asked_slot=session.last_asked_slot):
+                # Meal answers must never fill the callback slot.
+                if key == "preferred_callback" and is_meal_type_answer(text):
+                    if session.fields.meal_preference is None:
+                        _store_detail_field(session, "meal_preference", text)
+                    next_prompt = callback_pivot_prompt(name=session.fields.customer_name)
+                    meal = session.fields.meal_preference or normalize_meal_label(text)
+                    reply = f"Perfect. I've noted {meal} for your event.\n\n{next_prompt}"
+                    track_question(session, reply, slot_key="preferred_callback")
+                    record_exchange(session, text, reply)
+                    return AgentTurnResult(reply=reply, fields=session.fields)
                 # Fix 6: clarify once → callback offer → circuit breaker (via failed_turns >= 3)
                 fails = record_slot_failure(session, slot_key=key)
                 slot_fails = slot_fail_count(session, key)

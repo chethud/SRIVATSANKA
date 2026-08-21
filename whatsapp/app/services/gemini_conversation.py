@@ -312,7 +312,8 @@ def _is_probable_date(text: str) -> bool:
     return looks_like_event_date(text)
 
 
-def is_likely_field_answer(text: str, field_key: str) -> bool:
+def is_likely_field_answer(text: str, field_key: str, *, last_asked_slot: str | None = None) -> bool:
+    from app.services.human_style import has_callback_intent, is_meal_type_answer
     from app.services.event_date import has_service_planning_intent
     from app.services.human_style import wants_more_info, wants_showcase_look
     from app.services.website_gallery import customer_wants_photos
@@ -327,7 +328,7 @@ def is_likely_field_answer(text: str, field_key: str) -> bool:
     if looks_like_question(text):
         if field_key == "event_date" and _is_probable_date(text):
             return True
-        if field_key == "preferred_callback" and _is_probable_callback(text):
+        if field_key == "preferred_callback" and _is_probable_callback(text, last_asked_slot=last_asked_slot):
             return True
         if field_key == "event_location" and _is_probable_location(text) and "?" not in text:
             return True
@@ -335,7 +336,7 @@ def is_likely_field_answer(text: str, field_key: str) -> bool:
     if field_key == "event_date":
         return _is_probable_date(text)
     if field_key == "preferred_callback":
-        return _is_probable_callback(text)
+        return _is_probable_callback(text, last_asked_slot=last_asked_slot)
     if field_key == "guest_count":
         t = text.strip()
         if re.search(r"\b\d{1,2}(?:st|nd|rd|th)\b", t, re.I) and re.search(
@@ -354,6 +355,8 @@ def is_likely_field_answer(text: str, field_key: str) -> bool:
             )
         return False
     if field_key == "meal_preference":
+        if is_meal_type_answer(text):
+            return True
         t = text.lower()
         return any(
             w in t
@@ -430,8 +433,15 @@ def _is_probable_location(text: str) -> bool:
     return False
 
 
-def _is_probable_callback(text: str) -> bool:
+def _is_probable_callback(text: str, *, last_asked_slot: str | None = None) -> bool:
     from app.services.callback_time import IMMEDIATE_RE
+    from app.services.human_style import asks_callback_timing, has_callback_intent, is_meal_type_answer
+
+    if asks_callback_timing(text):
+        return False
+
+    if is_meal_type_answer(text) and last_asked_slot != "preferred_callback":
+        return False
 
     t = text.lower()
     if IMMEDIATE_RE.search(t):
@@ -442,20 +452,10 @@ def _is_probable_callback(text: str) -> bool:
         return True
     if re.search(r"\b(day after|tea time|weekend|after\s+\d|around\s+\d)\b", t):
         return True
-    return any(
-        w in t
-        for w in (
-            "today",
-            "tomorrow",
-            "tommarow",
-            "tomorow",
-            "morning",
-            "evening",
-            "afternoon",
-            "noon",
-            "call me",
-            "tonight",
-            "anytime",
-            "whenever",
+    if re.search(r"\b(today|tomorrow)\s+(morning|afternoon|evening|night)\b", t):
+        return True
+    if last_asked_slot == "preferred_callback":
+        return has_callback_intent(text) or bool(
+            re.search(r"\b(morning|afternoon|evening|night|noon|tonight|anytime|whenever)\b", t)
         )
-    ) or bool(re.search(r"\btom\w*row\b", t))
+    return has_callback_intent(text) or bool(re.search(r"\btom\w*row\b", t))

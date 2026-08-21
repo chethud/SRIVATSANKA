@@ -8,6 +8,7 @@ from app.database import get_db
 from app.services.chat_handoff import is_bot_paused_for_phone
 from app.services.chat_log import log_bot_message, log_customer_message
 from app.services.conversation_handler import handle_conversation
+from app.services.session_store import session_store
 from app.services.whatsapp_client import send_whatsapp_image, send_whatsapp_message, verify_webhook_signature
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,11 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
         return {"status": "no_messages"}
 
     message = messages[0]
+    message_id = (message.get("id") or "").strip()
+    if session_store.is_duplicate_message(message_id):
+        logger.info("Duplicate WhatsApp message ignored: %s", message_id)
+        return {"status": "duplicate"}
+
     from_number = message.get("from", "")
 
     if message.get("type") != "text":
