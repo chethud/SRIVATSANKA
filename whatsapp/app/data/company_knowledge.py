@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 WEBSITE_URL = "https://srivatsanka.com/"
 
@@ -11,6 +13,7 @@ COMPANY = {
     "brand_name": "Srivatsanka Events and Services",
     "established": "2017",
     "managing_director": "Mr. Kannan Sharangapani",
+    "business_owner_name": "Kannan",
     "founder": "Sri R. V. Sharangapani",
     "director_culture": "Mrs. Sangeetha K. S.",
     "phone": "+91-9945607074",
@@ -214,6 +217,7 @@ EVENT_TYPES = [
     "Engagement",
     "Birthday",
     "Reception",
+    "Family Gathering",
     "Corporate events",
 ]
 
@@ -280,29 +284,28 @@ POPULAR_DISHES = [
     "Live counters — dosa, chaat, tawa, sweets, juices",
 ]
 
-# Gallery from https://srivatsanka.com/ (home + service pages). category helps photo matching.
-GALLERY_ITEMS: list[dict[str, str]] = [
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/1620985900177-1.jpeg", "caption": "Wedding catering spread", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/1657811033159-1.png", "caption": "Guests enjoying our hospitality", "category": "hospitality"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/1714968534703-1.png", "caption": "Food presentation at a celebration", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20231229125945-scaled.jpg", "caption": "Traditional wedding hospitality", "category": "hospitality"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20231229145338-scaled.jpg", "caption": "Wedding celebration arrangements", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240103203446-scaled.jpg", "caption": "Traditional wedding catering", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/Wedding-Pooja-Setup-img-scaled.jpg", "caption": "Wedding pooja / ritual setup", "category": "rituals"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/swing-img.png", "caption": "Traditional wedding swing décor", "category": "decor"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/venues-for-celebration-img-scaled.jpg", "caption": "Celebration venue setup", "category": "venues"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250209202303-scaled.jpg", "caption": "Elegant wedding venue décor", "category": "venues"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250311203649-scaled.jpg", "caption": "Traditional ceremony arrangements", "category": "rituals"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/Decor-for-Celebrations-img.jpg", "caption": "Event décor for celebrations", "category": "decor"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240827170330-Copy-scaled.jpg", "caption": "Celebration décor setup", "category": "decor"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240911195637-Copy-scaled.jpg", "caption": "Decor & celebration styling", "category": "decor"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250129201422-scaled.jpg", "caption": "Catering service moment", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250120130855-scaled.jpg", "caption": "Celebration dining", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20240828092141-Copy-scaled.jpg", "caption": "Live catering experience", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/IMG20250216072908-Copy-scaled.jpg", "caption": "Ritual / ceremony support", "category": "rituals"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/05/banner-img-banana-leaf.jpg", "caption": "South Indian banana-leaf hospitality", "category": "catering"},
-    {"url": "https://srivatsanka.com/wp-content/uploads/2026/03/hero-img-scaled.jpg", "caption": "Srivatsanka celebration moment", "category": "hospitality"},
-]
+# Gallery from https://srivatsanka.com/services/ and linked service pages.
+def _load_gallery_items() -> list[dict[str, str]]:
+    path = Path(__file__).with_name("service_photos.json")
+    items: list[dict[str, str]] = []
+    seen: set[str] = set()
+    if path.exists():
+        for item in json.loads(path.read_text(encoding="utf-8")):
+            url = (item or {}).get("url") or ""
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            items.append(
+                {
+                    "url": url,
+                    "caption": item.get("caption") or "Srivatsanka Events and Services",
+                    "category": item.get("category") or "traditional",
+                }
+            )
+    return items
+
+
+GALLERY_ITEMS: list[dict[str, str]] = _load_gallery_items()
 
 GALLERY_IMAGE_URLS = [item["url"] for item in GALLERY_ITEMS]
 WELCOME_IMAGE_CAPTIONS = [item["caption"] for item in GALLERY_ITEMS[:3]]
@@ -372,6 +375,12 @@ EVENT_TYPE_DETAILS: dict[str, dict] = {
         "title": "Birthday",
         "short_reply": "Homely birthday menus and guest hospitality 🎂",
         "description": "Family birthday catering with authentic vegetarian menus.",
+        "image_captions": WELCOME_IMAGE_CAPTIONS,
+    },
+    "Family Gathering": {
+        "title": "Family Gathering",
+        "short_reply": "Warm vegetarian hospitality for family get-togethers 🌿",
+        "description": "Homely vegetarian menus and guest hospitality for family gatherings.",
         "image_captions": WELCOME_IMAGE_CAPTIONS,
     },
     "Reception": {
@@ -451,7 +460,16 @@ def match_event_type(text: str) -> str:
         "baby shower": "Baby Shower",
         "babyshower": "Baby Shower",
         "seemantham": "Baby Shower",
+        "seemantha": "Baby Shower",
         "seemanth": "Baby Shower",
+        "srimantha": "Baby Shower",
+        "srimantham": "Baby Shower",
+        "srimanth": "Baby Shower",
+        "valaikappu": "Baby Shower",
+        "valaikaapu": "Baby Shower",
+        "valai kappu": "Baby Shower",
+        "godh bharai": "Baby Shower",
+        "godhbharai": "Baby Shower",
         "naming ceremony": "Naming Ceremony",
         "namimg ceremony": "Naming Ceremony",
         "name ceremony": "Naming Ceremony",
@@ -459,6 +477,9 @@ def match_event_type(text: str) -> str:
         "upanayan": "Upanayanam",
         "engagement": "Engagement",
         "birthday": "Birthday",
+        "family gathering": "Family Gathering",
+        "family function": "Family Gathering",
+        "family event": "Family Gathering",
         "corporate": "Corporate events",
         "office lunch": "Corporate events",
         "corporate lunch": "Corporate events",

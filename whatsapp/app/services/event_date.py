@@ -187,6 +187,56 @@ def _month_token_in_text(t: str) -> bool:
     return any(re.search(rf"\b{m}\b", t) for m in short_months)
 
 
+_MONTH_NAME_PATTERN = (
+    r"january|february|march|april|may|june|july|august|september|october|november|december|"
+    r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec"
+)
+
+
+def is_impossible_calendar_date(text: str, now: datetime | None = None) -> bool:
+    """True when a specific day is named that does not exist (e.g. 33 November)."""
+    reference = now or datetime.now()
+    lower = _strip_ordinals(text or "")
+    if not lower:
+        return False
+
+    def _invalid(year: int, month: int, day: int) -> bool:
+        if month < 1 or month > 12 or day < 1:
+            return True
+        return day > monthrange(year, month)[1]
+
+    match = re.search(rf"\b(\d{{1,2}})\s+({_MONTH_NAME_PATTERN})(?:\s+(\d{{4}}))?\b", lower)
+    if match:
+        day = int(match.group(1))
+        month = MONTHS[match.group(2)]
+        year = int(match.group(3)) if match.group(3) else reference.year
+        return _invalid(year, month, day)
+
+    match = re.search(rf"\b({_MONTH_NAME_PATTERN})\s+(\d{{1,2}})(?:\s+(\d{{4}}))?\b", lower)
+    if match:
+        month = MONTHS[match.group(1)]
+        day = int(match.group(2))
+        year = int(match.group(3)) if match.group(3) else reference.year
+        return _invalid(year, month, day)
+
+    match = re.search(r"\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\b", lower)
+    if match:
+        day, month = int(match.group(1)), int(match.group(2))
+        year_raw = match.group(3)
+        year = reference.year
+        if year_raw:
+            year = int(year_raw)
+            if year < 100:
+                year += 2000
+        if 1 <= month <= 12:
+            return _invalid(year, month, day)
+        if 1 <= day <= 12:
+            return _invalid(year, day, month)
+        return True
+
+    return False
+
+
 def looks_like_event_date(text: str) -> bool:
     """True when the message is a date / month / relative window, not a random digit."""
     t = (text or "").lower().strip()

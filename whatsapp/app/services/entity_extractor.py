@@ -6,23 +6,24 @@ import re
 from dataclasses import dataclass
 
 from app.data.company_knowledge import is_known_event_type, match_event_type
-from app.services.callback_time import is_immediate_callback, normalize_callback_label
+from app.services.callback_time import compose_callback_label, parse_callback_parts
 from app.services.conversation_turns import clean_person_name, extract_name
 from app.services.event_date import (
     extract_date_snippet,
     has_service_planning_intent,
     is_ambiguous_date_phrase,
+    is_impossible_calendar_date,
     is_urgent_event_date,
     looks_like_event_date,
 )
-from app.services.human_style import (
-    asks_callback_timing,
-    has_callback_intent,
-    is_meal_type_answer,
-    normalize_meal_label,
-    wants_discuss_on_call,
-)
+from app.services.human_style import is_meal_type_answer, normalize_meal_label, wants_discuss_on_call
 from app.services.location_normalize import extract_location_entity
+from app.services.message_intent import (
+    MessageKind,
+    classify_message,
+    extract_phone_number,
+    uses_this_whatsapp_number,
+)
 from app.services.session_store import ConversationSession
 
 
@@ -36,8 +37,17 @@ class ExtractedEntities:
     event_date: str | None = None
     guest_count: str | int | None = None
     event_location: str | None = None
+    venue_status: str | None = None
+    venue_name: str | None = None
+    venue_area: str | None = None
+    venue_type: str | None = None
     meal_preference: str | None = None
     preferred_callback: str | None = None
+    callback_date: str | None = None
+    callback_time: str | None = None
+    callback_phone: str | None = None
+    callback_ambiguous_noon: bool = False
+    uses_this_number: bool = False
     special_requests: str | None = None
     reset_requested: bool = False
     callback_requested: bool = False
@@ -149,23 +159,42 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
     # Date words often appear in callback phrases — do not treat those as event_date.
     from app.services.human_style import wants_showcase_look
     from app.services.website_gallery import customer_wants_photos
+    from app.services.venue_parser import parse_venue_reply
+
+    kind = classify_message(raw, session)
+    phone = extract_phone_number(raw)
+    if phone:
+        entities.callback_phone = phone
+    if uses_this_whatsapp_number(raw):
+        entities.uses_this_number = True
 
     callbackish = bool(
         wants_discuss_on_call(raw)
         or re.search(r"\b(call|callback|ring me|speak|talk)\b", lower)
+        or kind
+        in {
+            MessageKind.CALLBACK_DATE,
+            MessageKind.CALLBACK_TIME,
+            MessageKind.CALLBACK_COMBO,
+        }
     )
     photoish = wants_showcase_look(raw) or customer_wants_photos(raw)
 
-    if (not callbackish) and looks_like_event_date(raw):
+    if (
+        kind not in {MessageKind.CALLBACK_DATE, MessageKind.CALLBACK_TIME, MessageKind.CALLBACK_COMBO, MessageKind.PHONE_NUMBER, MessageKind.VENUE_AREA, MessageKind.VENUE_HOME}
+        and (not callbackish)
+        and looks_like_event_date(raw)
+        and session.last_asked_slot != "preferred_callback"
+    ):
         date_entity = _extract_date_entity(raw)
-        if date_entity and not is_ambiguous_date_phrase(date_entity):
+        if date_entity and not is_ambiguous_date_phrase(date_entity) and not is_impossible_calendar_date(raw):
             entities.event_date = date_entity
             if is_urgent_event_date(raw):
                 entities.urgent_date = True
 
-    if re.search(r"\b(guests?|people|pax)\b", lower):
+    if kind == MessageKind.GUEST_COUNT or re.search(r"\b(guests?|people|pax)\b", lower):
         entities.guest_count = _extract_guest_count(raw)
-    elif re.search(r"\bfor\s+\d+\b", lower) and looks_like_event_date(raw):
+    elif re.search(r"\bfor\s+\d+\b", lower) and looks_like_event_date(raw) and not callbackish:
         entities.guest_count = _extract_guest_count(raw)
 
     if has_service_planning_intent(raw):
@@ -173,14 +202,31 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
         if re.search(r"\b(catering|decor|decoration)\b", lower):
             entities.special_requests = raw
 
-    if re.search(r"\b(venue|location|hall|area|city|locality|mysore|mysuru|bangalore|bengaluru|benglore|banglore|bengalore|hunsur|hundur)\b", lower):
-        loc = extract_location_entity(raw)
-        if loc:
-            entities.event_location = loc
-    elif not entities.event_location:
-        loc = extract_location_entity(raw)
-        if loc and len(loc.split()) <= 4 and len(raw) <= 80:
-            entities.event_location = loc
+    venue = parse_venue_reply(raw)
+    if kind in {MessageKind.VENUE_HOME, MessageKind.VENUE_STATUS, MessageKind.VENUE_AREA} or venue.status or venue.location or venue.is_home:
+        if venue.status:
+            entities.venue_status = venue.status
+        if venue.is_home:
+            entities.venue_type = "home"
+            entities.venue_name = venue.venue_name or "customer's house"
+            entities.venue_status = "fixed"
+        if venue.location:
+            entities.venue_area = venue.location
+            if entities.venue_name:
+                entities.event_location = f"{entities.venue_name}, {venue.location}"
+            else:
+                entities.event_location = venue.location
+        elif venue.is_home:
+            # Home without area is not a complete location.
+            entities.event_location = None
+        elif re.search(
+            r"\b(venue|location|hall|area|city|locality|mysore|mysuru|bangalore|bengaluru|benglore|banglore|bengalore|hunsur|hundur)\b",
+            lower,
+        ) and not venue.status:
+            loc = extract_location_entity(raw)
+            if loc:
+                entities.event_location = loc
+                entities.venue_area = loc
 
     meal = _extract_meal_from_text(raw)
     if meal:
@@ -194,24 +240,39 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
 
     if is_meal_type_answer(raw):
         entities.meal_preference = normalize_meal_label(raw)
-    elif not asks_callback_timing(raw) and (
-        session.last_asked_slot == "preferred_callback"
-        and re.search(r"\b(today|tomorrow|morning|afternoon|evening|night)\b", lower)
-    ):
-        if is_immediate_callback(raw) or (
-            entities.callback_requested
-            and re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night|am|pm)\b", lower)
-        ):
-            entities.preferred_callback = normalize_callback_label(raw)
-        elif re.search(r"\b(today|tomorrow)\s+(morning|evening|afternoon|night)\b", lower):
-            entities.preferred_callback = raw.strip().title()
-        elif re.search(r"\b(today|tomorrow|weekend|morning|evening|afternoon|night)\b", lower) and re.search(
-            r"\b(call|callback|ring|speak|talk)\b",
-            lower,
-        ):
-            entities.preferred_callback = normalize_callback_label(raw)
-        elif session.last_asked_slot == "preferred_callback":
-            entities.preferred_callback = normalize_callback_label(raw)
+
+    parts = parse_callback_parts(raw)
+    callback_kind = kind in {
+        MessageKind.CALLBACK_DATE,
+        MessageKind.CALLBACK_TIME,
+        MessageKind.CALLBACK_COMBO,
+        MessageKind.PHONE_NUMBER,
+    }
+    asking_callback = session.last_asked_slot == "preferred_callback"
+    if callback_kind or (asking_callback and (parts.date_label or parts.time_label or parts.immediate) and kind != MessageKind.VENUE_AREA):
+        if parts.date_label:
+            entities.callback_date = parts.date_label
+        if parts.time_label:
+            entities.callback_time = parts.time_label
+        entities.callback_ambiguous_noon = parts.ambiguous_noon
+        if parts.immediate:
+            entities.preferred_callback = "Immediately"
+        else:
+            composed = compose_callback_label(
+                date_label=parts.date_label or session.fields.callback_date,
+                time_label=None if parts.ambiguous_noon else (parts.time_label or session.fields.callback_time),
+                immediate=False,
+            )
+            # Date-only must not close the callback slot.
+            if composed and (parts.time_label or parts.period) and not parts.ambiguous_noon:
+                entities.preferred_callback = composed
+            elif asking_callback and parts.time_label and not parts.ambiguous_noon and not parts.date_label:
+                entities.preferred_callback = compose_callback_label(
+                    date_label=session.fields.callback_date,
+                    time_label=parts.time_label,
+                )
+        if parts.uses_this_number:
+            entities.uses_this_number = True
 
     if re.search(r"\b(fusion|custom|italian|chinese|dessert|live counter|pan asian|mocktail|gelato)\b", lower):
         if not re.search(r"\b(cocktail party|alcohol|alcoholic|conference|exhibition|expo)\b", lower):

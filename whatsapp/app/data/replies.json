@@ -156,13 +156,13 @@
     },
     "state3.intent_a": {
       "variants": [
-        "We'd love to show you! {showcase}\n\nYou can explore our portfolio anytime at **srivatsanka.com**.\n\n{date_ask}",
-        "We'd love to show you, {who}! {showcase}\n\nYou can view our complete gallery at **srivatsanka.com**.\n\n{date_ask}",
-        "We'd love to show you! From traditional South Indian banana-leaf feasts (Karnataka, Andhra, Tamil Nadu, and Kerala specialties) to live counters and bespoke stage or mandap decor, we craft every detail with care. \u2728\n\nYou can explore our complete photo portfolio and menu gallery anytime at **srivatsanka.com**.\n\n{date_ask}",
-        "Happy to share, {who}! {showcase}\n\nFull gallery: **srivatsanka.com**\n\n{date_ask}"
+        "We'd love to show you! {showcase}\n\nYou can explore our portfolio anytime at **srivatsanka.com**.\n\nType *DONE* to proceed.",
+        "We'd love to show you, {who}! {showcase}\n\nYou can view our complete gallery at **srivatsanka.com**.\n\nType *DONE* to proceed.",
+        "We'd love to show you! From traditional South Indian banana-leaf feasts (Karnataka, Andhra, Tamil Nadu, and Kerala specialties) to live counters and bespoke stage or mandap decor, we craft every detail with care. \u2728\n\nYou can explore our complete photo portfolio and menu gallery anytime at **srivatsanka.com**.\n\nType *DONE* to proceed.",
+        "Happy to share, {who}! {showcase}\n\nFull gallery: **srivatsanka.com**\n\nType *DONE* to proceed."
       ],
-      "next_state": "COLLECT_DETAILS",
-      "ask_slot": "event_date"
+      "next_state": "SHOWING_EVENT_INFORMATION",
+      "ask_slot": null
     },
     "state3.intent_b_no": {
       "variants": [
@@ -278,7 +278,7 @@
     },
     "state4.ack_date": {
       "variants": [
-        "{slot} is a fantastic time for a celebration! \ud83c\udf42",
+        "Got it — {slot} is noted for your {occasion}.",
         "{slot} is a wonderful time for a {occasion}!",
         "Got it, {slot} works well for the {occasion}."
       ]

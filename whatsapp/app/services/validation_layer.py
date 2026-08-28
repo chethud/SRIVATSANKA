@@ -6,15 +6,20 @@ Source of truth: D:\\Kannan.rules.txt — Global FSM recovery + State 5 circuit 
 from __future__ import annotations
 
 from app.schemas import EnquiryFields
-from app.services.session_store import ConversationSession, GuidedStep
+from app.services.session_store import (
+    ConversationPhase,
+    ConversationSession,
+    ConversationState,
+    GuidedStep,
+)
 
 RESET_PHRASES = frozenset(
     {
         "reset",
         "restart",
         "start over",
+        "start again",
         "begin again",
-        "main menu",
     }
 )
 
@@ -27,6 +32,11 @@ CIRCUIT_BREAKER_REPLY = (
 
 def is_reset_message(text: str) -> bool:
     return text.strip().lower().rstrip("!.") in RESET_PHRASES
+
+
+def is_cancel_message(text: str) -> bool:
+    t = text.strip().lower().rstrip("!.")
+    return t in {"cancel", "stop", "never mind", "nevermind", "not now"}
 
 
 def track_question(session: ConversationSession, reply: str, *, slot_key: str | None = None) -> None:
@@ -81,13 +91,8 @@ def clear_slot_failures(session: ConversationSession, slot_key: str | None = Non
 
 
 def should_trip_circuit_breaker(session: ConversationSession) -> bool:
-    """Rules: consecutive_loop_count >= 2 OR 3 failed turns in the same state.
-
-    Streak semantics: first ask sets count=1, second identical-slot ask sets count=2.
-    Trip only once we are about to ask a *third* time (count >= 3), or after 3 hard failures.
-    Asking twice (greeting + clarify) must not wipe the session before the user can answer.
-    """
-    return session.consecutive_loop_count >= 3 or session.failed_turns_in_state >= 3
+    """Never auto-restart. Unexpected answers must re-ask the current field."""
+    return False
 
 
 def reset_session_to_greeting(session: ConversationSession) -> None:
@@ -110,52 +115,112 @@ def reset_session_to_greeting(session: ConversationSession) -> None:
         slot.value = None
         slot.confidence = 0.0
         slot.collected = False
+    session.completed = False
+    session._saved = False
+    session.phase = ConversationPhase.ENQUIRY
+    session.selected_dishes = []
+    session.selected_category_keys = []
+    session.current_category_index = 0
+    session.customization_dish_index = 0
+    session.welcome_media_sent = False
+    session.sent_gallery_urls = []
+    session.last_user_message = None
+    session.pending_ampm_hour = None
+    session.pending_callback_phone_confirm = False
+    session.pending_alt_callback_phone = False
+    session.special_req_done = False
+    session.awaiting_special_req_text = False
+    session.conversation_state = ConversationState.START
+    _stamp_session(session)
 
 
 def soft_reset_session(session: ConversationSession) -> str:
-    """RESTART: keep confirmed name and known details; restart the guided flow."""
+    """Book-again: keep confirmed name and phone; clear event-specific booking data."""
     preserved = session.fields.model_dump()
     name = preserved.get("customer_name") if session.name_confirmed else None
+    phone = preserved.get("phone_number")
     reset_session_to_greeting(session)
     if name:
-        session.fields = EnquiryFields(
-            customer_name=name,
-            event_type=preserved.get("event_type"),
-            event_date=preserved.get("event_date"),
-            event_location=preserved.get("event_location"),
-            guest_count=preserved.get("guest_count"),
-            meal_preference=preserved.get("meal_preference"),
-            notes=preserved.get("notes"),
-        )
+        session.fields = EnquiryFields(customer_name=name, phone_number=phone)
         session.name_confirmed = True
-        if session.fields.event_type and session.fields.event_date:
-            session.guided_step = GuidedStep.COLLECT_DETAILS
-            from app.services.guided_flow import _next_detail_prompt
-
-            next_prompt = _next_detail_prompt(session)
-            return (
-                f"Of course, {name}. We can start fresh. I still have your basic details, "
-                f"but I'll confirm anything that has changed.\n\n{next_prompt or 'How can I help with your event?'}"
-            )
-        session.guided_step = (
-            GuidedStep.AWAIT_POST_SHOWCASE
-            if session.fields.event_type
-            else GuidedStep.AWAIT_EVENT_TYPE
-        )
+        name_slot = session.slots["customer_name"]
+        name_slot.value = name
+        name_slot.confidence = 1.0
+        name_slot.collected = True
+        session.guided_step = GuidedStep.AWAIT_EVENT_TYPE
+        session.conversation_state = ConversationState.MAIN_MENU
+        _stamp_session(session)
         return (
-            f"Of course, {name}. We can start fresh. I still have your basic details, "
-            "but I'll confirm anything that has changed.\n\n"
-            + (
-                "What celebration would you like to plan?"
-                if not session.fields.event_type
-                else "Would you like a quick look at past setups, or shall we continue with your event details?"
-            )
+            f"Of course, {name}. We can start fresh. 😊\n\n"
+            "What type of event are you planning?"
         )
     session.guided_step = GuidedStep.AWAIT_NAME
+    session.conversation_state = ConversationState.MAIN_MENU
+    _stamp_session(session)
     return (
-        "Of course. We can start fresh.\n\n"
-        "Hello! Welcome to Srivatsanka Events and Services. ✨ May I have your name, please?"
+        "Your previous planning session has been cleared. Let's start fresh. 😊\n\n"
+        "May I know your name?"
     )
+
+
+def cancel_to_main_menu(session: ConversationSession) -> str:
+    """Cancel the current booking flow and return to the main menu."""
+    name = session.fields.customer_name if session.name_confirmed else None
+    reset_session_to_greeting(session)
+    if name:
+        session.fields = EnquiryFields(customer_name=name)
+        session.name_confirmed = True
+        name_slot = session.slots["customer_name"]
+        name_slot.value = name
+        name_slot.confidence = 1.0
+        name_slot.collected = True
+        session.guided_step = GuidedStep.AWAIT_EVENT_TYPE
+        session.conversation_state = ConversationState.MAIN_MENU
+        _stamp_session(session)
+        return f"No problem, {name}. What celebration would you like to plan?"
+    from app.services.human_style import welcome_message
+
+    session.conversation_state = ConversationState.START
+    _stamp_session(session)
+    return welcome_message()
+
+
+def greeting_reset_reply(session: ConversationSession) -> str:
+    """Full conversation restart (restart / menu)."""
+    reset_session_to_greeting(session)
+    return (
+        "Your previous planning session has been cleared. Let's start fresh. 😊\n\n"
+        "May I know your name?"
+    )
+
+
+def _stamp_session(session: ConversationSession) -> None:
+    from datetime import datetime, timezone
+
+    session.updated_at = datetime.now(timezone.utc)
+
+
+def sync_conversation_state(session: ConversationSession) -> None:
+    """Derive a stable conversation_state from guided_step + completion flags."""
+    if session.completed and session._saved:
+        session.conversation_state = ConversationState.COMPLETED
+    elif session.guided_step == GuidedStep.AWAIT_BOOKING_CONFIRM:
+        session.conversation_state = ConversationState.BOOKING_CONFIRMATION
+    elif session.guided_step == GuidedStep.DONE:
+        session.conversation_state = ConversationState.BOOKING_CONFIRMATION
+    elif session.guided_step == GuidedStep.COLLECT_DETAILS:
+        session.conversation_state = ConversationState.EVENT_DETAILS
+    elif session.guided_step == GuidedStep.SHOWING_EVENT_INFORMATION:
+        session.conversation_state = ConversationState.SHOWING_EVENT_INFORMATION
+    elif session.guided_step == GuidedStep.PAST_SETUPS:
+        session.conversation_state = ConversationState.PAST_SETUPS
+    elif session.guided_step == GuidedStep.AWAIT_POST_SHOWCASE:
+        session.conversation_state = ConversationState.NEW_BOOKING
+    elif session.guided_step == GuidedStep.AWAIT_HI:
+        session.conversation_state = ConversationState.START
+    else:
+        session.conversation_state = ConversationState.MAIN_MENU
+    _stamp_session(session)
 
 
 def circuit_breaker_reply() -> str:

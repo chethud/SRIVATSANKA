@@ -10,6 +10,7 @@ PUBLIC_EXACT = {"/", "/docs", "/openapi.json", "/redoc", "/health"}
 PUBLIC_PREFIXES = (
     "/api/health",
     "/api/auth/login",
+    "/api/public/event-photos",
     "/webhook",
 )
 

@@ -276,7 +276,16 @@ def wants_to_move_further(text: str) -> bool:
     if any(c in t for c in cues):
         return True
     # Exact short confirms that mean "let's proceed" after we already asked move-further
-    return t in {"further", "move", "yes move", "yes further", "yes continue"}
+    if t in {"further", "move", "yes move", "yes further", "yes continue"}:
+        return True
+    return t in {
+        "event",
+        "events",
+        "event details",
+        "event detail",
+        "continue with event",
+        "continue with event details",
+    }
 
 
 
@@ -320,16 +329,16 @@ def small_talk_reply(*, event_label: str | None = None) -> str:
     )
 
 
-def welcome_message() -> str:
-    from app.services import reply_pack
-
-    packed = reply_pack.get_reply("state1.welcome")
-    if packed:
-        return packed
+def greeting_ask_name() -> str:
     return (
-        "Hello! Welcome to Srivatsanka Events and Services. ✨\n\n"
-        "May I have your name, please?"
+        "Namaste and welcome to Srivatsanka Events! 🙏\n\n"
+        "Let's create something beautiful for your celebration.\n\n"
+        "May I know your name?"
     )
+
+
+def welcome_message() -> str:
+    return greeting_ask_name()
 
 
 def name_confirm_prompt(name: str) -> str:
@@ -344,15 +353,11 @@ def name_confirm_prompt(name: str) -> str:
 
 
 def name_confirmed_event_ask(name: str) -> str:
-    from app.services import reply_pack
-
-    packed = reply_pack.get_reply("state1_2.name_confirmed_event_ask", name=name)
-    if packed:
-        return packed
     who = (name or "").strip() or "there"
     return (
-        f"Thanks, {who}! Lovely to connect. 😊 "
-        "Are you planning a wedding, an Upanayanam, a housewarming, or another special occasion?"
+        f"Lovely to connect with you, {who}! 😊\n\n"
+        "What are you planning?\n\n"
+        "Please select an event below:"
     )
 
 
@@ -384,6 +389,9 @@ def is_name_confirm_yes(text: str) -> bool:
         "yes it is",
         "yes that's right",
         "yes thats right",
+        "yes sir",
+        "yes madam",
+        "yes ji",
     }
 
 
@@ -456,7 +464,20 @@ def wants_straight_to_planning(text: str) -> bool:
         return True
     if "planning" in t and any(w in t for w in ("straight", "dive", "start", "lets", "let's", "into")):
         return True
-    return t in {"planning", "plan", "further", "move", "yes move", "yes further", "yes continue", "dive"}
+    if t in {"planning", "plan", "further", "move", "yes move", "yes further", "yes continue", "dive"}:
+        return True
+    return t in {
+        "event",
+        "events",
+        "event details",
+        "event detail",
+        "your event",
+        "my event",
+        "continue with event",
+        "continue with the event",
+        "continue with your event",
+        "continue with event details",
+    }
 
 
 def is_food_menu_question(text: str) -> bool:
@@ -515,20 +536,11 @@ def wants_showcase_look(text: str) -> bool:
         return False
     t = normalize_customer_text(text)
     if t in {
-        "yes",
-        "y",
-        "yeah",
-        "yep",
-        "yup",
-        "sure",
-        "haan",
-        "ha",
         "show",
-        "please",
+        "please show",
         "yes please",
         "yes sure",
         "yeah sure",
-        "see",
         "pics",
         "pic",
         "photos",
@@ -569,8 +581,6 @@ def wants_showcase_look(text: str) -> bool:
         "setups",
         "gallery",
         "examples",
-        "menu",
-        "cuisine",
         "send images",
         "send photos",
         "send portfolio",
@@ -590,8 +600,6 @@ def wants_showcase_look(text: str) -> bool:
         "show pictures",
         "show picture",
         "show photos",
-        "what kind of",
-        "what kinds of",
         "kind of wedding",
         "weddings have you",
         "have you done",
@@ -602,6 +610,110 @@ def wants_showcase_look(text: str) -> bool:
         "pictures",
     )
     return any(c in t for c in cues)
+
+
+def is_ambiguous_yes(text: str) -> bool:
+    t = normalize_customer_text(text)
+    return t in {"yes", "y", "yeah", "yep", "yup", "sure", "haan", "ha", "ok yes"}
+
+
+def is_information_done_command(text: str) -> bool:
+    """Advance from SHOWING_EVENT_INFORMATION only — never complete a booking."""
+    t = normalize_customer_text(text).strip().rstrip("!.,")
+    if t in {
+        "done",
+        "okay done",
+        "ok done",
+        "ok, done",
+        "finished",
+        "continue",
+        "proceed",
+        "lets continue",
+        "let's continue",
+        "please continue",
+        "please proceed",
+        "continue please",
+        "type done",
+        "ok proceed",
+        "okay proceed",
+    }:
+        return True
+    if re.fullmatch(r"(okay|ok|alright|yes)?\s*done", t):
+        return True
+    return False
+
+
+def proceed_with_done_prompt() -> str:
+    return "What would you like to do next?"
+
+
+def invalid_event_date_clarify() -> str:
+    return (
+        "I couldn't match that to a valid calendar date. "
+        "Could you please confirm the date or month you're considering for the event?"
+    )
+
+
+def wants_cuisine_options(text: str) -> bool:
+    t = normalize_customer_text(text)
+    if t in {"cuisines", "cuisine", "food", "menu", "menus", "cuisine options"}:
+        return True
+    return any(
+        c in t
+        for c in (
+            "cuisine",
+            "menu option",
+            "food option",
+            "what food",
+            "what do you serve",
+            "sample menu",
+        )
+    )
+
+
+def is_help_message(text: str) -> bool:
+    t = text.strip().lower().rstrip("!.")
+    return t in {"help", "options", "what can you do"}
+
+
+def is_information_request(text: str) -> bool:
+    if is_food_menu_question(text) or wants_more_info(text) or wants_cuisine_options(text):
+        return True
+    from app.services.gemini_conversation import looks_like_question
+
+    return looks_like_question(text)
+
+
+def showcase_choice_reply(*, name: str | None = None, event_type: str | None = None) -> str:
+    who = (name or "").strip()
+    occasion = (event_type or "celebration").strip().lower() or "celebration"
+    if occasion == "general":
+        occasion = "celebration"
+    hello = f"Absolutely, {who}!" if who else "Absolutely!"
+    return (
+        f"{hello} Would you like to see our past {occasion} setups, "
+        "or continue directly with your event details?\n\n"
+        "1. Past setups\n"
+        "2. Continue with event"
+    )
+
+
+def cuisine_options_reply(*, event_type: str | None = None) -> str:
+    occasion = (event_type or "celebration").strip().lower() or "celebration"
+    if occasion == "general":
+        occasion = "celebration"
+    return (
+        "Certainly! We can offer traditional South Indian catering, regional Karnataka, Andhra, "
+        "Tamil Nadu, and Kerala menus, customized vegetarian menus, live counters, and other options "
+        f"depending on the {occasion} and guest preferences."
+    )
+
+
+def help_options_reply() -> str:
+    return (
+        "You can type *past setups*, *cuisines*, or *event* to continue planning. "
+        "You can also type *book again*, *menu*, or *cancel* at any time."
+    )
 
 
 def is_short_planning_ack(text: str) -> bool:
@@ -804,6 +916,73 @@ def post_signoff_followup_reply(*, name: str | None = None) -> str:
     )
 
 
+def completed_booking_options_reply(*, name: str | None = None) -> str:
+    """COMPLETED-state fallback. Never reuse the post-submit additional-details copy."""
+    who = (name or "there").strip() or "there"
+    return (
+        f"You're all set, {who}. Our team will call you as planned.\n\n"
+        "If you'd like to book another celebration, type *book again*. "
+        "You can also type *menu* to start over."
+    )
+
+
+def extra_detail_noted_reply(*, name: str | None = None) -> str:
+    who = (name or "there").strip() or "there"
+    return (
+        f"I've noted that extra detail, {who}. Our team will cover it on the call.\n\n"
+        "If you'd like to book another celebration, type *book again*."
+    )
+
+
+def continue_event_details_prompt() -> str:
+    return proceed_with_done_prompt()
+
+
+def is_resume_booking_choice(text: str) -> bool:
+    """From COMPLETED, these messages start a new booking instead of follow-up notes.
+
+    Do not reuse wants_showcase_look() here — that treats Yes/Sure as showcase.
+    """
+    t = normalize_customer_text(text)
+    exact = {
+        "past setups",
+        "past setup",
+        "setups",
+        "event",
+        "events",
+        "event details",
+        "event detail",
+        "your event",
+        "my event",
+        "continue with event",
+        "continue with the event",
+        "continue with your event",
+        "continue with event details",
+        "continue with your event details",
+        "planning",
+        "straight to planning",
+        "photos",
+        "photo",
+        "pics",
+        "pictures",
+        "cuisines",
+        "cuisine",
+    }
+    if t in exact:
+        return True
+    return any(
+        c in t
+        for c in (
+            "past setup",
+            "past work",
+            "past event",
+            "show photos",
+            "show pictures",
+            "event details",
+        )
+    )
+
+
 def wants_book_again(text: str) -> bool:
     """Customer wants to start a fresh enquiry after a completed chat."""
     t = normalize_customer_text(text)
@@ -855,6 +1034,8 @@ def ask_event_date_only(*, event_type: str | None = None) -> str:
     occasion = (event_type or "celebration").strip().lower()
     if not occasion or occasion == "general":
         occasion = "celebration"
+    if occasion.endswith(" events"):
+        occasion = occasion[:-1]
     return f"What is your tentative date or month for the {occasion}?"
 
 
@@ -927,10 +1108,61 @@ def callback_confirmation_reply(*, name: str | None = None, callback_label: str 
         slot = "this weekend morning"
     else:
         slot = callback_label or "the requested time"
-    packed = _pack("state5.callback_scheduled", name=name, slot=slot)
-    if packed:
-        return packed
-    return f"Noted, {who}! We have scheduled your callback for {slot}. Our senior event planner will reach out to you on this number. 🗓️"
+    return (
+        f"I've noted your preference for {slot}, {who}. "
+        "Our senior event planner will reach out on this number."
+    )
+
+
+def venue_area_prompt(*, venue_name: str | None = None) -> str:
+    if venue_name and "house" in venue_name.lower():
+        return "Understood - the venue is your house. Could you please share the area or locality?"
+    if venue_name:
+        return f"Understood - the venue is {venue_name}. Could you please share the area or locality?"
+    return "Could you please share the area or locality?"
+
+
+def callback_time_prompt(*, date_label: str | None = None) -> str:
+    if date_label == "tomorrow":
+        return "Perfect. What time tomorrow would be convenient for the call?"
+    if date_label == "today":
+        return "What time today would be convenient for the call?"
+    if date_label:
+        return f"What time on {date_label} would be convenient for the call?"
+    return "What time would be convenient for the call?"
+
+
+def format_customer_phone(whatsapp_id: str | None) -> str:
+    digits = re.sub(r"\D", "", whatsapp_id or "")
+    if len(digits) >= 12 and digits.startswith("91"):
+        digits = digits[-10:]
+    elif len(digits) > 10:
+        digits = digits[-10:]
+    if len(digits) == 10:
+        return f"+91 {digits[:5]} {digits[5:]}"
+    return "this WhatsApp number"
+
+
+def confirm_callback_number_prompt(*, whatsapp_id: str | None, name: str | None = None) -> str:
+    shown = format_customer_phone(whatsapp_id)
+    who = (name or "").strip()
+    prefix = f"{who}, shall" if who else "Shall"
+    return (
+        f"{prefix} we call you on this WhatsApp number ({shown}), "
+        "or would you like to share an alternative number?"
+    )
+
+
+def ask_alternative_callback_number() -> str:
+    return "No problem. Please share the number we should call."
+
+
+def confirm_noon_prompt() -> str:
+    return "Just to confirm, do you mean 12 PM?"
+
+
+def noted_callback_phone_prompt() -> str:
+    return "Thanks. I've noted this as the preferred callback number. What time would be convenient for the call?"
 
 
 def callback_pivot_prompt(*, name: str | None = None) -> str:
@@ -961,27 +1193,23 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
         packed = _pack("state4.ask_venue", event_type=event_type)
         if packed:
             return packed
-        return random.choice(
-            (
-                "Do you already have a venue booked for the celebration, or are you looking for help with venue selection? If it is fixed, please share the venue name and area. If not, just let us know your preferred city or locality.",
-                f"For your {occasion}, is the venue already fixed? If yes, please share the venue name and area. If not yet, just tell us your preferred city or locality and we can help from there.",
-            )
+        return (
+            "Is your venue already fixed?"
         )
     if field_key == "preferred_callback":
         packed = _pack("state4.ask_callback", event_type=event_type)
         if packed:
             return packed
-        return random.choice(
-            (
-                "We’d love to connect you with our senior planner so we can share custom proposals and discuss venues and menu tastings.\n\nWhen would be the best time to give you a quick call? (e.g., today evening, tomorrow after 6 PM, or weekend morning?)",
-                "When works for a short callback?",
-            )
+        return (
+            "When would be a convenient time for our senior event planner to call you?"
         )
     if field_key == "meal_preference":
         packed = _pack("state4.ask_meal", event_type=event_type)
         if packed:
             return packed
-        return "Are you planning a lunch feast, an evening dinner, or high tea snacks?"
+        return "What kind of catering would you prefer?"
+    if field_key == "special_requirements":
+        return "Do you have any special requirements or preferences for the event?"
     return "Could you share a bit more?"
 
 
@@ -1009,7 +1237,7 @@ def acknowledge_field(field_key: str, value: str, *, event_type: str | None = No
         packed = _pack("state4.ack_venue", event_type=event_type, slot=v)
         if packed:
             return packed
-        return f"Got it, {v}! We have noted down the location."
+        return f"Got it. We have noted the venue: {v}."
     if field_key == "preferred_callback":
         return random.choice(("Perfect.", "Sounds good.", "Absolutely.", "Got it."))
     return soft_ack()
@@ -1032,14 +1260,13 @@ def natural_field_ack(
 ) -> str:
     if field_key == "event_date":
         display = (value or "").strip()
-        if re.match(r"^\d", display):
-            display = f"The {display}"
-        elif display and display[0].islower():
+        if display and display[0].islower():
             display = display[0].upper() + display[1:]
         packed = _pack("state4.ack_date", event_type=event_type, slot=display)
         if packed:
             return f"{packed}\n\n{next_prompt}"
-        return f"{display} is a wonderful time for {_occasion_phrase(event_type)}!\n\n{next_prompt}"
+        occasion = _occasion_phrase(event_type)
+        return f"Got it — {display} is noted for your {occasion}.\n\n{next_prompt}"
     if field_key == "guest_count":
         display = re.sub(r"\s*[-–—]\s*", " to ", str(value).strip(), count=1)
         display = re.sub(r"\s+", " ", display)
@@ -1056,7 +1283,7 @@ def natural_field_ack(
         packed = _pack("state4.ack_venue", event_type=event_type, slot=place)
         if packed:
             return f"{packed}\n\n{next_prompt}"
-        return f"Got it, {place}! We have noted down the location.\n\n{next_prompt}"
+        return f"Got it. We have noted the venue: {place}.\n\n{next_prompt}"
     if field_key == "meal_preference":
         packed = _pack("state4.ack_meal", event_type=event_type, slot=value)
         if packed:

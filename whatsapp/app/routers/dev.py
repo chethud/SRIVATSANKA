@@ -79,8 +79,10 @@ async def simulate_message(
     payload: DevMessageRequest,
     db: AsyncSession = Depends(get_db),
 ) -> DevMessageResponse:
-    await log_customer_message(db, payload.from_number, payload.text)
-    result, enquiry_saved = await handle_conversation(payload.from_number, payload.text, db)
+    await log_customer_message(db, payload.from_number, payload.text or payload.button_id or "")
+    result, enquiry_saved = await handle_conversation(
+        payload.from_number, payload.text, db, button_id=payload.button_id
+    )
     await log_bot_message(db, payload.from_number, result.reply, result.media)
 
     return DevMessageResponse(

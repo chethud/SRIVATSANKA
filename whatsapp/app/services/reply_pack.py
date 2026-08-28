@@ -82,11 +82,11 @@ def get_media_group(name: str | None) -> list[MediaAttachment]:
         return []
     items = _load_pack().get("media_groups", {}).get(name, [])
     attachments: list[MediaAttachment] = []
-    for item in items:
-        url = (item or {}).get("url")
+    for item in items[:1]:
+        url = (item.get("url") or "").strip()
         if not url:
             continue
-        attachments.append(MediaAttachment(url=url, caption=(item.get("caption") or "")))
+        attachments.append(MediaAttachment(url=url, caption=None))
     return attachments
 
 

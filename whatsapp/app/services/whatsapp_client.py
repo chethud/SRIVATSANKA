@@ -95,6 +95,43 @@ async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
     return True, None
 
 
+async def send_whatsapp_interactive(to: str, interactive: dict) -> tuple[bool, str | None]:
+    """Send a Cloud API interactive message (reply buttons or list)."""
+    to = normalize_phone(to)
+    if not to:
+        return False, "Invalid phone number"
+    if not interactive:
+        return False, "Missing interactive payload"
+
+    if not is_whatsapp_configured():
+        if settings.is_production:
+            return False, "WhatsApp API not configured"
+        logger.info("[WhatsApp Mock Interactive] To: %s | %s", to, interactive.get("type"))
+        return True, None
+
+    client = _client()
+    response = await client.post(
+        f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
+        headers={
+            "Authorization": f"Bearer {settings.whatsapp_token}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "interactive",
+            "interactive": interactive,
+        },
+    )
+    if response.status_code >= 400:
+        logger.error("WhatsApp interactive send failed (%s): %s", response.status_code, response.text)
+        detail = response.text[:240] if response.text else f"HTTP {response.status_code}"
+        return False, f"WhatsApp API error: {detail}"
+    logger.info("WhatsApp interactive message sent to %s", to)
+    return True, None
+
+
 async def send_whatsapp_image(to: str, image_url: str, caption: str | None = None) -> bool:
     """Send image by public URL (Meta WhatsApp Cloud API)."""
     to = normalize_phone(to)

@@ -26,20 +26,32 @@ from app.services.gemini_conversation import is_likely_field_answer, looks_like_
 from app.services.human_style import (
     acknowledge_opening_without_name,
     ask_event_date_only,
+    ask_alternative_callback_number,
     ask_move_further_prompt,
     asks_callback_timing,
     callback_confirmation_reply,
     callback_pivot_prompt,
     callback_timing_reply,
+    callback_time_prompt,
     catalog_portfolio_reply,
+    confirm_noon_prompt,
+    confirm_callback_number_prompt,
+    continue_event_details_prompt,
+    cuisine_options_reply,
     detail_question,
     immediate_callback_reply,
     intent_b_planning_reply,
+    help_options_reply,
+    invalid_event_date_clarify,
+    is_ambiguous_yes,
+    is_food_menu_question,
+    is_help_message,
+    is_information_done_command,
+    is_information_request,
     is_name_confirm_no,
     is_name_confirm_yes,
     is_portfolio_inquiry,
     customer_says_already_provided,
-    is_food_menu_question,
     is_meal_type_answer,
     is_short_planning_ack,
     is_service_topic_reply,
@@ -52,6 +64,8 @@ from app.services.human_style import (
     name_confirmed_event_ask,
     name_reask_prompt,
     normalize_meal_label,
+    noted_callback_phone_prompt,
+    proceed_with_done_prompt,
     sanitize_customer_reply,
     showcase_followup_date_ask,
     small_talk_reply,
@@ -59,12 +73,17 @@ from app.services.human_style import (
     undecided_reply,
     unsupported_event_refusal,
     urgent_timeline_reply,
+    showcase_choice_reply,
+    wants_cuisine_options,
     wants_discuss_on_call,
+    wants_book_again,
     wants_more_info,
     wants_showcase_look,
     wants_straight_to_planning,
     wants_to_move_further,
+    venue_area_prompt,
     warm_enquiry_signoff,
+    greeting_ask_name,
     welcome_message,
 )
 from app.services.session_store import ConversationSession, GuidedStep, SlotValue
@@ -73,34 +92,62 @@ from app.services.event_date import (
     extract_date_snippet,
     has_service_planning_intent,
     is_ambiguous_date_phrase,
+    is_impossible_calendar_date,
     is_urgent_event_date,
+    looks_like_event_date,
     suggest_ambiguous_date,
 )
 from app.services.location_normalize import extract_location_entity
-from app.services.callback_time import is_immediate_callback, normalize_callback_label
+from app.services.callback_time import (
+    callback_has_usable_time,
+    compose_callback_label,
+    is_immediate_callback,
+    normalize_callback_label,
+    parse_callback_parts,
+)
 from app.services.entity_extractor import extract_entities
+from app.services.message_intent import (
+    MessageKind,
+    classify_message,
+    extract_phone_number,
+    uses_this_whatsapp_number,
+)
 from app.services.memory_manager import hydrate_memory
 from app.services.slot_manager import apply_entities, slot_collected
 from app.services.transition_engine import advance_from_slots, move_to
 from app.services.validation_layer import (
-    circuit_breaker_reply,
+    cancel_to_main_menu,
     clear_slot_failures,
+    greeting_reset_reply,
+    is_cancel_message,
     is_reset_message,
     record_slot_failure,
     repeated_question,
-    reset_session_to_greeting,
-    should_trip_circuit_breaker,
     slot_fail_count,
     soft_reset_session,
     track_question,
 )
 from app.services.website_gallery import customer_wants_photos, mark_gallery_sent, prepare_gallery_photos
 from app.services.whatsapp_client import normalize_phone
+from app.services.whatsapp_interactive import (
+    CALLBACK_ID_TO_LABEL,
+    CUISINE_ID_TO_VALUE,
+    EDIT_ID_TO_SLOT,
+    EVENT_ID_TO_TYPE,
+    display_event_label,
+)
 from app.services import reply_pack
 
 logger = logging.getLogger(__name__)
 
-DETAIL_KEYS = ("event_date", "guest_count", "event_location", "meal_preference", "preferred_callback")
+DETAIL_KEYS = (
+    "event_date",
+    "guest_count",
+    "event_location",
+    "meal_preference",
+    "special_requirements",
+    "preferred_callback",
+)
 
 # Meal lunch/dinner/high-tea picker is only for informal gatherings.
 MEAL_PICKER_EVENT_KEYS = ("birthday", "family gathering", "family function", "get together", "get-together")
@@ -112,11 +159,8 @@ def should_ask_meal_preference(event_type: str | None) -> bool:
 
 
 def _skip_inapplicable_fields(session: ConversationSession) -> None:
-    """Auto-fill fields that do not apply to this occasion type."""
-    if session.fields.meal_preference is None and not should_ask_meal_preference(session.fields.event_type):
-        session.fields = EnquiryFields(
-            **{**session.fields.model_dump(), "meal_preference": "To be discussed on call"}
-        )
+    """Cuisine is collected for every event type via buttons."""
+    return
 
 
 EVENT_PROFILES = {
@@ -208,6 +252,8 @@ SKIP_NAMES = {
     "vanakkam",
     "start",
     "help",
+    "hlo",
+    "hloo",
     "yes",
     "ok",
     "okay",
@@ -236,13 +282,8 @@ def _next_detail_key(session: ConversationSession) -> str | None:
     for key in DETAIL_KEYS:
         if getattr(session.fields, key) is not None:
             continue
-        if key == "meal_preference":
-            inferred = infer_meal_preference(session)
-            if inferred:
-                from app.services.dish_flow import _preferences_to_items
-                session.selected_dishes = _preferences_to_items(inferred)
-                session.fields.meal_preference = ", ".join(inferred)
-                continue
+        if key == "special_requirements" and session.special_req_done:
+            continue
         return key
     return None
 
@@ -251,17 +292,66 @@ def _next_detail_prompt(session: ConversationSession) -> str | None:
     key = _next_detail_key(session)
     if not key:
         return None
+    if key == "event_location" and (
+        session.fields.venue_type == "home"
+        or (session.fields.venue_status == "fixed" and not (session.fields.venue_area or session.fields.event_location))
+        or (session.fields.venue_name and not session.fields.venue_area and not session.fields.event_location)
+    ):
+        return venue_area_prompt(venue_name=session.fields.venue_name)
+    if key == "preferred_callback":
+        if session.pending_ampm_hour == 12 and session.pending_callback_phone_confirm:
+            return (
+                f"{confirm_noon_prompt()} "
+                f"{confirm_callback_number_prompt(whatsapp_id=session.whatsapp_id, name=session.fields.customer_name)}"
+            )
+        if session.pending_callback_phone_confirm:
+            return confirm_callback_number_prompt(
+                whatsapp_id=session.whatsapp_id, name=session.fields.customer_name
+            )
+        if session.pending_alt_callback_phone:
+            return ask_alternative_callback_number()
+        if session.pending_ampm_hour == 12:
+            return confirm_noon_prompt()
+        if session.fields.callback_date and not callback_has_usable_time(
+            session.fields.preferred_callback,
+            time_label=session.fields.callback_time,
+            pending_ampm=bool(session.pending_ampm_hour),
+        ):
+            return callback_time_prompt(date_label=session.fields.callback_date)
     return detail_question(key, event_type=session.fields.event_type)
 
 
 def _details_complete(session: ConversationSession) -> bool:
     _skip_inapplicable_fields(session)
-    for key in DETAIL_KEYS:
-        value = getattr(session.fields, key)
-        if value is None:
+    data = session.fields.model_dump()
+    required = ("event_type", "guest_count", "event_date", "preferred_callback", "meal_preference")
+    for key in required:
+        if data.get(key) in (None, "", "To be discussed on call"):
             return False
-        if key == "preferred_callback" and is_meal_type_answer(str(value)):
+    if data.get("preferred_callback") and is_meal_type_answer(str(data.get("preferred_callback"))):
+        return False
+    loc = str(data.get("event_location") or "").strip()
+    status = data.get("venue_status")
+    if not session.special_req_done and not data.get("special_requirements"):
+        return False
+    if data.get("venue_type") == "home" and not data.get("venue_area"):
+        return False
+    if not loc or loc.lower() in {"to be discussed on call", "our house", "my house", "home"} or "already fixed" in loc.lower():
+        if status == "not_fixed":
             return False
+        return False
+    if status == "fixed" and not loc:
+        return False
+    if session.pending_ampm_hour:
+        return False
+    if session.pending_callback_phone_confirm or session.pending_alt_callback_phone:
+        return False
+    if not callback_has_usable_time(
+        data.get("preferred_callback"),
+        time_label=data.get("callback_time"),
+        pending_ampm=bool(session.pending_ampm_hour),
+    ):
+        return False
     return True
 
 
@@ -330,15 +420,11 @@ def handle_custom_request(session: ConversationSession, text: str, next_reply: s
 
 
 def _fill_pending_for_callback(session: ConversationSession) -> None:
-    """Skip remaining detail fields so we can pivot straight to callback scheduling."""
+    """Fill only optional meal preference. Never invent venue/date/guest data."""
     data = session.fields.model_dump()
-    placeholder = "To be discussed on call"
-    for key in DETAIL_KEYS:
-        if key == "preferred_callback":
-            continue
-        if data.get(key) is None:
-            data[key] = placeholder
-    session.fields = EnquiryFields(**data)
+    if data.get("meal_preference") in (None, ""):
+        data["meal_preference"] = "To be discussed on call"
+        session.fields = EnquiryFields(**data)
 
 
 def _venue_help_callback_prompt(location_value: str | None = None) -> str:
@@ -353,6 +439,43 @@ def _venue_help_callback_prompt(location_value: str | None = None) -> str:
     )
 
 
+def _booking_summary_text(session: ConversationSession) -> str:
+    f = session.fields
+    name = f.customer_name or "there"
+    event = display_event_label(f.event_type)
+    req = f.special_requirements or "None"
+    return (
+        f"Wonderful, {name}! 😊\n\n"
+        "Here are the details we've noted:\n\n"
+        f"🎉 Event: {event}\n"
+        f"📅 Date: {f.event_date or '—'}\n"
+        f"👥 Guests: {f.guest_count or '—'}\n"
+        f"📍 Venue: {f.event_location or '—'}\n"
+        f"🍽️ Catering: {f.meal_preference or '—'}\n"
+        f"📝 Requirements: {req}\n"
+        f"📞 Callback: {f.preferred_callback or '—'}\n\n"
+        "Would you like us to proceed with these details?"
+    )
+
+
+def _finalize_booking_reply(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    name = session.fields.customer_name or "there"
+    move_to(session, GuidedStep.DONE)
+    reply = (
+        f"Thank you, {name}! ❤️\n\n"
+        "We've received your event requirements. Our senior event planner will contact you "
+        "on the requested number to discuss everything further.\n\n"
+        "We look forward to helping you create a beautiful celebration! ✨"
+    )
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(
+        reply=reply,
+        fields=session.fields,
+        enquiry_fields_complete=True,
+        is_complete=True,
+    )
+
+
 def _complete_enquiry_reply(
     session: ConversationSession,
     whatsapp_id: str,
@@ -361,14 +484,17 @@ def _complete_enquiry_reply(
     lead: str | None = None,
 ) -> AgentTurnResult:
     _fill_pending_for_callback(session)
-    phone = normalize_phone(whatsapp_id)
+    if not _details_complete(session):
+        next_prompt = _next_detail_prompt(session) or detail_question(
+            _next_detail_key(session) or "event_location",
+            event_type=session.fields.event_type,
+        )
+        track_question(session, next_prompt, slot_key=_next_detail_key(session))
+        record_exchange(session, user_text, next_prompt)
+        return AgentTurnResult(reply=next_prompt, fields=session.fields)
+    phone = normalize_phone(session.fields.callback_phone or session.fields.phone_number or whatsapp_id)
     session.fields = EnquiryFields(
         **{**session.fields.model_dump(), "phone_number": session.fields.phone_number or phone}
-    )
-    move_to(session, GuidedStep.DONE)
-    signoff = warm_enquiry_signoff(
-        name=session.fields.customer_name,
-        event_type=session.fields.event_type,
     )
     callback_label = (session.fields.preferred_callback or "").strip()
     if is_meal_type_answer(callback_label):
@@ -383,21 +509,13 @@ def _complete_enquiry_reply(
         track_question(session, reply, slot_key="preferred_callback")
         record_exchange(session, user_text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
-    if lead:
-        reply = f"{lead}\n\n{signoff}"
-    elif is_immediate_callback(callback_label or user_text):
-        reply = (
-            f"{immediate_callback_reply(name=session.fields.customer_name)}\n\n{signoff}"
-        )
-    else:
-        reply = f"{callback_confirmation_reply(name=session.fields.customer_name, callback_label=callback_label)}\n\n{signoff}"
+    move_to(session, GuidedStep.AWAIT_BOOKING_CONFIRM)
+    summary = _booking_summary_text(session)
+    reply = f"{lead}\n\n{summary}" if lead else summary
     reply = handle_custom_request(session, user_text, reply)
+    track_question(session, reply)
     record_exchange(session, user_text, reply)
-    return AgentTurnResult(
-        reply=reply,
-        fields=session.fields,
-        enquiry_fields_complete=True,
-    )
+    return AgentTurnResult(reply=reply, fields=session.fields)
 
 
 def _company_intro_message(name: str) -> str:
@@ -416,20 +534,28 @@ def _confirm_and_store_name(session: ConversationSession, name: str) -> None:
     slot.collected = True
 
 
+def _name_is_confident(user_text: str, name: str) -> bool:
+    t = (user_text or "").strip()
+    if not name or not t:
+        return False
+    if re.search(r"\b((my\s+)?name\s+is|i\s+am|i'm|\bim\b|this\s+is)\b", t, re.I):
+        return True
+    cleaned = clean_person_name(t)
+    return bool(cleaned) and cleaned.lower() == name.lower() and len(t.split()) <= 3 and not is_greeting_only(t)
+
+
 def _reply_after_name_confirmed(session: ConversationSession, user_text: str) -> AgentTurnResult:
     name = session.fields.customer_name or "there"
     if is_known_event_type(session.fields.event_type):
         move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
-        reply = _event_showcase_message(session.fields.event_type, with_images=False)
+        label = display_event_label(session.fields.event_type)
+        reply = f"Would you like to know more about our {label} event services and options?"
         session.showcase_prompted = True
+        track_question(session, reply)
     else:
         move_to(session, GuidedStep.AWAIT_EVENT_TYPE)
         reply = name_confirmed_event_ask(name)
-    track_question(
-        session,
-        reply,
-        slot_key=None if session.fields.event_type else "event_type",
-    )
+        track_question(session, reply, slot_key="event_type")
     record_exchange(session, user_text, reply)
     return AgentTurnResult(reply=reply, fields=session.fields, media=[])
 
@@ -441,6 +567,11 @@ def _start_name_confirmation(
     *,
     event_type: str | None = None,
 ) -> AgentTurnResult:
+    if _name_is_confident(user_text, name):
+        _confirm_and_store_name(session, name)
+        if event_type and is_known_event_type(event_type):
+            session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
+        return _reply_after_name_confirmed(session, user_text)
     session.pending_name = clean_person_name(name) or extract_name(user_text) or name.strip()
     session.name_confirmed = False
     # Keep name pending until Yes — do not finalize customer_name yet
@@ -488,6 +619,46 @@ def _intent_b_reply(text: str, session: ConversationSession) -> str:
     return intent_b_planning_reply(text=text, name=name, event_type=event_type)
 
 
+def _strip_event_date_asks(reply: str) -> str:
+    text = reply or ""
+    text = re.sub(
+        r"\n*To help us[^\n]*tentative date[^\n]*\??",
+        "",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(
+        r"\n*What is your tentative date or month[^\n]*\??",
+        "",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def _with_plan_next(reply: str) -> str:
+    cleaned = _strip_event_date_asks(reply)
+    lower = cleaned.lower()
+    if "plan my event" in lower or "what would you like to do next" in lower:
+        return cleaned
+    return f"{cleaned}\n\nReady to plan your event?".strip()
+
+
+def _enter_showing_event_information(session: ConversationSession, reply: str) -> str:
+    move_to(session, GuidedStep.SHOWING_EVENT_INFORMATION)
+    return _with_plan_next(reply)
+
+
+def _begin_event_details_after_information(session: ConversationSession) -> str:
+    move_to(session, GuidedStep.COLLECT_DETAILS)
+    if session.fields.event_date:
+        return _next_detail_prompt(session) or ask_event_date_only(
+            event_type=session.fields.event_type
+        )
+    return ask_event_date_only(event_type=session.fields.event_type)
+
+
 def _showcase_followup_text(session: ConversationSession) -> str:
     """Follow-up after photos/showcase — never re-ask for a date already provided."""
     if session.fields.event_date:
@@ -501,32 +672,34 @@ def _showcase_followup_text(session: ConversationSession) -> str:
     return showcase_followup_date_ask(event_type=session.fields.event_type)
 
 
-def _intent_a_showcase_payload(session: ConversationSession, text: str) -> tuple[str, list]:
-    """JSON showcase copy + grouped event photos (Kannan.rules.txt Intent A)."""
+def _with_event_details_option(reply: str) -> str:
+    return _with_plan_next(reply)
+
+
+async def _intent_a_showcase_payload(session: ConversationSession, text: str) -> tuple[str, list]:
+    """JSON showcase copy + event photos (uploaded album first, Kannan.rules.txt Intent A)."""
     reply = reply_pack.get_reply("state3.intent_a", event_type=session.fields.event_type)
     if not reply:
         profile = get_event_profile(session.fields.event_type)
         reply = (
             f"We’d love to show you! {profile['showcase']}\n\n"
-            f"You can explore our portfolio anytime at **srivatsanka.com**.\n\n"
-            f"{_showcase_followup_text(session)}"
+            f"You can explore our portfolio anytime at **srivatsanka.com**."
         )
-    elif session.fields.event_date and "tentative date" in reply.lower():
-        reply = re.sub(
-            r"\n*To help us.*tentative date.*\?",
-            f"\n\n{_showcase_followup_text(session)}",
-            reply,
-            flags=re.I | re.S,
-        )
+    reply = _strip_event_date_asks(reply)
+    reply = re.sub(r"\n*Type \*?DONE\*? to proceed\.?\s*", "", reply, flags=re.I).strip()
     reply = handle_custom_request(session, text, reply)
     media: list[MediaAttachment] = []
     if not session.sent_gallery_urls or customer_wants_photos(text):
-        group_name = reply_pack.get_event_profile(session.fields.event_type).get("media_group")
-        media = reply_pack.get_media_group(group_name)
-        if media:
-            mark_gallery_sent(session, [m.url for m in media])
-        else:
-            media = prepare_gallery_photos(session, user_text=session.fields.event_type)
+        media = await prepare_gallery_photos(
+            session,
+            user_text=text,
+            event_type=session.fields.event_type,
+        )
+        if not media:
+            group_name = reply_pack.get_event_profile(session.fields.event_type).get("media_group")
+            media = reply_pack.get_media_group(group_name)
+            if media:
+                mark_gallery_sent(session, [m.url for m in media])
     return reply, media
 
 
@@ -602,8 +775,12 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
     if not value:
         return False
     if key == "event_date":
+        if is_impossible_calendar_date(user_text):
+            return False
         value = extract_date_entity(user_text)
         if not value:
+            return False
+        if is_impossible_calendar_date(str(value)):
             return False
         if is_ambiguous_date_phrase(str(value)):
             session.pending_date_confirm = str(value)
@@ -613,7 +790,15 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
         if isinstance(value, str) and len(value.split()) > 6:
             return False
     if key == "meal_preference":
-        if is_meal_type_answer(user_text):
+        title = user_text.strip()
+        mapped = CUISINE_ID_TO_VALUE.get(title)
+        if mapped:
+            value = mapped
+        elif title in set(CUISINE_ID_TO_VALUE.values()):
+            value = title
+        elif re.search(r"traditional|south indian|north indian|custom menu|not sure|vegetarian", title, re.I):
+            value = title
+        elif is_meal_type_answer(user_text):
             value = normalize_meal_label(user_text)
         else:
             lower = user_text.lower()
@@ -628,16 +813,69 @@ def _store_detail_field(session: ConversationSession, key: str, user_text: str) 
             if "snacks" in lower or "tea" in lower or "coffee" in lower:
                 selected.append("Snacks")
                 selected.append("Tea")
-            if not selected:
-                selected = ["Lunch", "Dinner"]
-            session.selected_dishes = _preferences_to_items(selected)
-            value = ", ".join(selected)
+            if selected:
+                session.selected_dishes = _preferences_to_items(selected)
+                value = ", ".join(selected)
+            else:
+                value = title
+    if key == "special_requirements":
+        session.special_req_done = True
+        session.awaiting_special_req_text = False
+        value = user_text.strip()[:500]
     if key == "event_location":
-        value = extract_location_entity(str(value))
+        from app.services.venue_parser import parse_venue_reply
+
+        parsed = parse_venue_reply(user_text)
+        data = session.fields.model_dump()
+        if parsed.status:
+            data["venue_status"] = parsed.status
+        if parsed.is_home:
+            data["venue_type"] = "home"
+            data["venue_name"] = parsed.venue_name or "customer's house"
+        if parsed.status == "fixed" and not parsed.location:
+            session.fields = EnquiryFields(**data)
+            return False
+        if not parsed.location:
+            session.fields = EnquiryFields(**data)
+            return False
+        data["venue_area"] = parsed.location
+        if data.get("venue_name"):
+            value = f"{data['venue_name']}, {parsed.location}"
+        else:
+            value = parsed.location
+        session.fields = EnquiryFields(**{**data, "event_location": value})
+        return True
     if key == "preferred_callback":
         if is_meal_type_answer(str(value)):
             return False
-        value = normalize_callback_label(str(value))
+        parts = parse_callback_parts(str(value))
+        data = session.fields.model_dump()
+        if parts.date_label:
+            data["callback_date"] = parts.date_label
+        if parts.uses_this_number:
+            session.pending_callback_phone_confirm = True
+            session.pending_alt_callback_phone = False
+        if parts.ambiguous_noon:
+            session.pending_ampm_hour = 12
+            session.fields = EnquiryFields(**data)
+            return False
+        if parts.time_label:
+            data["callback_time"] = parts.time_label
+        if parts.immediate:
+            data["preferred_callback"] = "Immediately"
+            session.fields = EnquiryFields(**data)
+            return True
+        composed = compose_callback_label(
+            date_label=data.get("callback_date"),
+            time_label=data.get("callback_time"),
+            immediate=False,
+        )
+        if not callback_has_usable_time(composed, time_label=data.get("callback_time")):
+            session.fields = EnquiryFields(**data)
+            return False
+        data["preferred_callback"] = composed
+        session.fields = EnquiryFields(**data)
+        return True
     session.fields = EnquiryFields(**{**session.fields.model_dump(), key: value})
     return True
 
@@ -670,28 +908,381 @@ def _start_detail_collection(session: ConversationSession, user_text: str) -> Ag
     return AgentTurnResult(reply=reply, fields=session.fields)
 
 
+def _set_event_type(session: ConversationSession, event_type: str) -> None:
+    session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
+    slot = session.slots.setdefault("event_type", SlotValue())
+    slot.value = event_type
+    slot.confidence = 1.0
+    slot.collected = True
+    session.showcase_prompted = False
+    clear_slot_failures(session, "event_type")
+
+
+def _offer_info_yes_no(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
+    label = display_event_label(session.fields.event_type)
+    reply = f"Would you like to know more about our {label} event services and options?"
+    session.showcase_prompted = True
+    track_question(session, reply)
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _ask_other_event_name(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    move_to(session, GuidedStep.AWAIT_OTHER_EVENT, force=True)
+    reply = (
+        "Of course! 😊\n\n"
+        "What type of event are you planning?\n"
+        "Please tell us the name of the event."
+    )
+    track_question(session, reply, slot_key="event_type")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _show_event_type_list(session: ConversationSession, user_text: str, *, extra: str | None = None) -> AgentTurnResult:
+    session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": None})
+    move_to(session, GuidedStep.AWAIT_EVENT_TYPE, force=True)
+    name = session.fields.customer_name or "there"
+    reply = extra or f"What type of event are you planning, {name}?"
+    track_question(session, reply, slot_key="event_type")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+async def _handle_stable_button(
+    session: ConversationSession,
+    whatsapp_id: str,
+    text: str,
+    button_id: str,
+) -> AgentTurnResult | None:
+    bid = (button_id or "").strip()
+    if not bid:
+        return None
+
+    if bid in EVENT_ID_TO_TYPE:
+        _set_event_type(session, EVENT_ID_TO_TYPE[bid])
+        return _offer_info_yes_no(session, text)
+    if bid == "event_other":
+        return _ask_other_event_name(session, text)
+    if bid in {"name_yes", "info_yes"} and session.guided_step == GuidedStep.AWAIT_NAME_CONFIRM:
+        candidate = (session.pending_name or "").strip()
+        if candidate:
+            _confirm_and_store_name(session, candidate)
+            return _reply_after_name_confirmed(session, text)
+    if bid == "name_no" and session.guided_step == GuidedStep.AWAIT_NAME_CONFIRM:
+        session.pending_name = None
+        session.name_confirmed = False
+        move_to(session, GuidedStep.AWAIT_NAME, force=True)
+        reply = name_reask_prompt()
+        track_question(session, reply, slot_key="customer_name")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "info_yes":
+        reply, media = await _intent_a_showcase_payload(session, text)
+        reply = _enter_showing_event_information(session, reply)
+        track_question(session, reply)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+    if bid == "info_no":
+        occasion = (display_event_label(session.fields.event_type) or "event").lower()
+        move_to(session, GuidedStep.COLLECT_DETAILS)
+        prompt = _next_detail_prompt(session) or ask_event_date_only(event_type=session.fields.event_type)
+        reply = f"Perfect! Let's start planning your {occasion}. 🗓️\n\n{prompt}"
+        track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "plan_event":
+        return _start_detail_collection(session, text)
+    if bid == "back_to_events":
+        return _show_event_type_list(session, text)
+    if bid == "venue_fixed":
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "venue_status": "fixed"})
+        reply = "Please share the venue name and area/locality."
+        track_question(session, reply, slot_key="event_location")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "venue_help":
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "venue_status": "not_fixed"})
+        reply = "Which city or locality would you prefer for the event?"
+        track_question(session, reply, slot_key="event_location")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid in CUISINE_ID_TO_VALUE:
+        _store_detail_field(session, "meal_preference", CUISINE_ID_TO_VALUE[bid])
+        next_prompt = _next_detail_prompt(session)
+        reply = f"Perfect. I've noted {CUISINE_ID_TO_VALUE[bid]}."
+        if next_prompt:
+            reply = f"{reply}\n\n{next_prompt}"
+        track_question(session, reply, slot_key=_next_detail_key(session))
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "req_yes":
+        session.awaiting_special_req_text = True
+        reply = "Please tell us about your requirements."
+        track_question(session, reply, slot_key="special_requirements")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "req_no":
+        session.special_req_done = True
+        session.awaiting_special_req_text = False
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "special_requirements": "None"})
+        next_prompt = _next_detail_prompt(session)
+        reply = next_prompt or _booking_summary_text(session)
+        if not next_prompt:
+            return _complete_enquiry_reply(session, whatsapp_id, text)
+        track_question(session, reply, slot_key=_next_detail_key(session))
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid in CALLBACK_ID_TO_LABEL:
+        period = CALLBACK_ID_TO_LABEL[bid]
+        session.fields = EnquiryFields(
+            **{
+                **session.fields.model_dump(),
+                "callback_time": period,
+                "preferred_callback": period,
+            }
+        )
+        return _complete_enquiry_reply(session, whatsapp_id, text)
+    if bid == "callback_other":
+        reply = "Please tell us a convenient day and time for the call."
+        track_question(session, reply, slot_key="preferred_callback")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "booking_confirm":
+        return _finalize_booking_reply(session, text)
+    if bid == "booking_edit":
+        move_to(session, GuidedStep.AWAIT_EDIT_FIELD, force=True)
+        reply = "What would you like to change?"
+        track_question(session, reply)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "booking_cancel":
+        move_to(session, GuidedStep.AWAIT_CANCEL_CONFIRM, force=True)
+        reply = "Would you like to cancel this planning session?"
+        track_question(session, reply)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "cancel_yes":
+        reply = cancel_to_main_menu(session)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "cancel_no":
+        move_to(session, GuidedStep.AWAIT_BOOKING_CONFIRM, force=True)
+        reply = _booking_summary_text(session)
+        track_question(session, reply)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid in EDIT_ID_TO_SLOT:
+        slot = EDIT_ID_TO_SLOT[bid]
+        if slot == "event_type":
+            return _show_event_type_list(session, text, extra="What type of event are you planning?")
+        data = session.fields.model_dump()
+        if slot == "special_requirements":
+            session.special_req_done = False
+            session.awaiting_special_req_text = False
+        if slot == "event_location":
+            data["venue_status"] = None
+            data["venue_area"] = None
+            data["venue_name"] = None
+            data["venue_type"] = None
+        data[slot] = None
+        if slot == "preferred_callback":
+            data["callback_date"] = None
+            data["callback_time"] = None
+        session.fields = EnquiryFields(**data)
+        move_to(session, GuidedStep.COLLECT_DETAILS, force=True)
+        prompt = _next_detail_prompt(session) or detail_question(slot, event_type=session.fields.event_type)
+        reply = prompt
+        track_question(session, reply, slot_key=slot)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    return None
+
+
+async def _maybe_information_interrupt(
+    session: ConversationSession,
+    text: str,
+) -> AgentTurnResult | None:
+    """Answer a question without advancing booking state."""
+    step = session.guided_step
+    if step in {GuidedStep.AWAIT_HI, GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_NAME_CONFIRM}:
+        return None
+    if wants_book_again(text) or wants_straight_to_planning(text) or wants_to_move_further(text):
+        if not is_food_menu_question(text) and not wants_cuisine_options(text):
+            return None
+    if session.guided_step in {
+        GuidedStep.SHOWING_EVENT_INFORMATION,
+        GuidedStep.PAST_SETUPS,
+    } and is_information_done_command(text):
+        return None
+    if wants_showcase_look(text) or customer_wants_photos(text):
+        return None
+    if is_ambiguous_yes(text):
+        return None
+
+    expected = session.last_asked_slot or _next_detail_key(session)
+    if expected and is_likely_field_answer(text, expected, last_asked_slot=session.last_asked_slot):
+        return None
+    if not is_information_request(text) and not is_food_menu_question(text) and not wants_cuisine_options(text):
+        return None
+
+    if (
+        (is_food_menu_question(text) or wants_cuisine_options(text))
+        and step == GuidedStep.AWAIT_POST_SHOWCASE
+        and not looks_like_question(text)
+    ):
+        return None
+
+    if is_food_menu_question(text) or wants_cuisine_options(text):
+        answered = cuisine_options_reply(event_type=session.fields.event_type)
+    else:
+        answered = await answer_details_question(session, text, None)
+
+    pending = None
+    if step in {GuidedStep.SHOWING_EVENT_INFORMATION, GuidedStep.PAST_SETUPS}:
+        pending = proceed_with_done_prompt()
+    elif step == GuidedStep.AWAIT_POST_SHOWCASE:
+        pending = (
+            f"Would you like to know more about our "
+            f"{display_event_label(session.fields.event_type)} event services and options?"
+        )
+    elif step == GuidedStep.COLLECT_DETAILS:
+        pending = _next_detail_prompt(session)
+    elif step == GuidedStep.AWAIT_EVENT_TYPE:
+        pending = "What celebration would you like to plan?"
+    if pending:
+        reply = f"{answered}\n\nComing back to your booking: {pending}"
+    else:
+        reply = answered
+    track_question(session, reply, slot_key=expected)
+    record_exchange(session, text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
 async def process_guided_flow(
     session: ConversationSession,
     whatsapp_id: str,
     user_text: str,
+    *,
+    button_id: str | None = None,
 ) -> AgentTurnResult | None:
     text = sanitize_customer_reply(user_text, last_bot_message=session.last_assistant_question)
     hydrate_memory(session)
     before_fields = session.fields.model_dump()
 
-    # 1) RECOVERY CHECK (Kannan.rules.txt Global FSM + State 5 circuit breaker)
-    if is_reset_message(text):
+    if button_id:
+        handled = await _handle_stable_button(session, whatsapp_id, text or button_id, button_id)
+        if handled is not None:
+            return handled
+
+    # Global commands — never fall through to completion
+    if wants_book_again(text):
         reply = soft_reset_session(session)
-        track_question(session, reply, slot_key="customer_name" if not session.name_confirmed else "event_type")
+        track_question(session, reply, slot_key="event_type" if session.fields.event_type else "customer_name")
         record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
 
-    if should_trip_circuit_breaker(session):
-        reset_session_to_greeting(session)
-        reply = circuit_breaker_reply()
+    if is_reset_message(text):
+        reply = greeting_reset_reply(session)
         track_question(session, reply, slot_key="customer_name")
         record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if is_cancel_message(text) and session.guided_step not in {
+        GuidedStep.AWAIT_BOOKING_CONFIRM,
+        GuidedStep.AWAIT_CANCEL_CONFIRM,
+    }:
+        reply = cancel_to_main_menu(session)
+        track_question(session, reply, slot_key="event_type" if session.name_confirmed else "customer_name")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if is_help_message(text) and session.guided_step != GuidedStep.AWAIT_HI:
+        reply = help_options_reply()
+        pending = session.last_assistant_question
+        if pending and "past setups" not in reply.lower():
+            reply = f"{reply}\n\n{pending}"
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    info_interrupt = await _maybe_information_interrupt(session, text)
+    if info_interrupt is not None:
+        return info_interrupt
+
+    def _lock_callback_phone(number: str) -> None:
+        data = session.fields.model_dump()
+        data["callback_phone"] = number
+        data["phone_number"] = number
+        session.fields = EnquiryFields(**data)
+        session.pending_callback_phone_confirm = False
+        session.pending_alt_callback_phone = False
+
+    def _lock_noon(meridiem: str) -> None:
+        data = session.fields.model_dump()
+        data["callback_time"] = "12:00 PM" if meridiem == "pm" else "12:00 AM"
+        data["preferred_callback"] = compose_callback_label(
+            date_label=data.get("callback_date"),
+            time_label=data["callback_time"],
+        )
+        session.pending_ampm_hour = None
+        session.fields = EnquiryFields(**data)
+
+    waiting_phone = session.pending_callback_phone_confirm or session.pending_alt_callback_phone
+    typed_phone = extract_phone_number(text)
+    if waiting_phone and typed_phone:
+        _lock_callback_phone(typed_phone)
+        if session.pending_ampm_hour == 12:
+            reply = confirm_noon_prompt()
+            track_question(session, reply, slot_key="preferred_callback")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+        return _complete_enquiry_reply(session, whatsapp_id, text)
+
+    if session.pending_callback_phone_confirm and is_name_confirm_no(text):
+        session.pending_callback_phone_confirm = False
+        session.pending_alt_callback_phone = True
+        reply = ask_alternative_callback_number()
+        track_question(session, reply, slot_key="preferred_callback")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if session.pending_callback_phone_confirm and is_name_confirm_yes(text):
+        _lock_callback_phone(normalize_phone(whatsapp_id))
+        if session.pending_ampm_hour == 12:
+            _lock_noon("pm")
+        return _complete_enquiry_reply(session, whatsapp_id, text)
+
+    if session.pending_alt_callback_phone and not typed_phone:
+        reply = ask_alternative_callback_number()
+        track_question(session, reply, slot_key="preferred_callback")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if session.pending_ampm_hour == 12 and is_name_confirm_yes(text):
+        _lock_noon("pm")
+        return _complete_enquiry_reply(session, whatsapp_id, text)
+
+    if session.pending_ampm_hour == 12 and re.search(r"\b(pm|p\.m|noon|afternoon)\b", text, re.I):
+        _lock_noon("pm")
+        return _complete_enquiry_reply(session, whatsapp_id, text)
+
+    if session.pending_ampm_hour == 12 and re.search(r"\b(am|a\.m|midnight)\b", text, re.I):
+        _lock_noon("am")
+        return _complete_enquiry_reply(session, whatsapp_id, text)
+
+    if session.guided_step not in {GuidedStep.AWAIT_HI, GuidedStep.AWAIT_NAME} and typed_phone:
+        _lock_callback_phone(typed_phone)
+        if session.guided_step == GuidedStep.COLLECT_DETAILS:
+            next_prompt = _next_detail_prompt(session) or callback_time_prompt(
+                date_label=session.fields.callback_date
+            )
+            reply = noted_callback_phone_prompt() if not session.fields.callback_time else next_prompt
+            if session.fields.callback_time or session.fields.preferred_callback:
+                return _complete_enquiry_reply(session, whatsapp_id, text)
+            track_question(session, reply, slot_key="preferred_callback")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
 
     if session.pending_date_confirm and is_name_confirm_yes(text):
         confirmed = suggest_ambiguous_date(session.pending_date_confirm) or session.pending_date_confirm
@@ -727,6 +1318,54 @@ async def process_guided_flow(
     if step == GuidedStep.DONE:
         return None
 
+    if step == GuidedStep.AWAIT_OTHER_EVENT:
+        custom = text.strip()[:80]
+        if len(custom) < 2 or is_greeting_only(text) or looks_like_question(text):
+            return _ask_other_event_name(session, text)
+        _set_event_type(session, custom.title())
+        return _offer_info_yes_no(session, text)
+
+    if step == GuidedStep.AWAIT_BOOKING_CONFIRM:
+        low = text.strip().lower()
+        if is_name_confirm_yes(text) or low in {"confirm", "proceed", "ok confirm"}:
+            return _finalize_booking_reply(session, text)
+        if "edit" in low:
+            return await _handle_stable_button(session, whatsapp_id, text, "booking_edit")
+        if is_cancel_message(text) or low in {"cancel"}:
+            return await _handle_stable_button(session, whatsapp_id, text, "booking_cancel")
+        reply = _booking_summary_text(session)
+        track_question(session, reply)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if step == GuidedStep.AWAIT_EDIT_FIELD:
+        low = text.strip().lower()
+        mapping = {
+            "event": "edit_event",
+            "date": "edit_date",
+            "guest": "edit_guests",
+            "guests": "edit_guests",
+            "venue": "edit_venue",
+            "catering": "edit_catering",
+            "cuisine": "edit_catering",
+            "requirement": "edit_requirements",
+            "callback": "edit_callback",
+        }
+        for key, bid in mapping.items():
+            if key in low:
+                return await _handle_stable_button(session, whatsapp_id, text, bid)
+        reply = "What would you like to change?"
+        track_question(session, reply)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if step == GuidedStep.AWAIT_CANCEL_CONFIRM:
+        if is_name_confirm_yes(text) or "cancel" in text.lower():
+            return await _handle_stable_button(session, whatsapp_id, text, "cancel_yes")
+        if is_name_confirm_no(text) or "continue" in text.lower():
+            return await _handle_stable_button(session, whatsapp_id, text, "cancel_no")
+        return await _handle_stable_button(session, whatsapp_id, text, "booking_cancel")
+
     if step == GuidedStep.AWAIT_HI:
         name = extract_name(text)
         event_type = _detect_event(text, name=name)
@@ -740,7 +1379,7 @@ async def process_guided_flow(
             )
         elif is_greeting_only(text):
             move_to(session, GuidedStep.AWAIT_NAME)
-            reply = welcome_message()
+            reply = greeting_ask_name()
         elif looks_like_question(text) or wants_more_info(text) or is_portfolio_inquiry(text):
             move_to(session, GuidedStep.AWAIT_NAME)
             if is_portfolio_inquiry(text):
@@ -767,6 +1406,9 @@ async def process_guided_flow(
 
         # Message that just provided the candidate name → ask Yes/No
         if candidate and typed_name and typed_name.lower() == candidate.lower():
+            if _name_is_confident(text, typed_name) or session.last_asked_slot != "customer_name":
+                _confirm_and_store_name(session, typed_name)
+                return _reply_after_name_confirmed(session, text)
             reply = name_confirm_prompt(candidate)
             track_question(session, reply, slot_key="customer_name")
             record_exchange(session, text, reply)
@@ -823,7 +1465,7 @@ async def process_guided_flow(
 
         if is_greeting_only(text):
             # Warm re-greeting — do not burn the loop budget before the user shares a name.
-            reply = welcome_message()
+            reply = greeting_ask_name()
             session.last_assistant_question = reply
             session.last_asked_slot = "customer_name"
             record_exchange(session, text, reply)
@@ -935,39 +1577,23 @@ async def process_guided_flow(
             return AgentTurnResult(reply=reply, fields=session.fields, media=[])
 
         if not event_type:
-            record_slot_failure(session, slot_key="event_type")
-            fails = slot_fail_count(session, "event_type")
-            if fails >= 2:
-                move_to(session, GuidedStep.COLLECT_DETAILS)
-                reply = callback_pivot_prompt(name=session.fields.customer_name)
-            else:
-                reply = random.choice(
-                    (
-                        "Got it, is it a wedding, house warming, birthday, or something else?",
-                        "What celebration is this for?",
-                    )
-                )
-            track_question(session, reply, slot_key="event_type" if fails < 2 else "preferred_callback")
-            record_exchange(session, text, reply)
-            return AgentTurnResult(reply=reply, fields=session.fields)
+            lowered = text.strip().lower()
+            if lowered in {"other", "something else", "something other"}:
+                return _ask_other_event_name(session, text)
+            custom = text.strip()[:80]
+            if len(custom.split()) <= 6 and not looks_like_question(text):
+                _set_event_type(session, custom.title())
+                return _offer_info_yes_no(session, text)
+            return _show_event_type_list(session, text, extra="Please select an event below, or choose Other.")
 
         clear_slot_failures(session, "event_type")
-        session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_type": event_type})
-        move_to(session, GuidedStep.AWAIT_POST_SHOWCASE)
-        reply = _event_showcase_message(event_type, with_images=False)
-        session.showcase_prompted = True
-        track_question(session, reply)
-        record_exchange(session, text, reply)
-        return AgentTurnResult(reply=reply, fields=session.fields, media=[])
+        _set_event_type(session, event_type)
+        return _offer_info_yes_no(session, text)
 
     if step == GuidedStep.AWAIT_POST_SHOWCASE:
         # Entity sweep may have just filled event_type and advanced here — still show showcase once.
         if "event_type" in newly_collected and not session.showcase_prompted:
-            session.showcase_prompted = True
-            reply = _event_showcase_message(session.fields.event_type, with_images=False)
-            track_question(session, reply)
-            record_exchange(session, text, reply)
-            return AgentTurnResult(reply=reply, fields=session.fields, media=[])
+            return _offer_info_yes_no(session, text)
 
         if is_thanks_only(text):
             reply = thanks_reply()
@@ -992,11 +1618,38 @@ async def process_guided_flow(
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
-        # Intent A first: Yes / Sure / show photos → past setups (Kannan.rules.txt)
-        if wants_showcase_look(text) or customer_wants_photos(text):
+        from app.services.human_style import normalize_customer_text as _norm_choice
+
+        choice = _norm_choice(text)
+        if is_ambiguous_yes(text) or is_name_confirm_yes(text) or choice in {"yes"}:
+            handled = await _handle_stable_button(session, whatsapp_id, text, "info_yes")
+            return handled
+
+        if is_name_confirm_no(text) or choice in {"no", "nope"}:
+            handled = await _handle_stable_button(session, whatsapp_id, text, "info_no")
+            return handled
+
+        if wants_cuisine_options(text) or choice in {"cuisine options", "cuisines"}:
+            reply = _enter_showing_event_information(
+                session,
+                cuisine_options_reply(event_type=session.fields.event_type),
+            )
+            track_question(session, reply)
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if choice in {"2", "3"}:
             move_to(session, GuidedStep.COLLECT_DETAILS)
-            reply, media = _intent_a_showcase_payload(session, text)
+            reply = _intent_b_reply(text, session)
             track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        # Intent A: past setups / photos — then wait for DONE
+        if wants_showcase_look(text) or customer_wants_photos(text) or choice in {"1"}:
+            reply, media = await _intent_a_showcase_payload(session, text)
+            reply = _enter_showing_event_information(session, reply)
+            track_question(session, reply)
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields, media=media)
 
@@ -1014,8 +1667,8 @@ async def process_guided_flow(
             else:
                 reply = f"Sorry about that, {name}. Could you share your tentative date once more?"
             if wants_showcase_look(text) or customer_wants_photos(text):
-                showcase_reply, media = _intent_a_showcase_payload(session, text)
-                reply = f"{reply}\n\n{showcase_reply}"
+                showcase_reply, media = await _intent_a_showcase_payload(session, text)
+                reply = _enter_showing_event_information(session, f"{reply}\n\n{showcase_reply}")
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields, media=media)
             record_exchange(session, text, reply)
@@ -1029,9 +1682,7 @@ async def process_guided_flow(
             record_exchange(session, text, reply)
             return AgentTurnResult(reply=reply, fields=session.fields)
 
-        # Info / "more details" / topic asks → answer once (no second question), then date
-        move_to(session, GuidedStep.COLLECT_DETAILS)
-        date_ask = "" if session.fields.event_date else ask_event_date_only(event_type=session.fields.event_type)
+        # Info / topic asks → show information, then Type DONE (do not ask date yet)
         if (
             looks_like_question(text)
             or wants_more_info(text)
@@ -1039,38 +1690,168 @@ async def process_guided_flow(
             or _is_custom_request(text)
         ):
             if wants_showcase_look(text) or customer_wants_photos(text):
-                reply, media = _intent_a_showcase_payload(session, text)
-                track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+                reply, media = await _intent_a_showcase_payload(session, text)
+                reply = _enter_showing_event_information(session, reply)
+                track_question(session, reply)
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields, media=media)
             if wants_more_info(text) and not is_service_topic_reply(text):
-                # Broad "more details" → Intent A style summary, then date (rules State 3)
                 profile = get_event_profile(session.fields.event_type)
                 answered = (
                     f"Absolutely! {profile['showcase']} "
                     f"You can also browse menus and setups at **srivatsanka.com**."
                 )
-                date_ask = _showcase_followup_text(session) if session.fields.event_date else showcase_followup_date_ask(
-                    event_type=session.fields.event_type
-                )
             else:
                 answered = await answer_showcase_question(session, text)
             if _is_custom_request(text):
                 answered = handle_custom_request(session, text, answered)
-            reply = f"{answered}\n\n{date_ask}".strip() if date_ask else answered
-        else:
-            # Intent B fallback (ok / emoji / unclassifiable) — one reply only, JSON-first
-            reply = _intent_b_reply(text, session)
-            reply = handle_custom_request(session, text, reply)
-        track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
-        if not repeated_question(session, reply):
+            reply = _enter_showing_event_information(session, answered)
+            track_question(session, reply)
+            if not repeated_question(session, reply):
+                record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        # Stay on Yes/No — never auto-start planning from unclassifiable text
+        return _offer_info_yes_no(session, text)
+
+    if step in {GuidedStep.PAST_SETUPS, GuidedStep.SHOWING_EVENT_INFORMATION}:
+        if (
+            is_information_done_command(text)
+            or wants_straight_to_planning(text)
+            or "plan my event" in text.lower()
+        ):
+            reply = _begin_event_details_after_information(session)
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
             record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+        if "back" in text.lower() and "event" in text.lower():
+            return _show_event_type_list(session, text)
+
+        if wants_discuss_on_call(text):
+            move_to(session, GuidedStep.COLLECT_DETAILS)
+            reply = callback_pivot_prompt(name=session.fields.customer_name)
+            reply = handle_custom_request(session, text, reply)
+            track_question(session, reply, slot_key="preferred_callback")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if wants_cuisine_options(text) or is_food_menu_question(text):
+            reply = _enter_showing_event_information(
+                session,
+                cuisine_options_reply(event_type=session.fields.event_type),
+            )
+            track_question(session, reply)
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        if wants_showcase_look(text) or customer_wants_photos(text):
+            reply, media = await _intent_a_showcase_payload(session, text)
+            reply = _enter_showing_event_information(session, reply)
+            track_question(session, reply)
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields, media=media)
+
+        if is_thanks_only(text):
+            reply = f"{thanks_reply()}\n\n{proceed_with_done_prompt()}"
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        reply = proceed_with_done_prompt()
+        track_question(session, reply)
+        record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
-
-
 
     if step == GuidedStep.COLLECT_DETAILS:
         _skip_inapplicable_fields(session)
+        asked = session.last_asked_slot or _next_detail_key(session)
+
+        if asked == "special_requirements" and not session.awaiting_special_req_text:
+            if is_name_confirm_no(text):
+                return await _handle_stable_button(session, whatsapp_id, text, "req_no")
+            if is_name_confirm_yes(text):
+                return await _handle_stable_button(session, whatsapp_id, text, "req_yes")
+        if asked == "event_location" and not session.fields.venue_status:
+            low = text.lower()
+            if "not" in low and ("fixed" in low or "yet" in low or "help" in low):
+                return await _handle_stable_button(session, whatsapp_id, text, "venue_help")
+            if is_name_confirm_no(text) or "help" in low:
+                return await _handle_stable_button(session, whatsapp_id, text, "venue_help")
+            if (is_name_confirm_yes(text) and "help" not in low) or (
+                "fixed" in low and "not" not in low
+            ):
+                return await _handle_stable_button(session, whatsapp_id, text, "venue_fixed")
+        if asked == "meal_preference":
+            low = text.lower().strip()
+            for cid, label in CUISINE_ID_TO_VALUE.items():
+                if low == label.lower() or label.lower() in low:
+                    return await _handle_stable_button(session, whatsapp_id, text, cid)
+        if asked == "preferred_callback" and not session.fields.callback_date:
+            low = text.lower()
+            for cid, period in CALLBACK_ID_TO_LABEL.items():
+                if period in low:
+                    return await _handle_stable_button(session, whatsapp_id, text, cid)
+            if "another" in low or "other time" in low:
+                return await _handle_stable_button(session, whatsapp_id, text, "callback_other")
+
+        if is_information_done_command(text):
+            prompt = _next_detail_prompt(session) or ask_event_date_only(
+                event_type=session.fields.event_type
+            )
+            reply = prompt
+            track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+
+        from app.services.venue_parser import parse_venue_reply
+
+        kind = classify_message(text, session)
+        venue = parse_venue_reply(text)
+        location_turn = (
+            kind in {MessageKind.VENUE_HOME, MessageKind.VENUE_AREA, MessageKind.VENUE_STATUS}
+            or _next_detail_key(session) == "event_location"
+            or session.last_asked_slot == "event_location"
+        )
+        if location_turn and not (is_information_request(text) and looks_like_question(text)):
+            data = session.fields.model_dump()
+            if venue.status:
+                data["venue_status"] = venue.status
+            if venue.is_home:
+                data["venue_type"] = "home"
+                data["venue_name"] = venue.venue_name or "customer's house"
+                data["venue_status"] = "fixed"
+            if venue.location:
+                data["venue_area"] = venue.location
+                if data.get("venue_name"):
+                    data["event_location"] = f"{data['venue_name']}, {venue.location}"
+                else:
+                    data["event_location"] = venue.location
+                session.fields = EnquiryFields(**data)
+                next_prompt = _next_detail_prompt(session)
+                reply = f"Thanks! I've noted {venue.location} as the venue area."
+                if next_prompt:
+                    reply = f"{reply}\n\n{next_prompt}"
+                track_question(session, reply, slot_key=_next_detail_key(session) or "preferred_callback")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+            session.fields = EnquiryFields(**data)
+            if venue.is_home or (venue.status == "fixed" and not venue.location):
+                reply = venue_area_prompt(venue_name=session.fields.venue_name)
+                if venue.status == "fixed" and not venue.is_home:
+                    reply = (
+                        "Understood, your venue is already fixed. "
+                        "Could you please share the venue name and area?"
+                    )
+                track_question(session, reply, slot_key="event_location")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+            if venue.status == "not_fixed" and not venue.location:
+                reply = (
+                    "No problem if the venue is not fixed yet. "
+                    "Which city or locality should we plan around?"
+                )
+                track_question(session, reply, slot_key="event_location")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
 
         if asks_callback_timing(text):
             reply = callback_timing_reply(
@@ -1094,7 +1875,7 @@ async def process_guided_flow(
             else:
                 reply = f"Sorry about that, {name}. Could you share your tentative date once more?"
             if wants_showcase_look(text) or customer_wants_photos(text):
-                showcase_reply, media = _intent_a_showcase_payload(session, text)
+                showcase_reply, media = await _intent_a_showcase_payload(session, text)
                 reply = f"{reply}\n\n{showcase_reply}"
                 track_question(session, reply, slot_key=_next_detail_key(session) or "event_date")
                 record_exchange(session, text, reply)
@@ -1152,7 +1933,7 @@ async def process_guided_flow(
             return AgentTurnResult(reply=reply, fields=session.fields)
 
         if wants_showcase_look(text) or customer_wants_photos(text):
-            reply, media = _intent_a_showcase_payload(session, text)
+            reply, media = await _intent_a_showcase_payload(session, text)
             pending = _next_detail_prompt(session)
             if pending and session.fields.event_date:
                 reply = handle_custom_request(session, text, f"{reply}\n\n{pending}")
@@ -1297,6 +2078,12 @@ async def process_guided_flow(
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
+            if key == "event_date" and is_impossible_calendar_date(text):
+                reply = invalid_event_date_clarify()
+                track_question(session, reply, slot_key="event_date")
+                record_exchange(session, text, reply)
+                return AgentTurnResult(reply=reply, fields=session.fields)
+
             if not is_likely_field_answer(text, key, last_asked_slot=session.last_asked_slot):
                 # Meal answers must never fill the callback slot.
                 if key == "preferred_callback" and is_meal_type_answer(text):
@@ -1308,43 +2095,40 @@ async def process_guided_flow(
                     track_question(session, reply, slot_key="preferred_callback")
                     record_exchange(session, text, reply)
                     return AgentTurnResult(reply=reply, fields=session.fields)
-                # Fix 6: clarify once → callback offer → circuit breaker (via failed_turns >= 3)
-                fails = record_slot_failure(session, slot_key=key)
-                slot_fails = slot_fail_count(session, key)
-                if fails >= 3 or should_trip_circuit_breaker(session):
-                    reset_session_to_greeting(session)
-                    reply = circuit_breaker_reply()
-                    track_question(session, reply, slot_key="customer_name")
+                record_slot_failure(session, slot_key=key)
+                if key == "event_date":
+                    reply = invalid_event_date_clarify()
+                    track_question(session, reply, slot_key="event_date")
                     record_exchange(session, text, reply)
                     return AgentTurnResult(reply=reply, fields=session.fields)
-                if slot_fails >= 2:
-                    reply = callback_pivot_prompt(name=session.fields.customer_name)
-                    reply = handle_custom_request(session, text, reply)
-                    track_question(session, reply, slot_key="preferred_callback")
-                    record_exchange(session, text, reply)
-                    return AgentTurnResult(reply=reply, fields=session.fields)
-                reply = f"Could you share that again? {prompt}"
+                reply = prompt
+                if key == "preferred_callback" and session.fields.callback_date:
+                    reply = callback_time_prompt(date_label=session.fields.callback_date)
+                if key == "event_location" and session.fields.venue_name:
+                    reply = venue_area_prompt(venue_name=session.fields.venue_name)
                 reply = handle_custom_request(session, text, reply)
-                if repeated_question(session, reply):
-                    reply = f"No worries, take your time. {prompt}"
                 track_question(session, reply, slot_key=key)
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
 
             if not _store_detail_field(session, key, text):
-                fails = record_slot_failure(session, slot_key=key)
-                if fails >= 3 or should_trip_circuit_breaker(session):
-                    reset_session_to_greeting(session)
-                    reply = circuit_breaker_reply()
-                    track_question(session, reply, slot_key="customer_name")
+                record_slot_failure(session, slot_key=key)
+                if key == "event_date":
+                    reply = invalid_event_date_clarify()
+                    track_question(session, reply, slot_key="event_date")
                     record_exchange(session, text, reply)
                     return AgentTurnResult(reply=reply, fields=session.fields)
-                if slot_fail_count(session, key) >= 2:
-                    reply = callback_pivot_prompt(name=session.fields.customer_name)
+                if key == "event_location":
+                    reply = venue_area_prompt(venue_name=session.fields.venue_name)
+                    track_question(session, reply, slot_key="event_location")
+                    record_exchange(session, text, reply)
+                    return AgentTurnResult(reply=reply, fields=session.fields)
+                if key == "preferred_callback":
+                    reply = _next_detail_prompt(session) or prompt
                     track_question(session, reply, slot_key="preferred_callback")
                     record_exchange(session, text, reply)
                     return AgentTurnResult(reply=reply, fields=session.fields)
-                reply = f"Could you share that again? {prompt}"
+                reply = prompt
                 reply = handle_custom_request(session, text, reply)
                 track_question(session, reply, slot_key=key)
                 record_exchange(session, text, reply)

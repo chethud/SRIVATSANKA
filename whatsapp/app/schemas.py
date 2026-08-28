@@ -12,8 +12,16 @@ class EnquiryFields(BaseModel):
     event_location: str | None = None
     guest_count: int | str | None = None
     preferred_callback: str | None = None
+    callback_date: str | None = None
+    callback_time: str | None = None
+    callback_phone: str | None = None
     notes: str | None = None
     meal_preference: str | None = None
+    special_requirements: str | None = None
+    venue_status: str | None = None  # fixed | not_fixed | unknown
+    venue_name: str | None = None
+    venue_area: str | None = None
+    venue_type: str | None = None  # home | hall | other
 
 
 class SelectedDishItem(BaseModel):
@@ -35,6 +43,7 @@ class AgentTurnResult(BaseModel):
     is_complete: bool = False
     enquiry_fields_complete: bool = False
     media: list[MediaAttachment] = Field(default_factory=list)
+    interactive: dict | None = None
 
 
 class EnquiryDishOut(BaseModel):
@@ -316,6 +325,25 @@ class DishOut(BaseModel):
     description: str | None = None
 
 
+class EventPhotoOut(BaseModel):
+    id: str
+    eventType: str
+    fileName: str
+    caption: str | None = None
+    url: str
+    createdAt: datetime
+
+
+class EventPhotoAlbumOut(BaseModel):
+    eventType: str
+    count: int
+    photos: list[EventPhotoOut]
+
+
+class EventPhotoAlbumsOut(BaseModel):
+    albums: list[EventPhotoAlbumOut]
+
+
 class VendorIn(BaseModel):
     name: str
     businessName: str | None = None
@@ -442,7 +470,8 @@ class UpdateEnquiryStatus(BaseModel):
 
 class DevMessageRequest(BaseModel):
     from_number: str = "919999999999"
-    text: str
+    text: str = ""
+    button_id: str | None = None
 
 
 class DevMessageResponse(BaseModel):

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 
 from app.schemas import EnquiryFields, SelectedDishItem
@@ -12,13 +13,30 @@ class ConversationPhase(str, Enum):
     DONE = "done"
 
 
+class ConversationState(str, Enum):
+    START = "START"
+    MAIN_MENU = "MAIN_MENU"
+    NEW_BOOKING = "NEW_BOOKING"
+    PAST_SETUPS = "PAST_SETUPS"
+    SHOWING_EVENT_INFORMATION = "SHOWING_EVENT_INFORMATION"
+    EVENT_DETAILS = "EVENT_DETAILS"
+    BOOKING_CONFIRMATION = "BOOKING_CONFIRMATION"
+    COMPLETED = "COMPLETED"
+
+
 class GuidedStep(str, Enum):
     AWAIT_HI = "await_hi"
     AWAIT_NAME = "await_name"
     AWAIT_NAME_CONFIRM = "await_name_confirm"
     AWAIT_EVENT_TYPE = "await_event_type"
+    AWAIT_OTHER_EVENT = "await_other_event"
     AWAIT_POST_SHOWCASE = "await_post_showcase"
+    PAST_SETUPS = "past_setups"
+    SHOWING_EVENT_INFORMATION = "showing_event_information"
     COLLECT_DETAILS = "collect_details"
+    AWAIT_BOOKING_CONFIRM = "await_booking_confirm"
+    AWAIT_EDIT_FIELD = "await_edit_field"
+    AWAIT_CANCEL_CONFIRM = "await_cancel_confirm"
     DONE = "done"
 
 
@@ -55,6 +73,15 @@ class ConversationSession:
     name_confirmed: bool = False
     pending_date_confirm: str | None = None
     pending_event_type_switch: str | None = None
+    conversation_state: ConversationState = ConversationState.START
+    last_user_message: str | None = None
+    last_processed_message_id: str | None = None
+    pending_ampm_hour: int | None = None
+    pending_callback_phone_confirm: bool = False
+    pending_alt_callback_phone: bool = False
+    special_req_done: bool = False
+    awaiting_special_req_text: bool = False
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     slots: dict[str, SlotValue] = field(
         default_factory=lambda: {
             "customer_name": SlotValue(),

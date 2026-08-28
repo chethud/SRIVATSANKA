@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
-  HardHat, FileText, BarChart3, Settings,
+  HardHat, FileText, BarChart3, Images, Settings,
   PanelLeftClose, PanelLeft, LogOut, X,
 } from 'lucide-react';
 import { useEffect } from 'react';
@@ -36,6 +36,7 @@ const navItems: {
   { to: '/workers', label: 'Workers', icon: HardHat },
   { to: '/invoices', label: 'Expenses Invoice', icon: FileText },
   { to: '/bot-tester', label: 'WhatsApp Chats', icon: WhatsAppIcon },
+  { to: '/photos', label: 'Photos', icon: Images },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -224,11 +225,22 @@ export function DashboardLayout() {
   );
 }
 
-export function PageHeader({ title, description }: { title: string; description?: string }) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+}) {
   return (
-    <div className="mb-6">
-      <h1 className="text-xl sm:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{title}</h1>
-      {description && <p className="text-[var(--muted)] mt-1.5 text-sm max-w-2xl">{description}</p>}
+    <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{title}</h1>
+        {description && <p className="text-[var(--muted)] mt-1.5 text-sm max-w-2xl">{description}</p>}
+      </div>
+      {actions ? <div className="shrink-0">{actions}</div> : null}
     </div>
   );
 }

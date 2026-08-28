@@ -377,6 +377,36 @@ export async function updateOwnerPhone(phone: string): Promise<{ ok: boolean; ow
 
 export const fetchWhatsAppStatus = () => apiFetch<WhatsAppStatus>('/api/whatsapp/status');
 
+export interface EventPhoto {
+  id: string;
+  eventType: string;
+  fileName: string;
+  caption: string | null;
+  url: string;
+  createdAt: string;
+}
+
+export interface EventPhotoAlbum {
+  eventType: string;
+  count: number;
+  photos: EventPhoto[];
+}
+
+export const fetchEventPhotoAlbums = () =>
+  apiFetch<{ albums: EventPhotoAlbum[] }>('/api/event-photos');
+
+export async function uploadEventPhotos(eventType: string, files: File[]): Promise<EventPhoto[]> {
+  const fd = new FormData();
+  fd.append('eventType', eventType);
+  for (const file of files) fd.append('files', file);
+  const res = await fetchWithAuth('/api/event-photos', { method: 'POST', body: fd });
+  return parseApiResponse<EventPhoto[]>(res, '/api/event-photos');
+}
+
+export async function deleteEventPhoto(id: string): Promise<void> {
+  await apiFetch<{ ok: boolean }>(`/api/event-photos/${id}`, { method: 'DELETE' });
+}
+
 export async function createEnquiry(data: {
   customerName: string;
   phoneNumber: string;

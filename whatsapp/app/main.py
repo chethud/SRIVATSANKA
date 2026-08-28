@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.database import SessionLocal, init_db
 from app.middleware.auth import AuthMiddleware
-from app.routers import api, auth, chat, dev, orders, resources, webhook
+from app.routers import api, auth, chat, dev, orders, photos, resources, webhook
 from app.services.gemini_conversation import is_gemini_configured
 from app.services.scheduler import start_scheduler
 
@@ -112,6 +112,7 @@ app.include_router(api.router)
 app.include_router(chat.router)
 app.include_router(orders.router)
 app.include_router(resources.router)
+app.include_router(photos.router)
 if not settings.is_production:
     app.include_router(dev.router)
 

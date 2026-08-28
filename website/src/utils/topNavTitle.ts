@@ -16,5 +16,6 @@ export function getTopNavTitle(pathname: string): string | null {
   }
   if (path === '/settings') return 'Settings';
   if (path === '/bot-tester' || path.startsWith('/bot-tester/')) return 'WhatsApp Chats';
+  if (path === '/photos' || path.startsWith('/photos/')) return 'Photos';
   return null;
 }

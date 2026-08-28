@@ -6,6 +6,7 @@ Times are interpreted in Asia/Kolkata (Bengaluru business hours), not bare UTC.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -102,6 +103,11 @@ def _extract_clock_time(lower: str) -> tuple[int, int] | None:
     if match and "am" not in lower and "pm" not in lower:
         return int(match.group(1)), int(match.group(2))
 
+    match = re.search(r"\b(?:at|around|by|@)\s*([1-9]|1[0-2]|12)\b", lower)
+    if match and not re.search(r"\b(?:guests?|people|pax)\b", lower):
+        hour = int(match.group(1))
+        return hour, 0
+
     return None
 
 
@@ -141,12 +147,46 @@ def is_immediate_callback(text: str | None) -> bool:
 
 
 def normalize_callback_label(text: str) -> str:
-    """Store a clean label for ASAP typos instead of echoing 'Imideatly'."""
+    """Store a short preference such as 'this evening', never the full sentence."""
     raw = (text or "").strip()
     if not raw:
         return "in 2 hours"
-    if _is_immediate(raw.lower()):
+    lower = raw.lower()
+    if _is_immediate(lower):
         return "Immediately"
+
+    period = None
+    if "tonight" in lower or "this evening" in lower or re.search(r"\bevening\b", lower):
+        period = "evening"
+    elif re.search(r"\bafternoon\b", lower):
+        period = "afternoon"
+    elif re.search(r"\bmorning\b", lower):
+        period = "morning"
+    elif re.search(r"\bnight\b", lower):
+        period = "night"
+
+    day = None
+    if _mentions_today(lower):
+        day = "today"
+    elif _mentions_tomorrow(lower):
+        day = "tomorrow"
+    elif _mentions_day_after_tomorrow(lower):
+        day = "day after tomorrow"
+
+    if day == "today" and period == "evening":
+        return "this evening"
+    if day and period:
+        return f"{day} {period}"
+    if period:
+        return period
+    if day:
+        return day
+    clock = _extract_clock_time(lower)
+    if clock:
+        hour, minute = clock
+        return f"{hour:02d}:{minute:02d}"
+    if len(raw.split()) > 5:
+        return period or "a convenient time"
     return raw
 
 
@@ -251,6 +291,116 @@ def format_callback_display(parsed: datetime, original: str | None = None) -> st
     original = normalize_callback_label(original or "")
     if original.lower() == "immediately":
         return f"{formatted} (Immediately)"
-    if original and original.lower() not in formatted.lower() and original.lower() != "in 2 hours":
-        return f"{formatted} ({original})"
+    if original and original.lower() not in formatted.lower() and original.lower() not in {
+        "in 2 hours",
+        "a convenient time",
+    }:
+        if len(original.split()) <= 4:
+            return f"{formatted} ({original})"
     return formatted
+
+
+@dataclass
+class CallbackParts:
+    date_label: str | None = None
+    time_label: str | None = None
+    period: str | None = None
+    uses_this_number: bool = False
+    ambiguous_noon: bool = False
+    immediate: bool = False
+
+
+def clock_is_ambiguous_noon(text: str, clock: tuple[int, int] | None) -> bool:
+    lower = (text or "").lower()
+    if not clock:
+        return False
+    hour, minute = clock
+    if hour != 12 or minute != 0:
+        return False
+    if re.search(r"\b(am|pm|a\.m|p\.m|noon|midnight|afternoon|morning)\b", lower):
+        return False
+    return True
+
+
+def parse_callback_parts(text: str) -> CallbackParts:
+    raw = (text or "").strip()
+    lower = raw.lower()
+    parts = CallbackParts()
+    if not raw:
+        return parts
+    if _is_immediate(lower):
+        parts.immediate = True
+        parts.time_label = "Immediately"
+        return parts
+    if re.search(r"\b(?:this\s+(?:number|no)|same\s+number|my\s+number|on\s+this)\b", lower):
+        parts.uses_this_number = True
+
+    if _mentions_day_after_tomorrow(lower):
+        parts.date_label = "day after tomorrow"
+    elif _mentions_tomorrow(lower):
+        parts.date_label = "tomorrow"
+    elif _mentions_today(lower):
+        parts.date_label = "today"
+
+    if "tonight" in lower or re.search(r"\bevening\b", lower):
+        parts.period = "evening"
+    elif re.search(r"\bafternoon\b", lower):
+        parts.period = "afternoon"
+    elif re.search(r"\bmorning\b", lower):
+        parts.period = "morning"
+    elif re.search(r"\bnight\b", lower):
+        parts.period = "night"
+    elif "noon" in lower:
+        parts.period = "noon"
+        parts.time_label = "12:00 PM"
+
+    clock = _extract_clock_time(lower)
+    if clock:
+        hour, minute = clock
+        parts.ambiguous_noon = clock_is_ambiguous_noon(raw, clock)
+        if "pm" in lower or "p.m" in lower or "am" in lower or "a.m" in lower:
+            display_hour = hour % 24
+            parts.time_label = datetime(2000, 1, 1, display_hour, minute).strftime("%I:%M %p").lstrip("0")
+        elif parts.ambiguous_noon:
+            parts.time_label = "12:00"
+        else:
+            parts.time_label = f"{hour:02d}:{minute:02d}"
+
+    if parts.period and not parts.time_label:
+        parts.time_label = parts.period
+    return parts
+
+
+def compose_callback_label(*, date_label: str | None, time_label: str | None, immediate: bool = False) -> str | None:
+    if immediate:
+        return "Immediately"
+    date_label = (date_label or "").strip() or None
+    time_label = (time_label or "").strip() or None
+    if date_label and time_label:
+        if time_label.lower() in {"evening", "morning", "afternoon", "night"}:
+            if date_label == "today" and time_label.lower() == "evening":
+                return "this evening"
+            return f"{date_label} {time_label}"
+        return f"{date_label} at {time_label}"
+    if time_label:
+        return time_label
+    return None
+
+
+def callback_has_usable_time(label: str | None, *, time_label: str | None = None, pending_ampm: bool = False) -> bool:
+    if pending_ampm:
+        return False
+    if time_label and time_label.lower() not in {"", "12:00"}:
+        return True
+    text = (label or "").strip().lower()
+    if not text:
+        return False
+    if text in {"immediately", "asap"}:
+        return True
+    if re.search(r"\b(morning|afternoon|evening|night|noon|am|pm)\b", text):
+        return True
+    if re.search(r"\d{1,2}\s*:\s*\d{2}", text):
+        return True
+    if text in {"today", "tomorrow", "day after tomorrow"}:
+        return False
+    return False

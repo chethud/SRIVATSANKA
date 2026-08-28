@@ -423,6 +423,13 @@ def _is_probable_location(text: str) -> bool:
         "looking for venue",
     )
     if any(c in lower for c in place_cues):
+        # "house warming" contains "house" — that is not a venue answer.
+        if re.search(r"\bhouse\s*warming\b|\bhousewarming\b", lower) and not re.search(
+            r"\b(hall|resort|hotel|layout|nagar|road|bangalore|bengaluru|mysore|mysuru|area|locality|city)\b",
+            lower,
+        ):
+            if "already fixed" in lower or "is fixed" in lower:
+                return False
         return True
     # Short place-like token(s), not a full sentence about something else
     if 1 <= len(t.split()) <= 5 and not re.search(
@@ -455,7 +462,11 @@ def _is_probable_callback(text: str, *, last_asked_slot: str | None = None) -> b
     if re.search(r"\b(today|tomorrow)\s+(morning|afternoon|evening|night)\b", t):
         return True
     if last_asked_slot == "preferred_callback":
-        return has_callback_intent(text) or bool(
-            re.search(r"\b(morning|afternoon|evening|night|noon|tonight|anytime|whenever)\b", t)
-        )
+        if re.search(r"\b(today|tomorrow|tommorow|tmrw|morning|afternoon|evening|night|noon|tonight|anytime|whenever)\b", t):
+            return True
+        if re.search(r"\b(?:at|around|by)\s*([1-9]|1[0-2]|12)\b", t):
+            return True
+        if has_callback_intent(text) or re.search(r"\bplease\s+call\b", t):
+            return True
+        return False
     return has_callback_intent(text) or bool(re.search(r"\btom\w*row\b", t))

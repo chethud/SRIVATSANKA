@@ -110,8 +110,11 @@ class Settings(BaseSettings):
 
     owner_phone_number: str = "919945607074"
     cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175"
+    # Absolute origin WhatsApp uses to fetch uploaded event photos (must be reachable HTTPS in production).
+    public_api_url: str = ""
 
-    # Supabase — PostgreSQL data + dashboard auth (JWT from Supabase Auth)
+    # Supabase Auth is opt-in. AWS production uses Admin username/password JWT.
+    use_supabase_auth: bool = False
     supabase_url: str = ""
     supabase_anon_key: str = ""  # publishable/anon key — fallback token verification via Auth API
     supabase_jwt_secret: str = ""
@@ -181,6 +184,7 @@ def _load_settings() -> Settings:
         "whatsapp_phone_number_id",
         "whatsapp_verify_token",
         "meta_app_secret",
+        "public_api_url",
     )
     for attr in strip_attrs:
         val = getattr(s, attr, None)

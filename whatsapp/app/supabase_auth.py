@@ -47,6 +47,8 @@ def is_supabase_auth_configured() -> bool:
 
     if os.getenv("TESTING") == "true":
         return False
+    if not getattr(settings, "use_supabase_auth", False):
+        return False
     url = _supabase_base_url()
     anon = (settings.supabase_anon_key or "").strip()
     jwt_secret = (settings.supabase_jwt_secret or "").strip()

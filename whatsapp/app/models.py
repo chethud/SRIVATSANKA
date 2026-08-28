@@ -164,6 +164,19 @@ class WhatsappChatState(Base):
     pausedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class ProcessedWhatsappMessage(Base):
+    """Inbound WhatsApp message idempotency. Unique on WhatsApp wamid."""
+
+    __tablename__ = "ProcessedWhatsappMessage"
+
+    messageId: Mapped[str] = mapped_column(String, primary_key=True)
+    phoneNumber: Mapped[str] = mapped_column(String, index=True)
+    receivedAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    processedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="claimed")  # claimed | sent | skipped | error
+    responseId: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class Vendor(Base):
     __tablename__ = "Vendor"
 
@@ -219,6 +232,20 @@ class Expense(Base):
     amount: Mapped[float] = mapped_column(Float)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     expenseDate: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class EventPhoto(Base):
+    """Owner-uploaded photos grouped by event type, sent on WhatsApp photo requests."""
+
+    __tablename__ = "EventPhoto"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=cuid)
+    eventType: Mapped[str] = mapped_column(String, index=True)
+    fileName: Mapped[str] = mapped_column(String)
+    filePath: Mapped[str] = mapped_column(String, default="")
+    fileData: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

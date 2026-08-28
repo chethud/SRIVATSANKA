@@ -2,6 +2,7 @@
 
 import re
 
+from app.data.company_knowledge import COMPANY
 from app.services.human_style import (
     continue_hint,
     natural_field_ack,
@@ -24,8 +25,71 @@ __all__ = [
 ]
 
 GREETING_ONLY = frozenset(
-    {"hi", "hello", "hey", "hii", "hiii", "namaste", "vanakkam", "start", "help", "good morning", "good evening"}
+    {
+        "hi",
+        "hii",
+        "hiii",
+        "hai",
+        "hello",
+        "helo",
+        "hey",
+        "heyyy",
+        "hlo",
+        "hloo",
+        "namaste",
+        "vanakkam",
+        "start",
+        "help",
+        "good morning",
+        "good evening",
+        "good afternoon",
+    }
 )
+
+_GREETING_LEAD = (
+    r"(?:hai+|hi+|hlo+|helo+|hello|hey+|namaste|vanakkam|"
+    r"good\s+morning|good\s+evening|good\s+afternoon)"
+)
+_OWNER_HONORIFIC = r"(?:bro|sir|ji|anna|madam|ma'?am|mam)"
+
+
+def business_owner_first_name() -> str:
+    configured = (COMPANY.get("business_owner_name") or "Kannan").strip()
+    return (configured.split()[0] if configured else "Kannan").lower()
+
+
+def is_explicit_self_intro(text: str) -> bool:
+    raw = text or ""
+    if re.search(
+        r"\b(?:my\s+name\s+is|i\s+am|i'?m|this\s+is|call\s+me|it'?s)\b",
+        raw,
+        re.I,
+    ):
+        return True
+    owner = re.escape(business_owner_first_name())
+    return bool(re.search(rf"\b{owner}\s+here\b|\bhere\s+{owner}\b", raw, re.I))
+
+
+def is_business_owner_name(name: str) -> bool:
+    token = (name or "").strip().split()[0].lower() if (name or "").strip() else ""
+    return token == business_owner_first_name()
+
+
+def is_greeting_addressing_owner(text: str) -> bool:
+    """True when Kannan is being greeted, not given as the customer's name."""
+    if is_explicit_self_intro(text):
+        return False
+    owner = re.escape(business_owner_first_name())
+    t = re.sub(r"[^a-z\s]", " ", (text or "").lower())
+    t = re.sub(r"\s+", " ", t).strip()
+    if not t:
+        return False
+    return bool(
+        re.fullmatch(
+            rf"{_GREETING_LEAD}(?:\s+{_OWNER_HONORIFIC})?\s+{owner}(?:\s+{_OWNER_HONORIFIC})?",
+            t,
+        )
+    )
 
 READY_PHRASES = (
     "ok",
@@ -65,9 +129,27 @@ def record_exchange(session: ConversationSession, user_text: str, reply: str) ->
     session.history.append({"role": "assistant", "content": reply})
 
 
+def is_honorific_greeting(text: str) -> bool:
+    """Greetings like 'hai sir' / 'hello madam' — never a customer name."""
+    t = re.sub(r"[^a-z\s]", " ", (text or "").lower())
+    t = re.sub(r"\s+", " ", t).strip()
+    if not t:
+        return False
+    return bool(
+        re.fullmatch(
+            rf"{_GREETING_LEAD}(?:\s+{_OWNER_HONORIFIC})+",
+            t,
+        )
+    )
+
+
 def is_greeting_only(text: str) -> bool:
     t = text.lower().strip().rstrip("!.,")
-    return t in GREETING_ONLY or (len(t) <= 4 and t in {"hi", "hey"})
+    if t in GREETING_ONLY or (len(t) <= 4 and t in {"hi", "hey", "hlo", "hai"}):
+        return True
+    if is_honorific_greeting(t):
+        return True
+    return is_greeting_addressing_owner(text)
 
 
 def customer_wants_to_proceed(text: str) -> bool:
@@ -108,11 +190,22 @@ NAME_STOP_WORDS = frozenset(
         "call",
         "from",
         "hello",
+        "helo",
         "hey",
         "hi",
+        "hai",
         "hii",
         "hiii",
         "here",
+        "hlo",
+        "hloo",
+        "sir",
+        "madam",
+        "mam",
+        "maam",
+        "ji",
+        "bro",
+        "anna",
         "i",
         "im",
         "i'm",
@@ -131,7 +224,7 @@ NAME_STOP_WORDS = frozenset(
 )
 
 NAME_INTRO_PATTERNS = (
-    r"^(?:(?:hi|hello|hey|hii|hiii|namaste|vanakkam)[,!\s]+)+",
+    r"^(?:(?:hi|hello|hey|hii|hiii|hlo|namaste|vanakkam)[,!\s]+)+",
     r"^(?:(?:my|the)\s+)?name\s+is\s+",
     r"^(?:i'?m|i am|this is|call me|it'?s|its)\s+",
 )
@@ -179,10 +272,16 @@ def extract_name(text: str) -> str:
     # Never treat polite fillers / intents as a personal name
     reject_names = {
         "hi",
+        "hai",
         "hello",
+        "helo",
         "hey",
         "hii",
         "hiii",
+        "hlo",
+        "hloo",
+        "sir",
+        "madam",
         "namaste",
         "vanakkam",
         "start",
@@ -229,13 +328,14 @@ def extract_name(text: str) -> str:
         m = re.search(pat, t, re.I)
         if m:
             name = clean_person_name(m.group(1))
-            if name and name.lower() not in GREETING_ONLY and name.lower() not in reject_names and len(name) >= 2:
-                return name
+            return _accepted_customer_name(name, t, reject_names)
 
     if re.search(r"\b(my\s+name\s+is|name\s+is|i\s+am|i'?m|this\s+is|call\s+me)\b", t, re.I):
         name = clean_person_name(t)
-        if name and name.lower() not in GREETING_ONLY and name.lower() not in reject_names and len(name) >= 2:
-            return name
+        return _accepted_customer_name(name, t, reject_names)
+
+    if is_greeting_addressing_owner(t) or is_honorific_greeting(t) or is_greeting_only(t):
+        return ""
 
     words = [w.strip(".,!") for w in t.split() if w.strip(".,!")]
     # Reject sentence-like or intent-heavy messages
@@ -280,12 +380,22 @@ def extract_name(text: str) -> str:
             and joined.lower() not in reject_names
             and not is_greeting_only(joined)
         ):
-            return joined
+            return _accepted_customer_name(joined, t, reject_names)
     if len(filtered) == 1 and len(filtered[0]) >= 2 and filtered[0].lower() not in GREETING_ONLY and filtered[0].lower() not in reject_names:
         if filtered[0].isdigit():
             return ""
-        return clean_person_name(filtered[0])
+        return _accepted_customer_name(clean_person_name(filtered[0]), t, reject_names)
     return ""
+
+
+def _accepted_customer_name(name: str, original: str, reject_names: set[str]) -> str:
+    if not name or len(name) < 2:
+        return ""
+    if name.lower() in GREETING_ONLY or name.lower() in reject_names:
+        return ""
+    if is_business_owner_name(name) and not is_explicit_self_intro(original):
+        return ""
+    return name
 
 
 def natural_continue_hint(*, event_type: str | None = None) -> str:

@@ -39,11 +39,6 @@ def _verify_login(username: str, password: str) -> bool:
 
 @router.post("/login", response_model=LoginOut)
 async def login(payload: LoginIn) -> LoginOut:
-    if is_supabase_auth_configured():
-        raise HTTPException(
-            status_code=400,
-            detail="Dashboard sign-in uses Supabase. Open the website and sign in with your email.",
-        )
     if not _verify_login(payload.username, payload.password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     name = payload.username.strip()

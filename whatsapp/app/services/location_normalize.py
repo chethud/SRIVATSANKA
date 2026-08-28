@@ -34,6 +34,10 @@ AREA_ALIASES: dict[str, str] = {
     "marathalli": "Marathahalli",
     "electronic city": "Electronic City",
     "hebbal": "Hebbal",
+    "sunkadakatte": "Sunkadakatte",
+    "sunkada katte": "Sunkadakatte",
+    "vijayanagar": "Vijayanagar",
+    "vijayanagara": "Vijayanagar",
     "yelahanka": "Yelahanka",
     "banashankari": "Banashankari",
     "rajajinagar": "Rajajinagar",
@@ -84,7 +88,10 @@ def extract_location_entity(text: str) -> str:
     raw = re.sub(r"\s+", " ", (text or "").strip())
     if not raw or _is_rejected_location(raw):
         return ""
-    if match_event_type(raw):
+    if re.match(r"^(?:i am|i'm|im|this is|my name is)\b", raw, re.I):
+        return ""
+    et = match_event_type(raw)
+    if et and et != "General" and re.fullmatch(re.escape(et), raw.strip(), flags=re.I):
         return ""
     lower = raw.lower()
     if "help" in lower and "venue" in lower:

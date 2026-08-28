@@ -17,6 +17,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import BotTesterPage from './pages/BotTesterPage';
+import PhotosPage from './pages/PhotosPage';
 
 export default function App() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="expenses" element={<Navigate to="/invoices" replace />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="bot-tester" element={<BotTesterPage />} />
+        <Route path="photos" element={<PhotosPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       </Route>
