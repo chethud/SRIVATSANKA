@@ -36,7 +36,6 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
     step = session.guided_step
     allowed: set[str] = set()
     early_steps = {
-        GuidedStep.AWAIT_HI,
         GuidedStep.AWAIT_NAME,
         GuidedStep.AWAIT_NAME_CONFIRM,
         GuidedStep.AWAIT_EVENT_TYPE,
@@ -46,7 +45,9 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
         GuidedStep.SHOWING_EVENT_INFORMATION,
     }
 
-    if step in {GuidedStep.AWAIT_HI, GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_NAME_CONFIRM}:
+    if step == GuidedStep.AWAIT_HI:
+        return set()
+    if step in {GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_NAME_CONFIRM}:
         allowed.add("customer_name")
         allowed.add("event_type")
     elif step == GuidedStep.AWAIT_EVENT_TYPE:
@@ -60,20 +61,25 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
             allowed.add("preferred_callback")
         allowed.add("special_requests")
     elif step == GuidedStep.COLLECT_DETAILS:
-        data = session.fields.model_dump()
-        for key in (
-            "event_date",
-            "guest_count",
-            "event_location",
-            "meal_preference",
-            "special_requirements",
-            "preferred_callback",
-        ):
-            if data.get(key) in (None, ""):
-                allowed.add(key)
-        allowed.add("special_requests")
-        if entities.callback_requested:
+        asked = session.last_asked_slot
+        if asked == "date_status":
+            allowed.add("event_date")
+        elif asked == "event_date":
+            allowed.add("event_date")
+        elif asked == "guest_count":
+            allowed.add("guest_count")
+        elif asked == "event_location":
+            allowed.add("event_location")
+        elif asked in {"venue_name", "venue_area"}:
+            allowed.add("event_location")
+        elif asked == "meal_preference":
+            allowed.add("meal_preference")
+        elif asked in {"special_requirements", "special_requirements_details"}:
+            allowed.add("special_requirements")
+            allowed.add("special_requests")
+        elif asked in {"preferred_callback", "callback_date", "callback_time", "callback_slot", "callback_period"}:
             allowed.add("preferred_callback")
+        # Never volunteer a different booking field than the one we asked for.
     elif step == GuidedStep.DONE:
         allowed.add("special_requests")
 
@@ -152,36 +158,49 @@ def apply_entities(session: ConversationSession, entities: ExtractedEntities) ->
         slot.confidence = max(slot.confidence, 0.85)
         slot.collected = True
 
-    if getattr(entities, "venue_status", None):
-        data["venue_status"] = entities.venue_status
-    if getattr(entities, "venue_name", None):
-        data["venue_name"] = entities.venue_name
-    if getattr(entities, "venue_area", None):
-        data["venue_area"] = entities.venue_area
-    if getattr(entities, "venue_type", None):
-        data["venue_type"] = entities.venue_type
-    if getattr(entities, "callback_date", None):
-        data["callback_date"] = entities.callback_date
-    if getattr(entities, "callback_time", None) and not getattr(entities, "callback_ambiguous_noon", False):
-        data["callback_time"] = entities.callback_time
-    if getattr(entities, "callback_phone", None):
-        data["callback_phone"] = entities.callback_phone
-        session.pending_callback_phone_confirm = False
-        session.pending_alt_callback_phone = False
-    elif getattr(entities, "uses_this_number", False):
-        session.pending_callback_phone_confirm = True
-        session.pending_alt_callback_phone = False
+    asked = session.last_asked_slot
+    venue_ok = session.guided_step != GuidedStep.COLLECT_DETAILS or asked in {
+        "event_location",
+        "venue_name",
+        "venue_area",
+    }
+    if venue_ok:
+        if getattr(entities, "venue_status", None):
+            data["venue_status"] = entities.venue_status
+        if getattr(entities, "venue_name", None):
+            data["venue_name"] = entities.venue_name
+        if getattr(entities, "venue_area", None):
+            data["venue_area"] = entities.venue_area
+        if getattr(entities, "venue_type", None):
+            data["venue_type"] = entities.venue_type
+    callback_ok = session.guided_step != GuidedStep.COLLECT_DETAILS or asked in {
+        "preferred_callback",
+        "callback_date",
+        "callback_time",
+        "callback_slot",
+        "callback_period",
+    }
+    if callback_ok:
+        if getattr(entities, "callback_date", None):
+            data["callback_date"] = entities.callback_date
+        if getattr(entities, "callback_time", None) and not getattr(entities, "callback_ambiguous_noon", False):
+            data["callback_time"] = entities.callback_time
+        if getattr(entities, "callback_phone", None):
+            data["callback_phone"] = entities.callback_phone
+            session.pending_callback_phone_confirm = False
+            session.pending_alt_callback_phone = False
+        elif getattr(entities, "uses_this_number", False):
+            session.pending_callback_phone_confirm = True
+            session.pending_alt_callback_phone = False
+        if getattr(entities, "callback_ambiguous_noon", False):
+            session.pending_ampm_hour = 12
 
-    # Home without area must not count as a finished venue.
-    if data.get("venue_type") == "home" and not data.get("venue_area"):
+    if venue_ok and data.get("venue_type") == "home" and not data.get("venue_area"):
         data["event_location"] = None
         loc_slot = session.slots.get("event_location")
         if loc_slot:
             loc_slot.collected = False
             loc_slot.value = None
-
-    if getattr(entities, "callback_ambiguous_noon", False):
-        session.pending_ampm_hour = 12
 
     if entities.special_requests and "special_requests" in allowed:
         notes = data.get("notes") or ""

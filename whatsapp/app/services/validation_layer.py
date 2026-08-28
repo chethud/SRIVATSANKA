@@ -217,7 +217,9 @@ def sync_conversation_state(session: ConversationSession) -> None:
     elif session.guided_step == GuidedStep.AWAIT_POST_SHOWCASE:
         session.conversation_state = ConversationState.NEW_BOOKING
     elif session.guided_step == GuidedStep.AWAIT_HI:
-        session.conversation_state = ConversationState.START
+        session.conversation_state = ConversationState.INITIAL_GREETING
+    elif session.guided_step in {GuidedStep.AWAIT_NAME, GuidedStep.AWAIT_NAME_CONFIRM}:
+        session.conversation_state = ConversationState.WAITING_FOR_NAME
     else:
         session.conversation_state = ConversationState.MAIN_MENU
     _stamp_session(session)

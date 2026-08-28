@@ -18,6 +18,7 @@ class EnquiryFields(BaseModel):
     notes: str | None = None
     meal_preference: str | None = None
     special_requirements: str | None = None
+    date_status: str | None = None  # confirmed | tentative
     venue_status: str | None = None  # fixed | not_fixed | unknown
     venue_name: str | None = None
     venue_area: str | None = None

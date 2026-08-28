@@ -331,9 +331,8 @@ def small_talk_reply(*, event_label: str | None = None) -> str:
 
 def greeting_ask_name() -> str:
     return (
-        "Namaste and welcome to Srivatsanka Events! 🙏\n\n"
-        "Let's create something beautiful for your celebration.\n\n"
-        "May I know your name?"
+        "Hi! Namaskara and welcome to Srivatsanka Events and Services. 🙏✨\n\n"
+        "Can I know your name?"
     )
 
 
@@ -342,13 +341,10 @@ def welcome_message() -> str:
 
 
 def name_confirm_prompt(name: str) -> str:
-    packed = _pack("state1_2.name_confirm", name=name)
-    if packed:
-        return packed
     who = (name or "").strip() or "that"
     return (
-        f"Just checking, is your name {who}?\n\n"
-        "Reply *Yes* to confirm, or *No* if I got it wrong."
+        f"Is it {who}?\n\n"
+        "Reply Yes to confirm, or No if I got it wrong."
     )
 
 
@@ -362,10 +358,7 @@ def name_confirmed_event_ask(name: str) -> str:
 
 
 def name_reask_prompt() -> str:
-    packed = _pack("state1_2.name_reask")
-    if packed:
-        return packed
-    return "No problem! Please type your name again."
+    return "No problem 😊 Could you please tell me your name?"
 
 
 def is_name_confirm_yes(text: str) -> bool:
@@ -649,8 +642,8 @@ def proceed_with_done_prompt() -> str:
 
 def invalid_event_date_clarify() -> str:
     return (
-        "I couldn't match that to a valid calendar date. "
-        "Could you please confirm the date or month you're considering for the event?"
+        "That doesn't appear to be a valid date. 😊\n\n"
+        "Please select a date from the options or provide a valid date."
     )
 
 
@@ -1183,31 +1176,22 @@ def detail_question(field_key: str, *, event_type: str | None = None) -> str:
         occasion = "celebration"
 
     if field_key == "event_date":
-        # Re-ask / mid-collection: date only (preamble already used leaving State 3).
         return ask_event_date_only(event_type=event_type)
+    if field_key == "date_status":
+        return "Is your event date confirmed, or is it still tentative?"
     if field_key == "guest_count":
         from app.services.guided_flow import get_event_profile
         profile = get_event_profile(event_type)
         return profile["pax_question"]
     if field_key == "event_location":
         packed = _pack("state4.ask_venue", event_type=event_type)
-        if packed:
+        if packed and packed.startswith("Is your venue"):
             return packed
-        return (
-            "Is your venue already fixed?"
-        )
+        return "Is your venue already fixed?"
     if field_key == "preferred_callback":
-        packed = _pack("state4.ask_callback", event_type=event_type)
-        if packed:
-            return packed
-        return (
-            "When would be a convenient time for our senior event planner to call you?"
-        )
+        return "When would you like our senior planner to call you?"
     if field_key == "meal_preference":
-        packed = _pack("state4.ask_meal", event_type=event_type)
-        if packed:
-            return packed
-        return "What kind of catering would you prefer?"
+        return "What type of catering would you prefer?"
     if field_key == "special_requirements":
         return "Do you have any special requirements or preferences for the event?"
     return "Could you share a bit more?"

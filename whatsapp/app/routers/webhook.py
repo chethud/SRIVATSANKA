@@ -1,3 +1,4 @@
+import hashlib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -70,6 +71,10 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
     message = messages[0]
     message_id = (message.get("id") or "").strip()
     from_number = message.get("from", "")
+    if not message_id:
+        stamp = str(message.get("timestamp") or "")
+        body = str(message.get("text") or message.get("interactive") or "")
+        message_id = "empty:" + hashlib.sha256(f"{from_number}|{stamp}|{body}".encode("utf-8")).hexdigest()[:32]
 
     if not await claim_inbound_message(db, message_id, from_number):
         return {"status": "duplicate"}

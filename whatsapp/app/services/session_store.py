@@ -15,6 +15,8 @@ class ConversationPhase(str, Enum):
 
 class ConversationState(str, Enum):
     START = "START"
+    INITIAL_GREETING = "INITIAL_GREETING"
+    WAITING_FOR_NAME = "WAITING_FOR_NAME"
     MAIN_MENU = "MAIN_MENU"
     NEW_BOOKING = "NEW_BOOKING"
     PAST_SETUPS = "PAST_SETUPS"
@@ -72,6 +74,7 @@ class ConversationSession:
     pending_name: str | None = None
     name_confirmed: bool = False
     pending_date_confirm: str | None = None
+    pending_event_month: str | None = None  # YYYY-MM while choosing a day
     pending_event_type_switch: str | None = None
     conversation_state: ConversationState = ConversationState.START
     last_user_message: str | None = None
@@ -81,6 +84,8 @@ class ConversationSession:
     pending_alt_callback_phone: bool = False
     special_req_done: bool = False
     awaiting_special_req_text: bool = False
+    callback_period: str | None = None
+    conversation_version: int = 0
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     slots: dict[str, SlotValue] = field(
         default_factory=lambda: {

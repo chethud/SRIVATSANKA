@@ -98,29 +98,56 @@ async def run() -> int:
     ):
         session_store.reset(phone)
         r, _ = await _turn(phone, "hlo kannan", db)
+        first = session_store.get(phone)
+        if first.fields.customer_name or first.pending_name:
+            fail("hlo kannan saved a customer name from the first message")
         if "kannan" in _low(r.reply) and ("confirm" in _low(r.reply) or "is it" in _low(r.reply) or "your name is" in _low(r.reply)):
             fail("hlo kannan asked to confirm Kannan as customer")
-        elif "name" not in _low(r.reply) and "speaking" not in _low(r.reply) and "who" not in _low(r.reply):
-            fail("hlo kannan did not ask for customer name")
+        elif "namaskara" not in _low(r.reply) or "name" not in _low(r.reply):
+            fail("hlo kannan did not send the fixed greeting")
         else:
             ok("hlo kannan → welcome, ask customer name")
         session_store.reset(phone)
+        r, _ = await _turn(phone, "I am Chetan", db)
+        chetan = session_store.get(phone)
+        if chetan.fields.customer_name or (chetan.pending_name or "").lower() == "chetan":
+            fail("first message 'I am Chetan' saved the name")
+        if "is it chetan" in _low(r.reply):
+            fail("first message asked to confirm Chetan")
+        if "namaskara" not in _low(r.reply):
+            fail("first message I am Chetan did not send fixed greeting")
+        else:
+            ok("first message I am Chetan ignored for name")
+        session_store.reset(phone)
 
         r, _ = await _turn(phone, "Hi", db)
-        if "welcome" not in _low(r.reply) and "name" not in _low(r.reply):
+        if "namaskara" not in _low(r.reply) or "name" not in _low(r.reply):
             fail("hi: missing welcome/name ask")
+        elif session_store.get(phone).fields.customer_name:
+            fail("hi saved a customer name")
         else:
             ok("hi → welcome")
 
         r, _ = await _turn(phone, "i am kariya", db)
+        after_name = session_store.get(phone)
+        if after_name.fields.customer_name:
+            fail("name saved before Yes confirmation")
+        if after_name.name_confirmed:
+            fail("name_confirmed before Yes")
         if "kariya" not in _low(r.reply):
             fail("name welcome missing Kariya")
-        elif "is your name" in _low(r.reply) or "just checking" in _low(r.reply):
-            fail("confident name still asked Yes/No")
-        elif "lovely to connect" not in _low(r.reply) and "what are you planning" not in _low(r.reply) and "select" not in _low(r.reply):
-            fail(f"after name, expected event-type list, got {r.reply!r}")
+        elif "is it kariya" not in _low(r.reply):
+            fail("did not ask to confirm Kariya")
         else:
-            ok("name accepted → event types")
+            ok("name captured → Yes/No confirm")
+
+        r, _ = await _turn(phone, "Yes", db)
+        if not session_store.get(phone).name_confirmed:
+            fail("Yes did not confirm the name")
+        elif "lovely to connect" not in _low(r.reply) and "what are you planning" not in _low(r.reply) and "select" not in _low(r.reply):
+            fail(f"after name Yes, expected event-type list, got {r.reply!r}")
+        else:
+            ok("name confirmed → event types")
 
         r, _ = await _turn(phone, "housewarming ceremony i am planning for around 30 people", db)
         if "know more" not in _low(r.reply) and "services and options" not in _low(r.reply) and "would you like" not in _low(r.reply):
@@ -163,7 +190,7 @@ async def run() -> int:
 
         session = session_store.get(phone)
         r, _ = await _turn(phone, "33 november 2026 is the tentative date", db)
-        if "valid calendar date" not in _low(r.reply):
+        if "valid date" not in _low(r.reply):
             fail("invalid date did not ask for clarification")
         if "start fresh" in _low(r.reply) or "tangled" in _low(r.reply):
             fail("invalid date restarted the conversation")
@@ -184,13 +211,14 @@ async def run() -> int:
         loc = session_store.get(phone).fields.event_location
         if loc:
             fail(f"stored fake location {loc!r}")
-        if "name and area" not in _low(r.reply):
-            fail("did not ask for venue name/area after fixed-without-name")
+        if "venue name" not in _low(r.reply) and "name and area" not in _low(r.reply):
+            fail("did not ask for venue name after fixed-without-name")
         if "noted down the location" in _low(r.reply):
             fail("echoed unusable venue text as confirmed")
         else:
             ok("venue_status=fixed, still asking for name/area")
 
+        r, _ = await _turn(phone, "ABC Gardens", db)
         r, _ = await _turn(phone, "HSR Layout, Bengaluru", db)
         if session_store.get(phone).fields.event_location is None:
             fail("real venue was not stored")
@@ -204,16 +232,17 @@ async def run() -> int:
             ok("cuisine stored")
 
         r, _ = await _turn(phone, "No", db)
+        if session_store.get(phone).last_asked_slot != "callback_date":
+            fail(f"No on special req did not move to callback_date, asked={session_store.get(phone).last_asked_slot}")
+        if "do you have any special requirements" in _low(r.reply):
+            fail("No on special req looped the same question")
         r, _ = await _turn(phone, "today evening would be great", db)
-        cb = session_store.get(phone).fields.preferred_callback
-        if cb and "would be great" in str(cb).lower():
-            fail(f"stored raw callback sentence: {cb!r}")
-        if cb != "this evening":
-            fail(f"callback expected this evening, got {cb!r}")
-        if "scheduled your callback for today evening would be great" in _low(r.reply):
-            fail("claimed a scheduled appointment from raw text")
+        if session_store.get(phone).fields.callback_date is None:
+            fail("today was not stored as callback date")
+        if "morning" not in _low(r.reply) and "time of day" not in _low(r.reply) and "afternoon" not in _low(r.reply):
+            fail("after callback date, expected time-of-day question")
         else:
-            ok("callback stored as this evening")
+            ok("callback date stored, asked time of day")
 
         # book again loop
         session = session_store.get(phone)
@@ -236,20 +265,29 @@ async def run() -> int:
 
         session_store.reset(phone)
         r, _ = await _turn(phone, "Hai sir", db)
-        if "hai sir" in _low(r.reply) or "is your name" in _low(r.reply) or "is it hai" in _low(r.reply):
+        if session_store.get(phone).fields.customer_name or session_store.get(phone).pending_name:
+            fail("Hai sir saved a customer name from the first message")
+        if "hai sir" in _low(r.reply) or "is it hai" in _low(r.reply):
             fail("Hai sir treated as a customer name")
-        elif "name" not in _low(r.reply) and "speaking" not in _low(r.reply) and "who" not in _low(r.reply):
+        elif "namaskara" not in _low(r.reply) or "name" not in _low(r.reply):
             fail("Hai sir did not ask for the customer name")
         else:
             ok("Hai sir → greeting, ask name")
 
         r, _ = await _turn(phone, "I am Sowmya", db)
+        if session_store.get(phone).fields.customer_name:
+            fail("Sowmya saved before Yes")
         if "sowmya" not in _low(r.reply):
             fail("Sowmya welcome missing")
-        elif "is your name" in _low(r.reply) or "just checking" in _low(r.reply):
-            fail("Sowmya still asked Yes/No")
+        elif "is it sowmya" not in _low(r.reply):
+            fail("Sowmya did not ask Yes/No")
         else:
-            ok("I am Sowmya → welcome + events")
+            ok("I am Sowmya → name confirm")
+        r, _ = await _turn(phone, "Yes", db)
+        if "lovely to connect" not in _low(r.reply) and "what are you planning" not in _low(r.reply):
+            fail("Yes after Sowmya did not open event selection")
+        else:
+            ok("Sowmya confirmed → events")
 
         r, _ = await _turn(phone, "Srimantha", db)
         if "celebration is this for" in _low(r.reply) and "seemantham" not in _low(r.reply) and "baby shower" not in _low(r.reply):
@@ -321,6 +359,44 @@ async def run() -> int:
             fail("phone number tripped restart")
         else:
             ok("phone number kept conversation state")
+
+        # Isolated: special requirements must never write venue_area.
+        session_store.reset("919900011122")
+        spec_phone = "919900011122"
+        sess = session_store.get(spec_phone)
+        sess.guided_step = GuidedStep.COLLECT_DETAILS
+        sess.name_confirmed = True
+        sess.fields = EnquiryFields(
+            customer_name="Test",
+            event_type="Wedding",
+            event_date="26 September 2026",
+            date_status="confirmed",
+            guest_count=500,
+            event_location="BTM Layout",
+            venue_area="BTM Layout",
+            venue_status="fixed",
+            meal_preference="To be discussed",
+        )
+        sess.last_asked_slot = "special_requirements_details"
+        sess.awaiting_special_req_text = True
+        r, _ = await _turn(spec_phone, "notjing", db)
+        spec_sess = session_store.get(spec_phone)
+        if (spec_sess.fields.venue_area or "").lower() == "notjing":
+            fail("notjing was saved as venue_area")
+        if spec_sess.fields.special_requirements is None:
+            fail("notjing was not saved as special requirements")
+        if spec_sess.last_asked_slot != "callback_date":
+            fail(f"notjing did not advance to callback_date, asked={spec_sess.last_asked_slot}")
+        if "special requirements" in _low(r.reply) and "don't have" not in _low(r.reply) and "do not have" not in _low(r.reply):
+            fail("notjing re-asked special requirements")
+        else:
+            ok("notjing in SPECIAL_REQUIREMENTS → none, not venue")
+
+        r, _ = await _turn(spec_phone, "No", db)
+        if session_store.get(spec_phone).last_asked_slot == "special_requirements":
+            fail("second No returned to SPECIAL_REQUIREMENTS")
+        else:
+            ok("No after requirements stays on callback")
 
     # Idempotency unit test with sqlite-like IntegrityError simulation
     from app.services.message_idempotency import claim_inbound_message

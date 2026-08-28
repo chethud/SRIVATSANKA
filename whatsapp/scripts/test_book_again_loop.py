@@ -98,7 +98,11 @@ async def run() -> int:
             failures.append("plan event: session marked completed")
         if session.guided_step != GuidedStep.COLLECT_DETAILS:
             failures.append(f"plan event: expected COLLECT_DETAILS, got {session.guided_step}")
-        if "tentative date" not in (result.reply or "").lower() and "date or month" not in (result.reply or "").lower():
+        if (
+            "tentative" not in (result.reply or "").lower()
+            and "date or month" not in (result.reply or "").lower()
+            and "event date" not in (result.reply or "").lower()
+        ):
             failures.append("plan event: did not ask the first event-detail date question")
 
         session.completed = True

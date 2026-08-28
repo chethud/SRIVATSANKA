@@ -120,20 +120,19 @@ def classify_message(text: str, session: ConversationSession) -> MessageKind:
         if len(words) <= 6 or not session.fields.event_type:
             return MessageKind.EVENT_TYPE
 
-    venue = parse_venue_reply(raw)
-    if venue.is_home:
-        return MessageKind.VENUE_HOME
-    if venue.status and not venue.location and not venue.is_home:
-        return MessageKind.VENUE_STATUS
-
     asked = session.last_asked_slot
-    collecting_venue = asked == "event_location" or (
-        venue_area_missing(session)
-        and asked in {None, "event_location", "preferred_callback"}
-        and bool(session.fields.venue_status or session.fields.venue_name or session.fields.venue_type)
-    )
-    if collecting_venue and (venue.location or looks_like_locality(raw)):
-        return MessageKind.VENUE_AREA
+    venue_slots = {"event_location", "venue_name", "venue_area"}
+    collecting_venue = asked in venue_slots
+    if session.guided_step == GuidedStep.COLLECT_DETAILS and not collecting_venue:
+        venue = None
+    else:
+        venue = parse_venue_reply(raw)
+        if collecting_venue and venue.is_home:
+            return MessageKind.VENUE_HOME
+        if collecting_venue and venue.status and not venue.location and not venue.is_home:
+            return MessageKind.VENUE_STATUS
+        if collecting_venue and (venue.location or looks_like_locality(raw)):
+            return MessageKind.VENUE_AREA
 
     lower = normalize_customer_text(raw)
     has_clock = bool(
@@ -186,9 +185,6 @@ def classify_message(text: str, session: ConversationSession) -> MessageKind:
 
     if "?" in raw or looks_like_info_request(raw):
         return MessageKind.GENERAL_QUESTION
-
-    if looks_like_locality(raw):
-        return MessageKind.VENUE_AREA
 
     return MessageKind.UNKNOWN
 

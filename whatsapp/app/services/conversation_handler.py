@@ -82,28 +82,29 @@ async def handle_conversation(
     if message_id:
         session.last_processed_message_id = message_id
 
-    if button_id == "book_again" or wants_book_again(user_text):
-        reply = soft_reset_session(session)
-        await resume_bot_for_phone(db, whatsapp_id)
-        sync_conversation_state(session)
-        return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
+    if session.guided_step != GuidedStep.AWAIT_HI:
+        if button_id == "book_again" or wants_book_again(user_text):
+            reply = soft_reset_session(session)
+            await resume_bot_for_phone(db, whatsapp_id)
+            sync_conversation_state(session)
+            return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
 
-    if is_reset_message(user_text) and button_id not in {"booking_cancel", "cancel_yes", "cancel_no"}:
-        reply = greeting_reset_reply(session)
-        await resume_bot_for_phone(db, whatsapp_id)
-        sync_conversation_state(session)
-        return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
+        if is_reset_message(user_text) and button_id not in {"booking_cancel", "cancel_yes", "cancel_no"}:
+            reply = greeting_reset_reply(session)
+            await resume_bot_for_phone(db, whatsapp_id)
+            sync_conversation_state(session)
+            return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
 
-    if is_cancel_message(user_text) and not button_id:
-        reply = cancel_to_main_menu(session)
-        await resume_bot_for_phone(db, whatsapp_id)
-        sync_conversation_state(session)
-        return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
+        if is_cancel_message(user_text) and not button_id:
+            reply = cancel_to_main_menu(session)
+            await resume_bot_for_phone(db, whatsapp_id)
+            sync_conversation_state(session)
+            return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
 
-    if is_help_message(user_text):
-        reply = help_options_reply()
-        sync_conversation_state(session)
-        return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
+        if is_help_message(user_text):
+            reply = help_options_reply()
+            sync_conversation_state(session)
+            return attach_session_ui(session, AgentTurnResult(reply=reply, fields=session.fields)), False
 
     if session.completed and session._saved and _is_fresh_booking_intent(user_text):
         # Resume a new booking from the current message (do not send the start-fresh copy).

@@ -24,7 +24,7 @@ from app.services.message_intent import (
     extract_phone_number,
     uses_this_whatsapp_number,
 )
-from app.services.session_store import ConversationSession
+from app.services.session_store import ConversationSession, GuidedStep
 
 
 RESET_WORDS = {"reset", "restart", "start over", "begin again"}
@@ -147,6 +147,8 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
     raw = (text or "").strip()
     lower = raw.lower()
     name = _sanitize_name(extract_name(raw) or None)
+    if session.guided_step == GuidedStep.AWAIT_HI:
+        name = None
     event_type = _extract_event(raw, name)
 
     entities = ExtractedEntities(
@@ -197,13 +199,23 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
     elif re.search(r"\bfor\s+\d+\b", lower) and looks_like_event_date(raw) and not callbackish:
         entities.guest_count = _extract_guest_count(raw)
 
-    if has_service_planning_intent(raw):
+    if has_service_planning_intent(raw) and session.last_asked_slot in {
+        "event_location",
+        "venue_name",
+        "venue_area",
+    }:
         entities.event_location = "Customer managed venue"
         if re.search(r"\b(catering|decor|decoration)\b", lower):
             entities.special_requests = raw
 
     venue = parse_venue_reply(raw)
-    if kind in {MessageKind.VENUE_HOME, MessageKind.VENUE_STATUS, MessageKind.VENUE_AREA} or venue.status or venue.location or venue.is_home:
+    asking_venue = session.last_asked_slot in {"event_location", "venue_name", "venue_area"}
+    if asking_venue and (
+        kind in {MessageKind.VENUE_HOME, MessageKind.VENUE_STATUS, MessageKind.VENUE_AREA}
+        or venue.status
+        or venue.location
+        or venue.is_home
+    ):
         if venue.status:
             entities.venue_status = venue.status
         if venue.is_home:
@@ -228,18 +240,13 @@ def extract_entities(text: str, session: ConversationSession) -> ExtractedEntiti
                 entities.event_location = loc
                 entities.venue_area = loc
 
-    meal = _extract_meal_from_text(raw)
-    if meal:
-        entities.meal_preference = meal
-    elif session.history:
-        history_text = " ".join(m["content"] for m in session.history if m["role"] == "user").lower()
-        if "dinner" in history_text:
-            entities.meal_preference = "Dinner, Dessert"
-        elif "lunch" in history_text:
-            entities.meal_preference = "Lunch"
-
-    if is_meal_type_answer(raw):
-        entities.meal_preference = normalize_meal_label(raw)
+    asking_meal = session.last_asked_slot == "meal_preference"
+    if asking_meal:
+        meal = _extract_meal_from_text(raw)
+        if meal:
+            entities.meal_preference = meal
+        if is_meal_type_answer(raw):
+            entities.meal_preference = normalize_meal_label(raw)
 
     parts = parse_callback_parts(raw)
     callback_kind = kind in {
