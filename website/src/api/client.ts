@@ -364,6 +364,7 @@ export async function checkApiHealth(): Promise<boolean> {
 }
 
 export const fetchStats = () => apiFetch<DashboardStats>('/api/stats');
+export const fetchEnquiries = () => apiFetch<Enquiry[]>('/api/enquiries');
 export async function retryOwnerNotification(enquiryId: string): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/retry-notification`, { method: 'POST' });
 }

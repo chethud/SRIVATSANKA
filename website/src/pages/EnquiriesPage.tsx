@@ -67,6 +67,7 @@ export default function EnquiriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [retryMsg, setRetryMsg] = useState('');
 
