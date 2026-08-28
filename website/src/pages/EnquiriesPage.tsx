@@ -7,7 +7,7 @@ import { useAppData } from '../context/AppDataContext';
 import { ErrorBanner, FilterChips, LoadingScreen } from '../components/ui';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { usePageSearch } from '../context/PageSearchContext';
-import { createEnquiry, updateEnquiryStatus, formatDate, formatDateTime } from '../api/client';
+import { createEnquiry, updateEnquiryStatus, retryOwnerNotification, formatDate, formatDateTime } from '../api/client';
 import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention';
 import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../utils/enquiryStatus';
 import { MONTH_FILTERS, matchesMonthFilter } from '../utils/monthFilter';
@@ -67,7 +67,8 @@ export default function EnquiriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryMsg, setRetryMsg] = useState('');
 
   useCreateActionListener('enquiry', () => setShowForm(true));
   usePageSearch('Search name, event, phone...', search, setSearch);
@@ -125,6 +126,24 @@ export default function EnquiriesPage() {
   async function changeStatus(id: string, status: string) {
     await updateEnquiryStatus(id, status);
     refresh();
+  }
+
+  async function retryAlert(id: string) {
+    setRetryingId(id);
+    setRetryMsg('');
+    try {
+      await retryOwnerNotification(id);
+      setRetryMsg('Owner alert sent.');
+      await refresh();
+    } catch (err) {
+      setRetryMsg(err instanceof Error ? err.message : 'Retry failed.');
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
+  function notificationFailed(enquiry: (typeof enquiries)[0]) {
+    return (enquiry.notificationStatus || '').toLowerCase() === 'failed';
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -277,6 +296,11 @@ export default function EnquiriesPage() {
                       <span className="text-xs font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
                       <span className="font-semibold text-[var(--foreground)] break-words">{e.customerName}</span>
                       {unread && <AttentionBadge />}
+                      {notificationFailed(e) && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600">
+                          Owner notification failed
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-[var(--muted)] mt-1 break-all">{e.phoneNumber}</p>
                     <p className="text-sm mt-2 text-[var(--foreground)]">{e.eventType}</p>
@@ -336,6 +360,11 @@ export default function EnquiriesPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium break-words">{e.customerName}</span>
                         {unread && <AttentionBadge />}
+                        {notificationFailed(e) && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600">
+                            Owner notification failed
+                          </span>
+                        )}
                       </div>
                       <div className="text-[var(--muted)] text-xs break-all">{e.phoneNumber}</div>
                       {unread && (
@@ -382,6 +411,9 @@ export default function EnquiriesPage() {
                         {detail.customerName}
                       </h2>
                       {isUnviewedEnquiry(detail) && <AttentionBadge />}
+                      {notificationFailed(detail) && (
+                        <span className="text-xs font-semibold text-red-600">Owner notification failed</span>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -421,8 +453,40 @@ export default function EnquiriesPage() {
                       </div>
                       <div>
                         <dt className="text-[var(--muted)]">Callback</dt>
-                        <dd className="break-words">{callbackDisplay(detail)}</dd>
+                        <dd className="break-words">
+                          {detail.callbackDate || callbackDisplay(detail)}
+                          {detail.callbackTime ? ` · ${detail.callbackTime}` : ''}
+                        </dd>
                       </div>
+                      <div>
+                        <dt className="text-[var(--muted)]">Owner WhatsApp alert</dt>
+                        <dd className="break-words">
+                          {(detail.notificationStatus || 'pending').toUpperCase()}
+                          {detail.notificationError ? ` — ${detail.notificationError}` : ''}
+                        </dd>
+                      </div>
+                      {notificationFailed(detail) && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+                          <p className="text-sm font-semibold text-red-700">Owner notification failed</p>
+                          <p className="text-xs text-red-800 break-words">
+                            Lead ID: {detail.id}
+                            <br />
+                            {detail.customerName} · {detail.phoneNumber}
+                            <br />
+                            {detail.eventType} · {formatDate(detail.eventDate)}
+                            <br />
+                            {detail.notificationError || 'WhatsApp provider error'}
+                          </p>
+                          <Button
+                            type="button"
+                            disabled={retryingId === detail.id}
+                            onClick={() => retryAlert(detail.id)}
+                          >
+                            {retryingId === detail.id ? 'Retrying…' : 'Retry owner alert'}
+                          </Button>
+                          {retryMsg && <p className="text-xs">{retryMsg}</p>}
+                        </div>
+                      )}
                       <div>
                         <dt className="text-[var(--muted)] mb-1">Status</dt>
                         <dd>

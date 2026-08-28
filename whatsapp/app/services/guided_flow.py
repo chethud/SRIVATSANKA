@@ -105,11 +105,20 @@ from app.services.callback_time import (
     normalize_callback_label,
     parse_callback_parts,
 )
-from app.services.entity_extractor import extract_entities
+from app.services.date_picker import (
+    EVENT_YEAR_HORIZON,
+    YEAR_PAGE_SIZE,
+    format_event_date,
+    parse_day_id,
+    parse_month_id,
+    parse_year_id,
+    valid_calendar_day,
+)
 from app.services.message_intent import (
     extract_phone_number,
     uses_this_whatsapp_number,
 )
+from app.services.entity_extractor import extract_entities
 from app.services.memory_manager import hydrate_memory
 from app.services.slot_manager import apply_entities, slot_collected
 from app.services.transition_engine import advance_from_slots, move_to
@@ -291,8 +300,14 @@ def _next_detail_prompt(session: ConversationSession) -> str | None:
     key = _next_detail_key(session)
     if not key:
         return None
-    if key == "event_date" and not session.fields.date_status:
-        return "Is your event date confirmed, or is it still tentative?"
+    if key == "event_date":
+        if not session.fields.date_status:
+            return "Is your event date confirmed, or is it still tentative?"
+        if not session.pending_event_year and not session.fields.event_year:
+            return "Which year is your event?"
+        if not session.pending_event_month and not session.fields.event_month:
+            return "Which month?"
+        return "Please select the event date."
     if key == "event_location" and (
         session.fields.venue_type == "home"
         or (session.fields.venue_status == "fixed" and not (session.fields.venue_area or session.fields.event_location))
@@ -313,6 +328,12 @@ def _next_detail_prompt(session: ConversationSession) -> str | None:
             return ask_alternative_callback_number()
         if session.pending_ampm_hour == 12:
             return confirm_noon_prompt()
+        if not session.fields.callback_date:
+            return "When would you like our senior planner to call you?"
+        if not (session.callback_period or session.fields.callback_time_period):
+            return "What time would be convenient for you? Morning, Afternoon, or Evening."
+        if not session.fields.callback_time:
+            return "What time would you prefer?"
         if session.fields.callback_date and not callback_has_usable_time(
             session.fields.preferred_callback,
             time_label=session.fields.callback_time,
@@ -461,7 +482,7 @@ def _booking_summary_text(session: ConversationSession) -> str:
         f"🍽️ Catering: {f.meal_preference or '—'}\n"
         f"✨ Special Requirements: {req}\n"
         f"📞 Planner Callback: {f.preferred_callback or '—'}\n\n"
-        "Would you like us to proceed?"
+        "Would you like to confirm these details?"
     )
 
 
@@ -469,10 +490,10 @@ def _finalize_booking_reply(session: ConversationSession, user_text: str) -> Age
     name = session.fields.customer_name or "there"
     move_to(session, GuidedStep.DONE)
     reply = (
-        "Thank you! ❤️\n\n"
-        "We've received your event requirements.\n\n"
-        "Our senior event planner will contact you at the requested time to discuss everything in detail.\n\n"
-        "We look forward to helping you create a beautiful celebration! ✨"
+        f"Thank you, {name}! 😊\n\n"
+        "We've received your event inquiry and noted all the details.\n\n"
+        "Our senior event planner will contact you at your selected callback time.\n\n"
+        "We look forward to helping you make your celebration special! ✨"
     )
     record_exchange(session, user_text, reply)
     return AgentTurnResult(
@@ -483,6 +504,25 @@ def _finalize_booking_reply(session: ConversationSession, user_text: str) -> Age
     )
 
 
+def _reask_current_slot(session: ConversationSession, user_text: str, asked: str) -> AgentTurnResult:
+    if asked in {"callback_date", "preferred_callback"} and not session.fields.callback_date:
+        reply = "When would you like our senior planner to call you?"
+        track_question(session, reply, slot_key="callback_date")
+    elif asked in {"callback_period", "preferred_callback"} and not (
+        session.callback_period or session.fields.callback_time_period
+    ):
+        reply = "What time would be convenient for you? Morning, Afternoon, or Evening."
+        track_question(session, reply, slot_key="callback_period")
+    elif asked in {"callback_slot", "callback_time"}:
+        reply = "What time would you prefer?"
+        track_question(session, reply, slot_key="callback_slot")
+    else:
+        reply = _next_detail_prompt(session) or "Please continue with the date selection."
+        track_question(session, reply, slot_key=asked)
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
 def _complete_enquiry_reply(
     session: ConversationSession,
     whatsapp_id: str,
@@ -490,6 +530,15 @@ def _complete_enquiry_reply(
     *,
     lead: str | None = None,
 ) -> AgentTurnResult:
+    asked = session.last_asked_slot
+    if asked in {
+        "event_year",
+        "event_month",
+        "event_day",
+        "event_date_confirm",
+        "date_status",
+    }:
+        return _reask_current_slot(session, user_text, asked)
     _fill_pending_for_callback(session)
     if not _details_complete(session):
         key = _next_detail_key(session) or session.last_asked_slot
@@ -1005,9 +1054,144 @@ def _ist_today():
     return datetime.now(ZoneInfo("Asia/Kolkata")).date()
 
 
+def _reset_date_picker(session: ConversationSession) -> None:
+    session.pending_event_year = None
+    session.pending_event_month = None
+    session.pending_event_day = None
+    session.year_list_offset = 0
+    session.month_list_page = 0
+    session.day_list_page = 0
+    session.pending_date_confirm = None
+
+
+def _ask_event_year(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    tentative = session.fields.date_status == "tentative"
+    reply = (
+        "Which year are you considering for the event?"
+        if tentative
+        else "Which year is your event?"
+    )
+    track_question(session, reply, slot_key="event_year")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _ask_event_month(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    tentative = session.fields.date_status == "tentative"
+    reply = "Which month are you considering?" if tentative else "Which month?"
+    track_question(session, reply, slot_key="event_month")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _ask_event_day(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    from calendar import month_name
+
+    year = int(session.pending_event_year or 0)
+    month = int(str(session.pending_event_month or "0").split("-")[-1] or 0)
+    reply = f"Please select the event date in {month_name[month]} {year}."
+    track_question(session, reply, slot_key="event_day")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _ask_confirm_event_date(
+    session: ConversationSession,
+    user_text: str,
+    *,
+    year: int,
+    month: int,
+    day: int,
+) -> AgentTurnResult:
+    label = format_event_date(year, month, day)
+    session.pending_event_year = year
+    session.pending_event_month = f"{year:04d}-{month:02d}"
+    session.pending_event_day = day
+    session.fields = EnquiryFields(
+        **{
+            **session.fields.model_dump(),
+            "event_year": year,
+            "event_month": month,
+            "event_date": label,
+        }
+    )
+    reply = f"Just to confirm, your event date is {label}."
+    track_question(session, reply, slot_key="event_date_confirm")
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _continue_after_event_date(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    next_prompt = _next_detail_prompt(session)
+    label = session.fields.event_date
+    reply = f"Perfect. I've noted {label}."
+    if next_prompt:
+        reply = f"{reply}\n\n{next_prompt}"
+    track_question(session, reply, slot_key=_next_detail_key(session))
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
+def _callback_time_from_text(text: str, *, period: str | None = None) -> str | None:
+    raw = re.sub(r"\s+", " ", (text or "").strip())
+    if not raw:
+        return None
+    compact = raw.lower().replace(".", "")
+    if re.fullmatch(r"\d{1,2}", raw):
+        hour = int(raw)
+        if hour == 12:
+            return "12 PM"
+        if 13 <= hour <= 23:
+            return f"{hour - 12} PM"
+        if 1 <= hour <= 11:
+            if (period or "").lower() == "morning":
+                return f"{hour} AM"
+            return f"{hour} PM"
+        return None
+    from app.services.callback_time import parse_callback_parts
+
+    parts = parse_callback_parts(raw)
+    if parts.time_label:
+        return parts.time_label
+    if re.search(r"\b\d{1,2}\s*(am|pm)\b", compact):
+        return raw.upper().replace("AM", "AM").replace("PM", "PM")
+    return None
+
+
+def _finish_callback(
+    session: ConversationSession,
+    whatsapp_id: str,
+    user_text: str,
+    time_label: str,
+) -> AgentTurnResult:
+    date_label = session.fields.callback_date or "the selected day"
+    period = session.callback_period or session.fields.callback_time_period
+    composed = compose_callback_label(date_label=date_label, time_label=time_label) or time_label
+    phone = normalize_phone(session.fields.callback_phone or session.fields.phone_number or whatsapp_id)
+    session.fields = EnquiryFields(
+        **{
+            **session.fields.model_dump(),
+            "callback_time": time_label,
+            "callback_time_period": period,
+            "preferred_callback": composed,
+            "phone_number": session.fields.phone_number or phone,
+        }
+    )
+    move_to(session, GuidedStep.AWAIT_BOOKING_CONFIRM)
+    reply = (
+        "Perfect! We've noted your preferred callback time. 😊\n\n"
+        f"📅 Callback: {date_label}\n"
+        f"⏰ Time: {time_label}\n\n"
+        "Our senior event planner will call you on this number.\n\n"
+        "Would you like to confirm these details?"
+    )
+    track_question(session, reply)
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
 def _set_callback_date_and_ask_period(session: ConversationSession, user_text: str, day) -> AgentTurnResult:
-    iso = day.isoformat() if hasattr(day, "isoformat") else str(day)
-    pretty = day.strftime("%d %B %Y") if hasattr(day, "strftime") else iso
+    pretty = day.strftime("%d %B %Y") if hasattr(day, "strftime") else str(day)
     session.fields = EnquiryFields(
         **{
             **session.fields.model_dump(),
@@ -1015,7 +1199,7 @@ def _set_callback_date_and_ask_period(session: ConversationSession, user_text: s
         }
     )
     session.callback_period = None
-    reply = "What time of day works best?"
+    reply = "What time would be convenient for you? Morning, Afternoon, or Evening."
     track_question(session, reply, slot_key="callback_period")
     record_exchange(session, user_text, reply)
     return AgentTurnResult(reply=reply, fields=session.fields)
@@ -1027,16 +1211,228 @@ def _lock_callback_slot(
     user_text: str,
     slot_label: str,
 ) -> AgentTurnResult:
-    date_label = session.fields.callback_date
-    composed = compose_callback_label(date_label=date_label, time_label=slot_label) or slot_label
-    session.fields = EnquiryFields(
-        **{
-            **session.fields.model_dump(),
-            "callback_time": slot_label,
-            "preferred_callback": composed,
-        }
-    )
-    return _complete_enquiry_reply(session, whatsapp_id, user_text)
+    return _finish_callback(session, whatsapp_id, user_text, slot_label)
+
+
+def _is_full_event_date_phrase(text: str) -> bool:
+    """True only for day+month (and optional year), never a bare year or day number."""
+    raw = (text or "").strip()
+    if not raw or re.fullmatch(r"20\d{2}", raw) or re.fullmatch(r"\d{1,2}", raw):
+        return False
+    if not looks_like_event_date(raw):
+        return False
+    if re.search(r"\b\d{1,2}[./\-]\d{1,2}(?:[./\-]\d{2,4})?\b", raw):
+        return True
+    from app.services.event_date import MONTHS
+
+    low = raw.lower()
+    has_month = any(re.search(rf"\b{re.escape(name)}\b", low) for name in MONTHS)
+    has_day = bool(re.search(r"\b\d{1,2}(st|nd|rd|th)?\b", low))
+    return bool(has_month and has_day)
+
+
+def _ymd_from_text(text: str) -> tuple[int, int, int] | None:
+    from app.services.event_date import parse_event_date
+
+    raw = (text or "").strip()
+    if not raw or is_impossible_calendar_date(raw):
+        return None
+    try:
+        parsed = parse_event_date(raw)
+    except Exception:
+        return None
+    if not parsed:
+        return None
+    return parsed.year, parsed.month, parsed.day
+
+
+def _parse_picker_or_nl_date(session: ConversationSession, text: str) -> AgentTurnResult | None:
+    ymd = _ymd_from_text(text)
+    if not ymd:
+        return None
+    year, month, day = ymd
+    if not valid_calendar_day(year, month, day):
+        return None
+    if not session.fields.date_status:
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "date_status": "tentative"})
+    return _ask_confirm_event_date(session, text, year=year, month=month, day=day)
+
+
+async def _handle_event_date_turn(
+    session: ConversationSession,
+    whatsapp_id: str,
+    text: str,
+    asked: str,
+) -> AgentTurnResult | None:
+    from calendar import month_name as cal_month_name
+
+    if asked == "event_date_confirm":
+        if is_name_confirm_yes(text) or text.lower().strip() in {"confirm", "ok", "okay"}:
+            return _continue_after_event_date(session, text)
+        if is_name_confirm_no(text) or "change" in text.lower():
+            data = session.fields.model_dump()
+            data["event_date"] = None
+            data["event_year"] = None
+            data["event_month"] = None
+            session.fields = EnquiryFields(**data)
+            _reset_date_picker(session)
+            return _ask_event_year(session, text)
+        return _ask_confirm_event_date(
+            session,
+            text,
+            year=int(session.pending_event_year or session.fields.event_year or 0),
+            month=int(session.fields.event_month or str(session.pending_event_month or "0").split("-")[-1] or 0),
+            day=int(session.pending_event_day or 1),
+        )
+
+    nl = None
+    if _is_full_event_date_phrase(text):
+        nl = _parse_picker_or_nl_date(session, text)
+        if nl is not None:
+            return nl
+
+    if asked == "event_year":
+        if re.fullmatch(r"20\d{2}", text.strip()):
+            year = int(text.strip())
+            current = _ist_today().year
+            if current <= year <= current + EVENT_YEAR_HORIZON:
+                session.pending_event_year = year
+                session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_year": year})
+                if session.fields.event_month:
+                    session.pending_event_month = f"{year:04d}-{int(session.fields.event_month):02d}"
+                    session.day_list_page = 0
+                    return _ask_event_day(session, text)
+                return _ask_event_month(session, text)
+        reply = "Please select a year from the list."
+        track_question(session, reply, slot_key="event_year")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if asked == "event_month":
+        low = text.strip().lower()
+        from app.services.event_date import MONTHS
+
+        month = MONTHS.get(low) or MONTHS.get(low[:3])
+        if month and session.pending_event_year:
+            year = int(session.pending_event_year)
+            session.pending_event_month = f"{year:04d}-{int(month):02d}"
+            session.fields = EnquiryFields(
+                **{**session.fields.model_dump(), "event_year": year, "event_month": int(month)}
+            )
+            session.day_list_page = 0
+            return _ask_event_day(session, text)
+        reply = "Please select a month from the list."
+        track_question(session, reply, slot_key="event_month")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if asked == "event_day":
+        if re.fullmatch(r"\d{1,2}", text.strip()):
+            day = int(text.strip())
+            year = int(session.pending_event_year or 0)
+            month = int(str(session.pending_event_month or "0").split("-")[-1] or 0)
+            if valid_calendar_day(year, month, day):
+                return _ask_confirm_event_date(session, text, year=year, month=month, day=day)
+            reply = invalid_event_date_clarify()
+            track_question(session, reply, slot_key="event_day")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+        reply = f"Please select a date in {cal_month_name[int(str(session.pending_event_month or '1').split('-')[-1] or 1)]}."
+        track_question(session, reply, slot_key="event_day")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if asked == "event_date":
+        if not session.pending_event_year:
+            return _ask_event_year(session, text)
+        if not session.pending_event_month:
+            return _ask_event_month(session, text)
+        return _ask_event_day(session, text)
+    return None
+
+
+async def _handle_callback_turn(
+    session: ConversationSession,
+    whatsapp_id: str,
+    text: str,
+    asked: str,
+) -> AgentTurnResult:
+    raw = (text or "").strip()
+    low = raw.lower()
+    slot = asked
+    if asked == "preferred_callback":
+        slot = "callback_date" if not session.fields.callback_date else (
+            "callback_period" if not session.callback_period else "callback_slot"
+        )
+
+    if uses_this_whatsapp_number(text) or "this number" in low:
+        parts = parse_callback_parts(text)
+        if parts.ambiguous_noon:
+            session.pending_ampm_hour = 12
+        session.pending_callback_phone_confirm = True
+        reply = confirm_callback_number_prompt(
+            whatsapp_id=whatsapp_id, name=session.fields.customer_name
+        )
+        if session.pending_ampm_hour == 12:
+            reply = f"{confirm_noon_prompt()} {reply}"
+        track_question(session, reply, slot_key=slot)
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if slot == "callback_date":
+        if session.fields.callback_date:
+            reply = "What time would be convenient for you? Morning, Afternoon, or Evening."
+            track_question(session, reply, slot_key="callback_period")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+        if "today" in low:
+            return await _handle_stable_button(session, whatsapp_id, text, "callback_today")
+        if "tomorrow" in low or "tommorow" in low:
+            return await _handle_stable_button(session, whatsapp_id, text, "callback_tomorrow")
+        if looks_like_event_date(text) and not is_impossible_calendar_date(text):
+            ymd = _ymd_from_text(text)
+            if ymd:
+                from datetime import date as date_cls
+
+                return _set_callback_date_and_ask_period(session, text, date_cls(ymd[0], ymd[1], ymd[2]))
+            snippet = extract_date_snippet(text) or text.strip()
+            return _set_callback_date_and_ask_period(session, text, snippet)
+        reply = "When would you like our senior planner to call you?"
+        track_question(session, reply, slot_key="callback_date")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if slot == "callback_period":
+        for cid, period in CALLBACK_ID_TO_LABEL.items():
+            if period in low and "callback_" not in low:
+                return await _handle_stable_button(session, whatsapp_id, text, cid)
+        if "exact" in low:
+            return await _handle_stable_button(session, whatsapp_id, text, "callback_exact_time")
+        if not re.fullmatch(r"\d{1,2}", raw):
+            typed = _callback_time_from_text(text, period=session.callback_period)
+            if typed:
+                return _finish_callback(session, whatsapp_id, text, typed)
+        reply = "What time would be convenient for you? Morning, Afternoon, or Evening."
+        track_question(session, reply, slot_key="callback_period")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    if slot in {"callback_slot", "callback_time"}:
+        for cid, label in CALLBACK_SLOT_IDS.items():
+            if label.lower().replace("–", "-") in low.replace("–", "-"):
+                return await _handle_stable_button(session, whatsapp_id, text, cid)
+        typed = _callback_time_from_text(text, period=session.callback_period)
+        if typed:
+            return _finish_callback(session, whatsapp_id, text, typed)
+        reply = "What time would you prefer?"
+        track_question(session, reply, slot_key="callback_slot")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+
+    reply = "When would you like our senior planner to call you?"
+    track_question(session, reply, slot_key="callback_date")
+    record_exchange(session, text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
 
 
 def _offer_info_yes_no(session: ConversationSession, user_text: str) -> AgentTurnResult:
@@ -1153,39 +1549,81 @@ async def _handle_stable_button(
         return _advance_after_special_requirements(session, text, stored="None")
     if bid == "date_confirmed":
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "date_status": "confirmed"})
-        session.pending_event_month = None
-        reply = "Please select the month of your event."
-        track_question(session, reply, slot_key="event_date")
-        record_exchange(session, text, reply)
-        return AgentTurnResult(reply=reply, fields=session.fields)
+        _reset_date_picker(session)
+        return _ask_event_year(session, text)
     if bid == "date_tentative":
         session.fields = EnquiryFields(**{**session.fields.model_dump(), "date_status": "tentative"})
-        session.pending_event_month = None
-        reply = "What month are you considering for the event?"
-        track_question(session, reply, slot_key="event_date")
-        record_exchange(session, text, reply)
-        return AgentTurnResult(reply=reply, fields=session.fields)
+        _reset_date_picker(session)
+        return _ask_event_year(session, text)
+    if bid == "event_year_more":
+        session.year_list_offset = int(session.year_list_offset or 0) + YEAR_PAGE_SIZE
+        return _ask_event_year(session, text)
+    year_picked = parse_year_id(bid)
+    if year_picked is not None:
+        session.pending_event_year = year_picked
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_year": year_picked})
+        session.month_list_page = 0
+        if session.fields.event_month:
+            session.pending_event_month = f"{year_picked:04d}-{int(session.fields.event_month):02d}"
+            session.day_list_page = 0
+            return _ask_event_day(session, text)
+        return _ask_event_month(session, text)
+    if bid == "cal_month_more":
+        session.month_list_page = 1
+        return _ask_event_month(session, text)
+    month_picked = parse_month_id(bid)
+    if month_picked is not None:
+        year = int(session.pending_event_year or 0)
+        if bid.startswith("month_") and bid.count("_") == 2:
+            try:
+                year = int(bid.split("_")[1])
+                session.pending_event_year = year
+            except ValueError:
+                pass
+        if not year:
+            return _ask_event_year(session, text)
+        session.pending_event_month = f"{year:04d}-{month_picked:02d}"
+        session.fields = EnquiryFields(**{**session.fields.model_dump(), "event_year": year, "event_month": month_picked})
+        session.day_list_page = 0
+        return _ask_event_day(session, text)
+    if bid == "event_day_more":
+        session.day_list_page = int(session.day_list_page or 0) + 1
+        return _ask_event_day(session, text)
+    day_picked = parse_day_id(bid) if bid.startswith("event_day_") else None
+    if day_picked is not None:
+        year = int(session.pending_event_year or 0)
+        month = int(str(session.pending_event_month or "0").split("-")[-1] or 0)
+        if not valid_calendar_day(year, month, day_picked):
+            reply = invalid_event_date_clarify()
+            track_question(session, reply, slot_key="event_day")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
+        return _ask_confirm_event_date(session, text, year=year, month=month, day=day_picked)
+    if bid == "event_date_confirm":
+        return _continue_after_event_date(session, text)
+    if bid == "event_date_change":
+        data = session.fields.model_dump()
+        data["event_date"] = None
+        data["event_year"] = None
+        data["event_month"] = None
+        session.fields = EnquiryFields(**data)
+        _reset_date_picker(session)
+        return _ask_event_year(session, text)
     if bid.startswith("month_") and bid != "month_other":
-        try:
-            _, year_s, month_s = bid.split("_")
-            session.pending_event_month = f"{int(year_s):04d}-{int(month_s):02d}"
-        except ValueError:
-            session.pending_event_month = None
-        from calendar import month_name
-
-        label = text
-        if session.pending_event_month:
-            y, m = session.pending_event_month.split("-")
-            label = f"{month_name[int(m)]} {y}"
-        reply = f"{label}\n\nPlease select or send your event date."
-        track_question(session, reply, slot_key="event_date")
-        record_exchange(session, text, reply)
-        return AgentTurnResult(reply=reply, fields=session.fields)
+        month_picked = parse_month_id(bid)
+        if month_picked:
+            try:
+                year = int(bid.split("_")[1])
+            except (IndexError, ValueError):
+                year = int(session.pending_event_year or 0)
+            if not year:
+                return _ask_event_year(session, text)
+            session.pending_event_year = year
+            session.pending_event_month = f"{year:04d}-{month_picked:02d}"
+            session.day_list_page = 0
+            return _ask_event_day(session, text)
     if bid == "month_other":
-        reply = "Please tell us the month and year you're considering."
-        track_question(session, reply, slot_key="event_date")
-        record_exchange(session, text, reply)
-        return AgentTurnResult(reply=reply, fields=session.fields)
+        return _ask_event_year(session, text)
     if bid == "callback_today":
         return _set_callback_date_and_ask_period(session, text, _ist_today())
     if bid == "callback_tomorrow":
@@ -1197,6 +1635,9 @@ async def _handle_stable_button(
         return AgentTurnResult(reply=reply, fields=session.fields)
     if bid in CALLBACK_ID_TO_LABEL:
         session.callback_period = CALLBACK_ID_TO_LABEL[bid]
+        session.fields = EnquiryFields(
+            **{**session.fields.model_dump(), "callback_time_period": session.callback_period}
+        )
         reply = "What time would you prefer?"
         track_question(session, reply, slot_key="callback_slot")
         record_exchange(session, text, reply)
@@ -1204,9 +1645,24 @@ async def _handle_stable_button(
     if bid in CALLBACK_SLOT_IDS:
         slot_label = CALLBACK_SLOT_IDS[bid]
         return _lock_callback_slot(session, whatsapp_id, text, slot_label)
-    if bid == "callback_exact":
+    if bid in {"callback_exact", "callback_exact_time"}:
+        if session.last_asked_slot == "callback_period" or not session.callback_period:
+            session.callback_period = "exact"
         reply = "Please send the exact time (for example 10:30 AM)."
         track_question(session, reply, slot_key="callback_time")
+        record_exchange(session, text, reply)
+        return AgentTurnResult(reply=reply, fields=session.fields)
+    if bid == "callback_change":
+        data = session.fields.model_dump()
+        data["callback_date"] = None
+        data["callback_time"] = None
+        data["callback_time_period"] = None
+        data["preferred_callback"] = None
+        session.fields = EnquiryFields(**data)
+        session.callback_period = None
+        move_to(session, GuidedStep.COLLECT_DETAILS, force=True)
+        reply = "When would you like our senior planner to call you?"
+        track_question(session, reply, slot_key="callback_date")
         record_exchange(session, text, reply)
         return AgentTurnResult(reply=reply, fields=session.fields)
     if bid == "callback_other":
@@ -1483,7 +1939,12 @@ async def process_guided_flow(
         "callback_period",
         "callback_slot",
         "callback_time",
+        "preferred_callback",
         "venue_name",
+        "event_year",
+        "event_month",
+        "event_day",
+        "event_date_confirm",
     }:
         newly_collected = []
     else:
@@ -1516,6 +1977,8 @@ async def process_guided_flow(
         low = text.strip().lower()
         if is_name_confirm_yes(text) or low in {"confirm", "proceed", "ok confirm"}:
             return _finalize_booking_reply(session, text)
+        if "change callback" in low:
+            return await _handle_stable_button(session, whatsapp_id, text, "callback_change")
         if "edit" in low:
             return await _handle_stable_button(session, whatsapp_id, text, "booking_edit")
         if is_cancel_message(text) or low in {"cancel"}:
@@ -1936,33 +2399,42 @@ async def process_guided_flow(
                 track_question(session, reply, slot_key="date_status")
                 record_exchange(session, text, reply)
                 return AgentTurnResult(reply=reply, fields=session.fields)
-            if not looks_like_event_date(text):
+            if looks_like_event_date(text) and _is_full_event_date_phrase(text) and not is_impossible_calendar_date(text):
+                parsed = _parse_picker_or_nl_date(session, text)
+                if parsed:
+                    return parsed
+            if not looks_like_event_date(text) or not _is_full_event_date_phrase(text):
                 low = text.lower()
                 if "tentat" in low:
                     return await _handle_stable_button(session, whatsapp_id, text, "date_tentative")
-                if "confirm" in low:
+                if "confirm" in low or is_name_confirm_yes(text):
                     return await _handle_stable_button(session, whatsapp_id, text, "date_confirmed")
+                from app.services.event_date import MONTHS as _MONTHS
 
-        if asked == "callback_date":
-            low = text.lower()
-            if "today" in low:
-                return await _handle_stable_button(session, whatsapp_id, text, "callback_today")
-            if "tomorrow" in low or "tommorow" in low:
-                return await _handle_stable_button(session, whatsapp_id, text, "callback_tomorrow")
-            if looks_like_event_date(text) and not is_impossible_calendar_date(text):
-                snippet = extract_date_snippet(text) or text.strip()
-                return _set_callback_date_and_ask_period(session, text, snippet)
+                month_only = _MONTHS.get(text.strip().lower()) or _MONTHS.get(text.strip().lower()[:3])
+                if month_only and re.fullmatch(r"[A-Za-z]+", text.strip()):
+                    session.fields = EnquiryFields(
+                        **{
+                            **session.fields.model_dump(),
+                            "date_status": session.fields.date_status or "tentative",
+                            "event_month": int(month_only),
+                        }
+                    )
+                    return _ask_event_year(session, text)
+            reply = "Is your event date confirmed, or is it still tentative?"
+            track_question(session, reply, slot_key="date_status")
+            record_exchange(session, text, reply)
+            return AgentTurnResult(reply=reply, fields=session.fields)
 
-        if asked in {"callback_period", "callback_slot"} or (
-            asked == "preferred_callback" and session.fields.callback_date
+        if asked in {"event_year", "event_month", "event_day", "event_date_confirm", "event_date"}:
+            handled_date = await _handle_event_date_turn(session, whatsapp_id, text, asked)
+            if handled_date is not None:
+                return handled_date
+
+        if asked in {"callback_date", "callback_period", "callback_slot", "callback_time"} or (
+            asked == "preferred_callback"
         ):
-            low = text.lower()
-            for cid, period in CALLBACK_ID_TO_LABEL.items():
-                if period in low:
-                    return await _handle_stable_button(session, whatsapp_id, text, cid)
-            for cid, label in CALLBACK_SLOT_IDS.items():
-                if label.lower().replace("–", "-") in low.replace("–", "-"):
-                    return await _handle_stable_button(session, whatsapp_id, text, cid)
+            return await _handle_callback_turn(session, whatsapp_id, text, asked)
 
         if asked == "venue_name":
             name = text.strip()[:160]
@@ -2006,12 +2478,6 @@ async def process_guided_flow(
             for cid, label in CUISINE_ID_TO_VALUE.items():
                 if low == label.lower() or label.lower() in low:
                     return await _handle_stable_button(session, whatsapp_id, text, cid)
-        if asked in {"preferred_callback", "callback_date"} and not session.fields.callback_date:
-            low = text.lower()
-            if "today" in low:
-                return await _handle_stable_button(session, whatsapp_id, text, "callback_today")
-            if "tomorrow" in low or "tommorow" in low:
-                return await _handle_stable_button(session, whatsapp_id, text, "callback_tomorrow")
 
         if is_information_done_command(text):
             prompt = _next_detail_prompt(session) or ask_event_date_only(
@@ -2247,7 +2713,7 @@ async def process_guided_flow(
             expected = "event_location"
         elif expected in {"callback_date", "callback_period", "callback_slot", "callback_time"}:
             expected = "preferred_callback"
-        elif expected == "date_status":
+        elif expected in {"event_year", "event_month", "event_day", "event_date_confirm", "date_status"}:
             expected = "event_date"
         elif expected == "special_requirements_details":
             expected = "special_requirements"

@@ -65,11 +65,17 @@ CALLBACK_ID_TO_LABEL = {
 
 CALLBACK_SLOT_IDS = {
     "callback_slot_8_10": "8 AM – 10 AM",
+    "callback_morning_8_10": "8 AM – 10 AM",
     "callback_slot_10_12": "10 AM – 12 PM",
+    "callback_morning_10_12": "10 AM – 12 PM",
     "callback_slot_12_2": "12 PM – 2 PM",
+    "callback_afternoon_12_2": "12 PM – 2 PM",
     "callback_slot_2_4": "2 PM – 4 PM",
+    "callback_afternoon_2_4": "2 PM – 4 PM",
     "callback_slot_4_6": "4 PM – 6 PM",
+    "callback_evening_4_6": "4 PM – 6 PM",
     "callback_slot_6_8": "6 PM – 8 PM",
+    "callback_evening_6_8": "6 PM – 8 PM",
 }
 
 EDIT_ROWS = (
@@ -209,28 +215,57 @@ def date_status_buttons() -> InteractiveSpec:
     )
 
 
-def event_month_list(*, tentative: bool) -> InteractiveSpec:
-    from calendar import month_name
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
-    start = datetime.now(ZoneInfo("Asia/Kolkata")).date().replace(day=1)
-    rows = []
-    year, month = start.year, start.month
-    for _ in range(5):
-        label = f"{month_name[month]} {year}"
-        rows.append((f"month_{year}_{month:02d}", label[:24], ""))
-        month += 1
-        if month > 12:
-            month = 1
-            year += 1
-    rows.append(("month_other", "Other Month", ""))
-    body = (
-        "What month are you considering for the event?"
-        if tentative
-        else "Please select the month of your event."
+def event_date_confirm_buttons(label: str) -> InteractiveSpec:
+    return buttons(
+        f"Just to confirm, your event date is {label}.",
+        [("event_date_confirm", "Confirm"), ("event_date_change", "Change Date")],
     )
-    return option_list(body, rows, list_button="Select month", section_title="MONTH")
+
+
+def event_year_list(*, offset: int = 0, tentative: bool = False) -> InteractiveSpec:
+    from app.services.date_picker import year_list_rows
+
+    body = (
+        "Which year are you considering for the event?"
+        if tentative
+        else "Which year is your event?"
+    )
+    return option_list(
+        body,
+        year_list_rows(offset=offset),
+        list_button="Select year",
+        section_title="YEAR",
+    )
+
+
+def event_month_list(*, tentative: bool = False, page: int = 0) -> InteractiveSpec:
+    from app.services.date_picker import month_list_rows
+
+    body = (
+        "Which month are you considering?"
+        if tentative
+        else "Which month?"
+    )
+    return option_list(
+        body,
+        month_list_rows(page=page),
+        list_button="Select month",
+        section_title="MONTH",
+    )
+
+
+def event_day_list(*, year: int, month: int, page: int = 0) -> InteractiveSpec:
+    from calendar import month_name
+
+    from app.services.date_picker import day_list_rows
+
+    body = f"Please select the event date in {month_name[month]} {year}."
+    return option_list(
+        body,
+        day_list_rows(year=year, month=month, page=page),
+        list_button="Select date",
+        section_title="DATE",
+    )
 
 
 def callback_day_buttons() -> InteractiveSpec:
@@ -245,13 +280,16 @@ def callback_day_buttons() -> InteractiveSpec:
 
 
 def callback_period_buttons() -> InteractiveSpec:
-    return buttons(
-        "What time of day works best?",
-        [
-            ("callback_morning", "Morning"),
-            ("callback_afternoon", "Afternoon"),
-            ("callback_evening", "Evening"),
-        ],
+    return option_list(
+        "What time would be convenient for you?",
+        (
+            ("callback_morning", "Morning", ""),
+            ("callback_afternoon", "Afternoon", ""),
+            ("callback_evening", "Evening", ""),
+            ("callback_exact_time", "Choose Exact Time", ""),
+        ),
+        list_button="Select time",
+        section_title="TIME OF DAY",
     )
 
 
@@ -259,21 +297,21 @@ def callback_slot_buttons(period: str) -> InteractiveSpec:
     period = (period or "").lower()
     if period == "afternoon":
         pairs = [
-            ("callback_slot_12_2", "12 PM – 2 PM"),
-            ("callback_slot_2_4", "2 PM – 4 PM"),
-            ("callback_exact", "Choose Exact Time"),
+            ("callback_afternoon_12_2", "12 PM – 2 PM"),
+            ("callback_afternoon_2_4", "2 PM – 4 PM"),
+            ("callback_exact_time", "Choose Exact Time"),
         ]
     elif period == "evening":
         pairs = [
-            ("callback_slot_4_6", "4 PM – 6 PM"),
-            ("callback_slot_6_8", "6 PM – 8 PM"),
-            ("callback_exact", "Choose Exact Time"),
+            ("callback_evening_4_6", "4 PM – 6 PM"),
+            ("callback_evening_6_8", "6 PM – 8 PM"),
+            ("callback_exact_time", "Choose Exact Time"),
         ]
     else:
         pairs = [
-            ("callback_slot_8_10", "8 AM – 10 AM"),
-            ("callback_slot_10_12", "10 AM – 12 PM"),
-            ("callback_exact", "Choose Exact Time"),
+            ("callback_morning_8_10", "8 AM – 10 AM"),
+            ("callback_morning_10_12", "10 AM – 12 PM"),
+            ("callback_exact_time", "Choose Exact Time"),
         ]
     return buttons("What time would you prefer?", pairs)
 
@@ -299,8 +337,8 @@ def booking_confirm_buttons(summary: str) -> InteractiveSpec:
         summary,
         [
             ("booking_confirm", "Confirm"),
+            ("callback_change", "Change Callback"),
             ("booking_edit", "Edit Details"),
-            ("booking_cancel", "Cancel"),
         ],
     )
 
@@ -368,8 +406,35 @@ def attach_session_ui(session, result):
     elif step == GuidedStep.COLLECT_DETAILS:
         if asked == "date_status":
             spec = date_status_buttons()
-        elif asked == "event_date" and not session.pending_event_month:
-            spec = event_month_list(tentative=session.fields.date_status != "confirmed")
+        elif asked == "event_year":
+            spec = event_year_list(
+                offset=getattr(session, "year_list_offset", 0) or 0,
+                tentative=session.fields.date_status == "tentative",
+            )
+        elif asked == "event_month":
+            spec = event_month_list(
+                tentative=session.fields.date_status == "tentative",
+                page=getattr(session, "month_list_page", 0) or 0,
+            )
+        elif asked == "event_day" and session.pending_event_year and getattr(session, "pending_event_month", None):
+            month_n = int(str(session.pending_event_month).split("-")[-1])
+            spec = event_day_list(
+                year=int(session.pending_event_year),
+                month=month_n,
+                page=getattr(session, "day_list_page", 0) or 0,
+            )
+        elif asked == "event_date_confirm" and session.fields.event_date:
+            spec = event_date_confirm_buttons(str(session.fields.event_date))
+        elif asked == "event_date" and not session.pending_event_year:
+            spec = event_year_list(
+                offset=getattr(session, "year_list_offset", 0) or 0,
+                tentative=session.fields.date_status == "tentative",
+            )
+        elif asked == "event_date" and session.pending_event_year and not session.pending_event_month:
+            spec = event_month_list(
+                tentative=session.fields.date_status == "tentative",
+                page=getattr(session, "month_list_page", 0) or 0,
+            )
         elif asked == "event_location" and not session.fields.venue_status:
             spec = venue_status_buttons()
         elif asked == "meal_preference":

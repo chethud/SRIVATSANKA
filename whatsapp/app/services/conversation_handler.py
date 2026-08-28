@@ -41,26 +41,28 @@ async def _persist_enquiry(
     whatsapp_id: str,
     result: AgentTurnResult,
 ) -> tuple[AgentTurnResult, bool]:
+    if session._saved and session.saved_enquiry_id:
+        sync_conversation_state(session)
+        return attach_session_ui(session, result), True
     try:
-        await save_enquiry(db, session.fields, whatsapp_id, session.selected_dishes)
+        enquiry = await save_enquiry(
+            db,
+            session.fields,
+            whatsapp_id,
+            session.selected_dishes,
+            inbound_message_id=session.last_processed_message_id,
+        )
         session._saved = True
+        session.saved_enquiry_id = enquiry.id
+        session.completed = True
         sync_conversation_state(session)
         return attach_session_ui(session, result), True
     except Exception:
         logger.exception("Failed to save WhatsApp enquiry for %s", whatsapp_id)
-        session.completed = False
+        session.completed = True
         session._saved = False
-        session.phase = ConversationPhase.SELECT_CATEGORIES
-        return (
-            AgentTurnResult(
-                reply=(
-                    "Hmm, that didn’t save. Could you share the meals again, or say *skip*?"
-                ),
-                fields=session.fields,
-                enquiry_fields_complete=True,
-            ),
-            False,
-        )
+        sync_conversation_state(session)
+        return attach_session_ui(session, result), False
 
 
 def _is_fresh_booking_intent(user_text: str) -> bool:
@@ -166,10 +168,15 @@ async def handle_conversation(
             False,
         )
 
-    # Incomplete save left session stuck, send them back to meal selection.
+    # Persist failed earlier — retry lead save. Never restart into dish selection.
     if session.completed and not session._saved:
-        session.completed = False
-        session.phase = ConversationPhase.SELECT_CATEGORIES
+        retry_result = AgentTurnResult(
+            reply=completed_booking_options_reply(name=session.fields.customer_name),
+            fields=session.fields,
+            enquiry_fields_complete=True,
+            is_complete=True,
+        )
+        return await _persist_enquiry(db, session, whatsapp_id, retry_result)
 
     # Cuisine preference (types only, no individual dishes).
     if session.phase == ConversationPhase.SELECT_CATEGORIES:

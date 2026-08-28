@@ -96,6 +96,29 @@ async def _migrate_sqlite_columns() -> None:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN paymentReceived BOOLEAN DEFAULT 0")
                 if "discountAmount" not in ecols:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN discountAmount FLOAT DEFAULT 0")
+                extra_enquiry = {
+                    "dateStatus": "ALTER TABLE Enquiry ADD COLUMN dateStatus VARCHAR",
+                    "venueName": "ALTER TABLE Enquiry ADD COLUMN venueName VARCHAR",
+                    "venueArea": "ALTER TABLE Enquiry ADD COLUMN venueArea VARCHAR",
+                    "mealPreference": "ALTER TABLE Enquiry ADD COLUMN mealPreference VARCHAR",
+                    "specialRequirements": "ALTER TABLE Enquiry ADD COLUMN specialRequirements TEXT",
+                    "callbackDate": "ALTER TABLE Enquiry ADD COLUMN callbackDate VARCHAR",
+                    "callbackTime": "ALTER TABLE Enquiry ADD COLUMN callbackTime VARCHAR",
+                    "completionKey": "ALTER TABLE Enquiry ADD COLUMN completionKey VARCHAR",
+                    "whatsappMessageId": "ALTER TABLE Enquiry ADD COLUMN whatsappMessageId VARCHAR",
+                    "notificationStatus": "ALTER TABLE Enquiry ADD COLUMN notificationStatus VARCHAR DEFAULT 'pending'",
+                    "notificationMessageId": "ALTER TABLE Enquiry ADD COLUMN notificationMessageId VARCHAR",
+                    "notificationAttempts": "ALTER TABLE Enquiry ADD COLUMN notificationAttempts INTEGER DEFAULT 0",
+                    "notificationSentAt": "ALTER TABLE Enquiry ADD COLUMN notificationSentAt DATETIME",
+                    "notificationError": "ALTER TABLE Enquiry ADD COLUMN notificationError TEXT",
+                    "lastNotificationAttempt": "ALTER TABLE Enquiry ADD COLUMN lastNotificationAttempt DATETIME",
+                    "reminderAttempts": "ALTER TABLE Enquiry ADD COLUMN reminderAttempts INTEGER DEFAULT 0",
+                    "reminderError": "ALTER TABLE Enquiry ADD COLUMN reminderError TEXT",
+                    "lastReminderAttempt": "ALTER TABLE Enquiry ADD COLUMN lastReminderAttempt DATETIME",
+                }
+                for col, sql in extra_enquiry.items():
+                    if col not in ecols:
+                        alters.append(sql)
             if "EnquiryPayment" not in tables:
                 connection.execute(
                     sa.text(
@@ -172,6 +195,14 @@ async def _migrate_sqlite_columns() -> None:
                 )
             for sql in alters:
                 connection.execute(sa.text(sql))
+
+            if "Enquiry" in tables:
+                connection.execute(
+                    sa.text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_enquiry_completion_key "
+                        "ON Enquiry (completionKey) WHERE completionKey IS NOT NULL"
+                    )
+                )
 
             if "Enquiry" in tables:
                 connection.execute(
@@ -315,6 +346,35 @@ async def _migrate_enquiry_payment_columns() -> None:
                     connection.execute(
                         sa.text('ALTER TABLE "Enquiry" ADD COLUMN "discountAmount" DOUBLE PRECISION DEFAULT 0')
                     )
+                extra = {
+                    "dateStatus": 'ALTER TABLE "Enquiry" ADD COLUMN "dateStatus" VARCHAR',
+                    "venueName": 'ALTER TABLE "Enquiry" ADD COLUMN "venueName" VARCHAR',
+                    "venueArea": 'ALTER TABLE "Enquiry" ADD COLUMN "venueArea" VARCHAR',
+                    "mealPreference": 'ALTER TABLE "Enquiry" ADD COLUMN "mealPreference" VARCHAR',
+                    "specialRequirements": 'ALTER TABLE "Enquiry" ADD COLUMN "specialRequirements" TEXT',
+                    "callbackDate": 'ALTER TABLE "Enquiry" ADD COLUMN "callbackDate" VARCHAR',
+                    "callbackTime": 'ALTER TABLE "Enquiry" ADD COLUMN "callbackTime" VARCHAR',
+                    "completionKey": 'ALTER TABLE "Enquiry" ADD COLUMN "completionKey" VARCHAR',
+                    "whatsappMessageId": 'ALTER TABLE "Enquiry" ADD COLUMN "whatsappMessageId" VARCHAR',
+                    "notificationStatus": "ALTER TABLE \"Enquiry\" ADD COLUMN \"notificationStatus\" VARCHAR DEFAULT 'pending'",
+                    "notificationMessageId": 'ALTER TABLE "Enquiry" ADD COLUMN "notificationMessageId" VARCHAR',
+                    "notificationAttempts": 'ALTER TABLE "Enquiry" ADD COLUMN "notificationAttempts" INTEGER DEFAULT 0',
+                    "notificationSentAt": 'ALTER TABLE "Enquiry" ADD COLUMN "notificationSentAt" TIMESTAMP',
+                    "notificationError": 'ALTER TABLE "Enquiry" ADD COLUMN "notificationError" TEXT',
+                    "lastNotificationAttempt": 'ALTER TABLE "Enquiry" ADD COLUMN "lastNotificationAttempt" TIMESTAMP',
+                    "reminderAttempts": 'ALTER TABLE "Enquiry" ADD COLUMN "reminderAttempts" INTEGER DEFAULT 0',
+                    "reminderError": 'ALTER TABLE "Enquiry" ADD COLUMN "reminderError" TEXT',
+                    "lastReminderAttempt": 'ALTER TABLE "Enquiry" ADD COLUMN "lastReminderAttempt" TIMESTAMP',
+                }
+                for col, sql in extra.items():
+                    if col not in cols:
+                        connection.execute(sa.text(sql))
+                connection.execute(
+                    sa.text(
+                        'CREATE UNIQUE INDEX IF NOT EXISTS ix_enquiry_completion_key '
+                        'ON "Enquiry" ("completionKey") WHERE "completionKey" IS NOT NULL'
+                    )
+                )
             if "EnquiryPayment" not in tables:
                 connection.execute(
                     sa.text(

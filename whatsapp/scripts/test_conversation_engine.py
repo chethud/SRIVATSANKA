@@ -26,10 +26,10 @@ def _low(text: str) -> str:
     return (text or "").lower()
 
 
-async def _turn(phone: str, text: str, db):
+async def _turn(phone: str, text: str, db, button_id: str | None = None):
     from app.services.conversation_handler import handle_conversation
 
-    result, saved = await handle_conversation(phone, text, db)
+    result, saved = await handle_conversation(phone, text, db, button_id=button_id)
     return result, saved
 
 
@@ -202,8 +202,11 @@ async def run() -> int:
             ok("invalid date stays in event details")
 
         r, _ = await _turn(phone, "21 November 2026", db)
-        if "venue" not in _low(r.reply) and "locality" not in _low(r.reply):
-            fail("after date, expected venue question")
+        if "21 november 2026" not in _low(r.reply) or "confirm" not in _low(r.reply):
+            fail(f"did not confirm typed event date, got {r.reply!r}")
+        r, _ = await _turn(phone, "Yes", db)
+        if "venue" not in _low(r.reply) and "locality" not in _low(r.reply) and "guest" not in _low(r.reply):
+            fail("after date confirm, expected next detail question")
         else:
             ok("date stored, venue asked")
 
@@ -299,7 +302,13 @@ async def run() -> int:
         if sess.guided_step == GuidedStep.AWAIT_EVENT_TYPE:
             r, _ = await _turn(phone, "Baby shower", db)
         r, _ = await _turn(phone, "No", db)
+        from datetime import date as date_cls
+
+        r, _ = await _turn(phone, "Tentative Date", db, button_id="date_tentative")
+        r, _ = await _turn(phone, str(date_cls.today().year), db)
         r, _ = await _turn(phone, "November", db)
+        r, _ = await _turn(phone, "20", db)
+        r, _ = await _turn(phone, "Yes", db)
         r, _ = await _turn(phone, "200", db)
         r, _ = await _turn(phone, "Location is our house", db)
         if "noted down the location" in _low(r.reply) and "area" not in _low(r.reply) and "locality" not in _low(r.reply):
@@ -397,6 +406,83 @@ async def run() -> int:
             fail("second No returned to SPECIAL_REQUIREMENTS")
         else:
             ok("No after requirements stays on callback")
+
+        # Dynamic year picker + isolated callback states (no venue loop).
+        from app.services.date_picker import available_years, days_in_month, today_ist
+
+        years = available_years()
+        now_year = today_ist().year
+        if years[0] != now_year or now_year + 10 not in years or now_year + 2 not in years:
+            fail(f"year range not dynamic: {years[:3]}…{years[-1:]}")
+        else:
+            ok(f"years {now_year}–{now_year + 10} generated dynamically")
+        if days_in_month(2028, 2) != 29 or days_in_month(2027, 2) != 28:
+            fail("leap-year day counts are wrong")
+        if days_in_month(2028, 4) != 30:
+            fail("April should have 30 days")
+        else:
+            ok("calendar days respect leap years and 30-day months")
+
+        yphone = "919888877766"
+        session_store.reset(yphone)
+        r, _ = await _turn(yphone, "Hi", db)
+        r, _ = await _turn(yphone, "Kariya", db)
+        r, _ = await _turn(yphone, "Yes", db)
+        r, _ = await _turn(yphone, "Wedding", db)
+        r, _ = await _turn(yphone, "No", db)
+        r, _ = await _turn(yphone, "Date Confirmed", db, button_id="date_confirmed")
+        if "year" not in _low(r.reply):
+            fail(f"after date confirmed, expected year picker, got {r.reply!r}")
+        r, _ = await _turn(yphone, "2028", db)
+        ys = session_store.get(yphone)
+        if ys.pending_event_year != 2028 or ys.fields.event_year != 2028:
+            fail(f"selected year was not 2028, got {ys.fields.event_year}")
+        if ys.fields.event_date:
+            fail("event_date was set before month/day")
+        if "month" not in _low(r.reply):
+            fail("did not ask month after 2028")
+        else:
+            ok("2028 stored as event year, not current year")
+        r, _ = await _turn(yphone, "November", db)
+        r, _ = await _turn(yphone, "15", db)
+        if "15 november 2028" not in _low(r.reply):
+            fail(f"expected confirm 15 November 2028, got {r.reply!r}")
+        r, _ = await _turn(yphone, "Confirm", db, button_id="event_date_confirm")
+        if session_store.get(yphone).fields.event_year != 2028:
+            fail("confirm lost event_year 2028")
+        if "guest" not in _low(r.reply):
+            fail(f"after date confirm expected guests, got {r.reply!r}")
+        r, _ = await _turn(yphone, "500", db)
+        r, _ = await _turn(yphone, "Yes", db, button_id="venue_fixed")
+        r, _ = await _turn(yphone, "BTM Hall", db)
+        r, _ = await _turn(yphone, "BTM Layout", db)
+        r, _ = await _turn(yphone, "Not Sure", db, button_id="cuisine_unsure")
+        r, _ = await _turn(yphone, "No", db, button_id="req_no")
+        if session_store.get(yphone).last_asked_slot != "callback_date":
+            fail(f"expected CALLBACK_DATE, asked={session_store.get(yphone).last_asked_slot}")
+        event_date_before = session_store.get(yphone).fields.event_date
+        r, _ = await _turn(yphone, "Tomorrow", db, button_id="callback_tomorrow")
+        if session_store.get(yphone).last_asked_slot != "callback_period":
+            fail(f"Tomorrow did not advance to CALLBACK_TIME_PERIOD, asked={session_store.get(yphone).last_asked_slot}")
+        if session_store.get(yphone).fields.event_date != event_date_before:
+            fail("callback_date overwrote event_date")
+        if "venue" in _low(r.reply) or "special requirement" in _low(r.reply):
+            fail("callback date looped back to venue/requirements")
+        r, _ = await _turn(yphone, "Morning", db, button_id="callback_morning")
+        if session_store.get(yphone).last_asked_slot != "callback_slot":
+            fail(f"Morning did not advance to CALLBACK_TIME, asked={session_store.get(yphone).last_asked_slot}")
+        r, _ = await _turn(yphone, "10 AM – 12 PM", db, button_id="callback_morning_10_12")
+        ysess = session_store.get(yphone)
+        if ysess.guided_step != GuidedStep.AWAIT_BOOKING_CONFIRM:
+            fail(f"callback time did not reach CONFIRMATION, step={ysess.guided_step} asked={ysess.last_asked_slot}")
+        if ysess.last_asked_slot in {"callback_date", "event_location", "special_requirements", "event_date"}:
+            fail(f"callback looped to {ysess.last_asked_slot}")
+        if "10 am" not in _low(r.reply) and "10 AM" not in r.reply:
+            fail(f"confirmation missing callback time, got {r.reply!r}")
+        if ysess.fields.callback_time != "10 AM – 12 PM":
+            fail(f"callback_time={ysess.fields.callback_time!r}")
+        else:
+            ok("year 2028 + callback Tomorrow/Morning/10-12 → CONFIRMATION")
 
     # Idempotency unit test with sqlite-like IntegrityError simulation
     from app.services.message_idempotency import claim_inbound_message

@@ -94,6 +94,18 @@ def _enquiry_to_out(e: Enquiry, menu_prices: dict[str, float] | None = None) -> 
         amountDue=due,
         payments=payments,
         createdAt=e.createdAt,
+        dateStatus=getattr(e, "dateStatus", None),
+        venueName=getattr(e, "venueName", None),
+        venueArea=getattr(e, "venueArea", None),
+        mealPreference=getattr(e, "mealPreference", None),
+        specialRequirements=getattr(e, "specialRequirements", None),
+        callbackDate=getattr(e, "callbackDate", None),
+        callbackTime=getattr(e, "callbackTime", None),
+        notificationStatus=getattr(e, "notificationStatus", None),
+        notificationAttempts=int(getattr(e, "notificationAttempts", 0) or 0),
+        notificationSentAt=getattr(e, "notificationSentAt", None),
+        notificationError=getattr(e, "notificationError", None),
+        reminderSent=bool(getattr(e, "reminderSent", False)),
         dishes=[
             EnquiryDishOut(
                 id=d.id,
@@ -318,6 +330,25 @@ async def list_enquiries(db: AsyncSession = Depends(get_db)) -> list[EnquiryOut]
         .limit(100)
     )
     return [_enquiry_to_out(e) for e in result.scalars().all()]
+
+
+@router.post("/enquiries/{enquiry_id}/retry-notification", response_model=EnquiryOut)
+async def retry_owner_notification(enquiry_id: str, db: AsyncSession = Depends(get_db)) -> EnquiryOut:
+    from app.services.enquiry_service import send_owner_lead_notification
+
+    result = await db.execute(
+        select(Enquiry).options(*_enquiry_load_options()).where(Enquiry.id == enquiry_id)
+    )
+    enquiry = result.scalar_one_or_none()
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if (enquiry.notificationStatus or "") == "sent":
+        return _enquiry_to_out(enquiry)
+    enquiry.notificationStatus = "pending"
+    await db.commit()
+    await send_owner_lead_notification(db, enquiry, force=True)
+    await db.refresh(enquiry)
+    return _enquiry_to_out(enquiry)
 
 
 @router.patch("/enquiries/{enquiry_id}/status", response_model=EnquiryOut)

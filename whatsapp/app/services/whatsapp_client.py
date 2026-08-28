@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import hashlib
 import hmac
 import logging
@@ -11,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 WHATSAPP_API = "https://graph.facebook.com/v21.0"
 _http_client: httpx.AsyncClient | None = None
+
+
+@dataclass
+class WhatsAppSendResult:
+    ok: bool
+    error: str | None = None
+    message_id: str | None = None
 
 
 def _client() -> httpx.AsyncClient:
@@ -53,35 +61,40 @@ def verify_webhook_signature(payload: bytes, signature_header: str | None) -> bo
     return hmac.compare_digest(signature_header.removeprefix("sha256="), expected)
 
 
-async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
-    """Send text. Returns (success, error_message)."""
+async def send_whatsapp_message_detailed(to: str, text: str) -> WhatsAppSendResult:
+    """Send text. Returns ok / error / provider message id."""
     to = normalize_phone(to)
     if not to:
         logger.error("Invalid recipient phone number")
-        return False, "Invalid phone number"
+        return WhatsAppSendResult(False, "Invalid phone number")
 
     if not is_whatsapp_configured():
         if settings.is_production:
             logger.error("WhatsApp not configured — cannot send message in production")
-            return False, "WhatsApp API not configured"
+            return WhatsAppSendResult(False, "WhatsApp API not configured")
         logger.info("[WhatsApp Mock] To: %s | %s", to, text[:120])
-        return True, None
+        return WhatsAppSendResult(True, None, "mock-wamid")
 
     client = _client()
-    response = await client.post(
-        f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
-        headers={
-            "Authorization": f"Bearer {settings.whatsapp_token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to,
-            "type": "text",
-            "text": {"preview_url": False, "body": text},
-        },
-    )
+    try:
+        response = await client.post(
+            f"{WHATSAPP_API}/{settings.whatsapp_phone_number_id}/messages",
+            headers={
+                "Authorization": f"Bearer {settings.whatsapp_token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": to,
+                "type": "text",
+                "text": {"preview_url": False, "body": text},
+            },
+        )
+    except Exception as exc:
+        logger.exception("WhatsApp send network error to %s", to)
+        return WhatsAppSendResult(False, f"Network error: {exc}")
+
     if response.status_code >= 400:
         logger.error("WhatsApp send failed (%s): %s", response.status_code, response.text)
         detail = response.text[:240] if response.text else f"HTTP {response.status_code}"
@@ -90,9 +103,21 @@ async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
             " Check WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_TOKEN in Meta → WhatsApp → API Setup "
             f"(current Phone number ID ends …{phone_id[-6:] if len(phone_id) >= 6 else phone_id})."
         )
-        return False, f"WhatsApp API error: {detail}.{hint}"
-    logger.info("WhatsApp message sent to %s", to)
-    return True, None
+        return WhatsAppSendResult(False, f"WhatsApp API error: {detail}.{hint}")
+    message_id = None
+    try:
+        payload = response.json()
+        message_id = ((payload.get("messages") or [{}])[0] or {}).get("id")
+    except Exception:
+        message_id = None
+    logger.info("WhatsApp message sent to %s id=%s", to, message_id)
+    return WhatsAppSendResult(True, None, message_id)
+
+
+async def send_whatsapp_message(to: str, text: str) -> tuple[bool, str | None]:
+    """Send text. Returns (success, error_message)."""
+    result = await send_whatsapp_message_detailed(to, text)
+    return result.ok, result.error
 
 
 async def send_whatsapp_interactive(to: str, interactive: dict) -> tuple[bool, str | None]:

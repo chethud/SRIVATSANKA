@@ -31,11 +31,12 @@ async def set_setting(db: AsyncSession, key: str, value: str) -> str:
 
 
 async def get_owner_phone(db: AsyncSession) -> str:
-    """Dashboard override wins; otherwise OWNER_PHONE_NUMBER from env."""
+    """Dashboard / profile override wins; then OWNER_WHATSAPP_NUMBER; then OWNER_PHONE_NUMBER."""
     override = await get_setting(db, OWNER_PHONE_KEY)
     if override:
         return normalize_phone(override)
-    return normalize_phone(settings.owner_phone_number)
+    env = settings.owner_whatsapp_number or settings.owner_phone_number
+    return normalize_phone(env)
 
 
 async def set_owner_phone(db: AsyncSession, phone: str) -> str:

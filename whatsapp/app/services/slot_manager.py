@@ -64,7 +64,7 @@ def _allowed_entity_keys(session: ConversationSession, entities: ExtractedEntiti
         asked = session.last_asked_slot
         if asked == "date_status":
             allowed.add("event_date")
-        elif asked == "event_date":
+        elif asked in {"event_date", "event_year", "event_month", "event_day", "event_date_confirm"}:
             allowed.add("event_date")
         elif asked == "guest_count":
             allowed.add("guest_count")

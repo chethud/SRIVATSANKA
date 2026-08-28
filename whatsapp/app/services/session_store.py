@@ -75,6 +75,11 @@ class ConversationSession:
     name_confirmed: bool = False
     pending_date_confirm: str | None = None
     pending_event_month: str | None = None  # YYYY-MM while choosing a day
+    pending_event_year: int | None = None
+    pending_event_day: int | None = None
+    year_list_offset: int = 0
+    month_list_page: int = 0
+    day_list_page: int = 0
     pending_event_type_switch: str | None = None
     conversation_state: ConversationState = ConversationState.START
     last_user_message: str | None = None
@@ -86,6 +91,7 @@ class ConversationSession:
     awaiting_special_req_text: bool = False
     callback_period: str | None = None
     conversation_version: int = 0
+    saved_enquiry_id: str | None = None
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     slots: dict[str, SlotValue] = field(
         default_factory=lambda: {

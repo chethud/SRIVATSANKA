@@ -159,6 +159,18 @@ export interface Enquiry {
   payments?: EnquiryPayment[];
   createdAt: string;
   dishes: EnquiryDish[];
+  dateStatus?: string | null;
+  venueName?: string | null;
+  venueArea?: string | null;
+  mealPreference?: string | null;
+  specialRequirements?: string | null;
+  callbackDate?: string | null;
+  callbackTime?: string | null;
+  notificationStatus?: string | null;
+  notificationAttempts?: number;
+  notificationSentAt?: string | null;
+  notificationError?: string | null;
+  reminderSent?: boolean;
 }
 
 export interface Dish {
@@ -352,7 +364,9 @@ export async function checkApiHealth(): Promise<boolean> {
 }
 
 export const fetchStats = () => apiFetch<DashboardStats>('/api/stats');
-export const fetchEnquiries = () => apiFetch<Enquiry[]>('/api/enquiries');
+export async function retryOwnerNotification(enquiryId: string): Promise<Enquiry> {
+  return apiFetch<Enquiry>(`/api/enquiries/${enquiryId}/retry-notification`, { method: 'POST' });
+}
 export const fetchDishes = () => apiFetch<Dish[]>('/api/dishes');
 export const fetchNotifications = () => apiFetch<Notification[]>('/api/notifications');
 

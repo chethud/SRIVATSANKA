@@ -18,11 +18,14 @@ class EnquiryFields(BaseModel):
     notes: str | None = None
     meal_preference: str | None = None
     special_requirements: str | None = None
+    event_year: int | None = None
+    event_month: int | None = None
     date_status: str | None = None  # confirmed | tentative
     venue_status: str | None = None  # fixed | not_fixed | unknown
     venue_name: str | None = None
     venue_area: str | None = None
     venue_type: str | None = None  # home | hall | other
+    callback_time_period: str | None = None
 
 
 class SelectedDishItem(BaseModel):
@@ -276,6 +279,18 @@ class EnquiryOut(BaseModel):
     payments: list[EnquiryPaymentOut] = Field(default_factory=list)
     createdAt: datetime
     dishes: list[EnquiryDishOut] = Field(default_factory=list)
+    dateStatus: str | None = None
+    venueName: str | None = None
+    venueArea: str | None = None
+    mealPreference: str | None = None
+    specialRequirements: str | None = None
+    callbackDate: str | None = None
+    callbackTime: str | None = None
+    notificationStatus: str | None = None
+    notificationAttempts: int = 0
+    notificationSentAt: datetime | None = None
+    notificationError: str | None = None
+    reminderSent: bool = False
 
     @field_validator("status", mode="before")
     @classmethod

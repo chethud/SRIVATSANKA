@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     meta_app_secret: str = ""  # optional – verifies webhook signatures
 
     owner_phone_number: str = "919945607074"
+    owner_whatsapp_number: str = ""
     cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175"
     # Absolute origin WhatsApp uses to fetch uploaded event photos (must be reachable HTTPS in production).
     public_api_url: str = ""
