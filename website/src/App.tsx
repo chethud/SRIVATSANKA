@@ -34,6 +34,7 @@ export default function App() {
         <Route path="orders/:orderId" element={<OrderDetailPage />} />
         <Route path="orders/:orderId/kitchen" element={<OrderCopyPage copyType="kitchen" />} />
         <Route path="orders/:orderId/billing" element={<OrderCopyPage copyType="billing" />} />
+        <Route path="orders/:orderId/ours" element={<OrderCopyPage copyType="ours" />} />
         <Route path="dishes" element={<DishesPage />} />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="workers" element={<WorkersPage />} />

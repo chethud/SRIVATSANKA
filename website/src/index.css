@@ -246,6 +246,14 @@ div.grid:not([class*='items-']) {
   color: var(--primary);
 }
 
+.copy-ours-note {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .copy-client-block {
   text-align: center;
   margin-bottom: 0;

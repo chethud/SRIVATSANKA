@@ -38,7 +38,7 @@ import { MEAL_SESSIONS, PREFERENCE_CATEGORIES, resolveSessionTabs } from '../../
 import { resolveMenuColumns } from '../../utils/orderMenuGrid';
 import { downloadOrderCopyExcel } from '../../utils/orderCopies';
 
-export type OrderPageView = 'details' | 'kitchen' | 'billing';
+export type OrderPageView = 'details' | 'kitchen' | 'billing' | 'ours';
 
 function buildScheduleDraft(extras: OrderExtras, defaultEventDate: string) {
   return {
@@ -119,7 +119,7 @@ export function OrderDetailView({
     }
   }
 
-  async function handleDownloadExcel(copyType: 'kitchen' | 'billing') {
+  async function handleDownloadExcel(copyType: 'kitchen' | 'billing' | 'ours') {
     setExcelBusy(true);
     try {
       await downloadOrderCopyExcel(order, copyType);
@@ -377,6 +377,13 @@ export function OrderDetailView({
           onClick={() => setPageView('billing')}
         >
           <FileText size={18} /> Order copy
+        </button>
+        <button
+          type="button"
+          className={`order-copy-btn ${pageView === 'ours' ? 'order-copy-btn--active' : ''}`}
+          onClick={() => setPageView('ours')}
+        >
+          <FileText size={18} /> Our copy
         </button>
       </div>
 

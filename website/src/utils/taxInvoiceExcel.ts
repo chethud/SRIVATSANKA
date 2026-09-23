@@ -31,11 +31,22 @@ function thinBorder() {
   return { top: side, left: side, bottom: side, right: side };
 }
 
-function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): LineItem[] {
+export type TaxInvoiceCopyType = 'kitchen' | 'billing' | 'ours';
+
+function scaleMoney(value: number, scale: number): number {
+  return Math.round(value * scale * 100) / 100;
+}
+
+function buildInvoiceLines(
+  enquiry: Enquiry,
+  copyType: TaxInvoiceCopyType,
+  amountScale = 1,
+): LineItem[] {
   const extras = parseOrderNotes(enquiry.notes);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, enquiry, menuItems);
   const lines: LineItem[] = [];
+  const showExtras = copyType === 'billing' || copyType === 'ours';
 
   for (const col of columns) {
     const items = dishesForColumn(col, menuItems, extras);
@@ -49,7 +60,8 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
       copyType === 'kitchen' && dishNames.length > 0 ? dishNames.join(', ') : null,
     ].filter(Boolean);
 
-    const amount = typeof col.amount === 'number' ? col.amount : 0;
+    const rawAmount = typeof col.amount === 'number' ? col.amount : 0;
+    const amount = scaleMoney(rawAmount, amountScale);
     const qty = col.pax != null && col.pax > 0 ? col.pax : dishNames.length || 'NA';
     let unitRate: number | string = '';
     if (typeof qty === 'number' && qty > 0 && amount > 0) {
@@ -66,9 +78,10 @@ function buildInvoiceLines(enquiry: Enquiry, copyType: 'kitchen' | 'billing'): L
     });
   }
 
-  if (copyType === 'billing' && extras.extrasEnabled) {
+  if (showExtras && extras.extrasEnabled) {
     for (const item of activeOrderExtraItems(extras.extraItems)) {
-      const amount = typeof item.amount === 'number' ? item.amount : 0;
+      const rawAmount = typeof item.amount === 'number' ? item.amount : 0;
+      const amount = scaleMoney(rawAmount, amountScale);
       lines.push({
         description: item.title + (item.description ? `\n${item.description}` : ''),
         qty: item.quantity?.trim() || 'NA',
@@ -163,12 +176,20 @@ async function embedInvoiceLogo(
   }
 }
 
-/** Build a tax-invoice Excel workbook matching the Casagrand sales-invoice layout. */
-export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitchen' | 'billing') {
+/** Build a tax-invoice Excel workbook matching the Casagrand sales-invoice layout.
+ *  `ours` uses 50% of line amounts; CGST/SGST are calculated on that half. */
+export async function buildTaxInvoiceWorkbook(
+  enquiry: Enquiry,
+  copyType: TaxInvoiceCopyType,
+  opts?: { amountScale?: number },
+) {
+  const amountScale = opts?.amountScale ?? (copyType === 'ours' ? 0.5 : 1);
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = INVOICE_COMPANY.legalName;
-  const ws = wb.addWorksheet(copyType === 'kitchen' ? 'Kitchen Invoice' : 'IN', {
+  const sheetName =
+    copyType === 'kitchen' ? 'Kitchen Invoice' : copyType === 'ours' ? 'Our Copy' : 'IN';
+  const ws = wb.addWorksheet(sheetName, {
     views: [{ showGridLines: false }],
   });
 
@@ -198,8 +219,8 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
     }
   };
 
-  // Row 2 — "Original" label only (outside the bordered header)
-  ws.getCell('H2').value = 'Original';
+  // Row 2 — copy label only (outside the bordered header)
+  ws.getCell('H2').value = copyType === 'ours' ? 'Our Copy' : 'Original';
   ws.getCell('H2').alignment = { horizontal: 'right' };
   ws.getCell('H2').font = { bold: true, size: 11 };
 
@@ -284,7 +305,7 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
     cell.alignment = center;
   }
 
-  const lines = buildInvoiceLines(enquiry, copyType);
+  const lines = buildInvoiceLines(enquiry, copyType, amountScale);
   const firstDataRow = 13;
   lines.forEach((line, i) => {
     const r = firstDataRow + i;
@@ -325,9 +346,15 @@ export async function buildTaxInvoiceWorkbook(enquiry: Enquiry, copyType: 'kitch
     const sessionTotal = sumOrderCopyTotals(columns);
     const extrasTotal = extras.extrasEnabled ? sumExtraItemAmounts(extras.extraItems) : null;
     const parts = [sessionTotal, extrasTotal].filter((a): a is number => a != null);
-    if (parts.length > 0) subTotal = parts.reduce((s, a) => s + a, 0);
+    if (parts.length > 0) {
+      subTotal = scaleMoney(
+        parts.reduce((s, a) => s + a, 0),
+        amountScale,
+      );
+    }
   }
 
+  // GST always applies to the (possibly halved) subtotal shown on this copy
   const cgst = Math.round(subTotal * INVOICE_COMPANY.cgstRate * 100) / 100;
   const sgst = Math.round(subTotal * INVOICE_COMPANY.sgstRate * 100) / 100;
   const grand = Math.round((subTotal + cgst + sgst) * 100) / 100;

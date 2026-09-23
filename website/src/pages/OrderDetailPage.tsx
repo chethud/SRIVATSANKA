@@ -17,7 +17,7 @@ export default function OrderDetailPage() {
 
   const openCopy = (location.state as { openCopy?: OrderPageView } | null)?.openCopy;
   const [initialView] = useState<OrderPageView>(() =>
-    openCopy === 'kitchen' || openCopy === 'billing' ? openCopy : 'details',
+    openCopy === 'kitchen' || openCopy === 'billing' || openCopy === 'ours' ? openCopy : 'details',
   );
 
   useEffect(() => {

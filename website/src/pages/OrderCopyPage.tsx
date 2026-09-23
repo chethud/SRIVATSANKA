@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { EmptyState } from '../components/Layout';
 import { useAppData } from '../context/AppDataContext';
 
-type Props = { copyType: 'kitchen' | 'billing' };
+type Props = { copyType: 'kitchen' | 'billing' | 'ours' };
 
 /** Legacy routes — send users back to the order page (copies open in-place there). */
 export default function OrderCopyPage({ copyType }: Props) {
@@ -30,7 +30,10 @@ export default function OrderCopyPage({ copyType }: Props) {
     );
   }
 
+  const label =
+    copyType === 'kitchen' ? 'kitchen' : copyType === 'ours' ? 'our' : 'order';
+
   return (
-    <p className="text-sm text-[var(--muted)]">Opening {copyType === 'kitchen' ? 'kitchen' : 'order'} copy…</p>
+    <p className="text-sm text-[var(--muted)]">Opening {label} copy…</p>
   );
 }

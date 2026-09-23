@@ -20,20 +20,39 @@ import { OrderRegionalStylePrint } from './order/OrderRegionalStyleSection';
 import { VenueMapQrPrint } from './order/OrderVenueMapSection';
 import { kitchenSpecificationNotes } from '../utils/kitchenSpecs';
 
-export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: 'kitchen' | 'billing' }) {
-  const title = copyType === 'kitchen' ? 'Kitchen Copy' : 'Order Copy';
+export type OrderCopyKind = 'kitchen' | 'billing' | 'ours';
+
+const AMOUNT_SCALE: Record<OrderCopyKind, number> = {
+  kitchen: 1,
+  billing: 1,
+  ours: 0.5,
+};
+
+function scaleAmount(amount: number | null | undefined, scale: number): number | null {
+  if (typeof amount !== 'number') return null;
+  return Math.round(amount * scale * 100) / 100;
+}
+
+export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: OrderCopyKind }) {
+  const title =
+    copyType === 'kitchen' ? 'Kitchen Copy' : copyType === 'ours' ? 'Our Copy' : 'Order Copy';
+  const showMoney = copyType === 'billing' || copyType === 'ours';
+  const amountScale = AMOUNT_SCALE[copyType];
   const extras = parseOrderNotes(enquiry.notes);
   const kitchenSpecs = kitchenSpecificationNotes(extras.dietary);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, enquiry, menuItems);
   const grandTotal = useMemo(() => {
-    if (copyType !== 'billing') return null;
+    if (!showMoney) return null;
     const sessionTotal = sumOrderCopyTotals(columns);
     const extrasTotal = extras.extrasEnabled ? sumExtraItemAmounts(extras.extraItems) : null;
     const parts = [sessionTotal, extrasTotal].filter((a): a is number => a != null);
     if (parts.length === 0) return null;
-    return parts.reduce((sum, amount) => sum + amount, 0);
-  }, [columns, copyType, extras.extrasEnabled, extras.extraItems]);
+    return scaleAmount(
+      parts.reduce((sum, amount) => sum + amount, 0),
+      amountScale,
+    );
+  }, [amountScale, columns, extras.extrasEnabled, extras.extraItems, showMoney]);
 
   const stylesByDate = useMemo(() => {
     return eventDatesForStyles(extras, enquiry.eventDate)
@@ -57,6 +76,12 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         <BrandLogo variant="card" className="copy-logo" />
         <p className="copy-doc-title">{title}</p>
       </header>
+
+      {copyType === 'ours' && (
+        <p className="copy-ours-note print:hidden">
+          Amounts at 50% of the order total. GST (CGST/SGST) on Excel download is calculated on this half.
+        </p>
+      )}
 
       <div className="copy-intro">
         <div className="copy-client-block">
@@ -89,6 +114,10 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
             const items = dishesForColumn(col, menuItems, extras);
             const paxLine = formatPaxTimeLine(col);
             const dayStyle = shownDayStyle[index];
+            const displayAmount = scaleAmount(
+              typeof col.amount === 'number' ? col.amount : null,
+              amountScale,
+            );
 
             return (
               <section
@@ -117,10 +146,12 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
                   )}
                 </ul>
 
-                {copyType === 'billing' && items.length > 0 && (
+                {showMoney && items.length > 0 && (
                   <div className="copy-session-total">
                     <p className="copy-session-total-label">Session total</p>
-                    <p className="copy-session-total-amount">{formatColumnAmount(col.amount) || '—'}</p>
+                    <p className="copy-session-total-amount">
+                      {formatColumnAmount(displayAmount) || '—'}
+                    </p>
                   </div>
                 )}
               </section>
@@ -132,15 +163,21 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
 
       {extras.extrasEnabled && (
         <OrderExtrasTable
-          items={extras.extraItems ?? []}
+          items={(extras.extraItems ?? []).map((item) =>
+            showMoney && amountScale !== 1 && typeof item.amount === 'number'
+              ? { ...item, amount: scaleAmount(item.amount, amountScale) ?? item.amount }
+              : item,
+          )}
           hideAmounts={copyType === 'kitchen'}
           highlightSpecs={copyType === 'kitchen'}
         />
       )}
 
-      {copyType === 'billing' && grandTotal != null && (
+      {showMoney && grandTotal != null && (
         <div className="copy-overall-total">
-          <p className="copy-overall-total-label">Overall total</p>
+          <p className="copy-overall-total-label">
+            {copyType === 'ours' ? 'Overall total (50%)' : 'Overall total'}
+          </p>
           <p className="copy-overall-total-amount">{formatColumnAmount(grandTotal)}</p>
         </div>
       )}

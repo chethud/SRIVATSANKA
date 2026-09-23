@@ -102,7 +102,8 @@ type DayColumn = {
  */
 function buildDayColumns(
   enquiry: Enquiry,
-  copyType: 'kitchen' | 'billing',
+  copyType: 'kitchen' | 'billing' | 'ours',
+  amountScale = 1,
 ): DayColumn[] {
   const extras = parseOrderNotes(enquiry.notes);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
@@ -115,10 +116,12 @@ function buildDayColumns(
     if (!date) continue;
     const list = byDate.get(date) ?? [];
     const label = column.sessionLabel;
+    const rawAmount = typeof column.amount === 'number' ? column.amount : null;
     list.push({
       label,
       paxLine: formatPaxTimeLine(column) || (column.pax ? `${column.pax} Pax` : ''),
-      amount: typeof column.amount === 'number' ? column.amount : null,
+      amount:
+        rawAmount != null ? Math.round(rawAmount * amountScale * 100) / 100 : null,
       dishNames: dishesForColumn(column, menuItems, extras).map((d) =>
         copyType === 'kitchen' && d.served ? `${d.dishName} ✓` : d.dishName,
       ),
@@ -206,14 +209,16 @@ function paintMergedRow(
 export async function appendMenuSheet(
   wb: Workbook,
   enquiry: Enquiry,
-  copyType: 'kitchen' | 'billing',
+  copyType: 'kitchen' | 'billing' | 'ours',
+  opts?: { amountScale?: number },
 ) {
+  const amountScale = opts?.amountScale ?? (copyType === 'ours' ? 0.5 : 1);
   const ws = wb.addWorksheet('Menu', {
     views: [{ state: 'frozen', ySplit: 3, showGridLines: true }],
   });
 
   const extras = parseOrderNotes(enquiry.notes);
-  const dayColumns = buildDayColumns(enquiry, copyType);
+  const dayColumns = buildDayColumns(enquiry, copyType, amountScale);
   const colCount = dayColumns.length;
   const border = thinBorder();
   const bold = { name: 'Calibri', size: 11, bold: true };
