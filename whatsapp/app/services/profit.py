@@ -15,8 +15,8 @@ def line_price(item: EnquiryDish, menu_prices: dict[str, float]) -> float:
 
 
 def order_amount(enquiry: Enquiry, menu_prices: dict[str, float]) -> float:
-    """Prefer Excel order-copy totals in notes; fall back to dish × guests."""
-    from_notes = billing_total_from_notes(enquiry.notes)
+    """Prefer order-copy billing in notes (grand total / sessions + extras); fall back to dish × guests."""
+    from_notes = billing_total_from_notes(enquiry.notes, getattr(enquiry, "dish_items", None))
     if from_notes is not None and from_notes > 0:
         return from_notes
     line_sum = sum(line_price(d, menu_prices) for d in (enquiry.dish_items or []))
@@ -87,8 +87,14 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
     converted = list(result.scalars().all())
 
     order_revenue = 0.0
+    booked_order_value = 0.0
     monthly_rev: dict[str, float] = defaultdict(float)
     revenue_items: list[dict] = []
+
+    for e in converted:
+        billing = order_amount(e, menu_prices)
+        discount = max(0.0, float(getattr(e, "discountAmount", 0) or 0))
+        booked_order_value += max(0.0, billing - discount)
 
     for e in converted:
         payments = list(getattr(e, "payments", None) or [])
@@ -209,6 +215,7 @@ async def compute_profit_analytics(db: AsyncSession) -> dict:
     return {
         "total_revenue": total_revenue,
         "order_revenue": order_revenue,
+        "booked_order_value": booked_order_value,
         "uploaded_revenue": uploaded_revenue,
         "total_expenses": total_expenses,
         "global_expenses": 0.0,

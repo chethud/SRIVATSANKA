@@ -3,11 +3,11 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, MessageSquare, ShoppingBag, UtensilsCrossed, Users,
   HardHat, FileText, BarChart3, Images, Settings,
-  PanelLeftClose, PanelLeft, LogOut, X,
+  LogOut, X,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppData } from '../context/AppDataContext';
+import { AppDataProvider, useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
 import { CreateActionProvider } from '../context/CreateActionContext';
 import { LayoutProvider, SIDEBAR_EXPANDED, useLayout } from '../context/LayoutContext';
@@ -44,7 +44,6 @@ function DashboardLayoutInner() {
   const data = useAppData();
   const {
     sidebarCollapsed,
-    toggleSidebar,
     sidebarWidth,
     isMobileNav,
     mobileNavOpen,
@@ -168,18 +167,6 @@ function DashboardLayoutInner() {
             <LogOut size={18} />
             {!railCollapsed && <span>Sign out</span>}
           </button>
-          {!isMobileNav && (
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] transition-colors min-h-[2.75rem] ${
-                railCollapsed ? 'justify-center' : ''
-              }`}
-            >
-              {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-              {!railCollapsed && <span>Collapse</span>}
-            </button>
-          )}
         </div>
       </aside>
 
@@ -215,13 +202,15 @@ function DashboardLayoutInner() {
 
 export function DashboardLayout() {
   return (
-    <LayoutProvider>
-      <CreateActionProvider>
-        <PageSearchProvider>
-          <DashboardLayoutInner />
-        </PageSearchProvider>
-      </CreateActionProvider>
-    </LayoutProvider>
+    <AppDataProvider>
+      <LayoutProvider>
+        <CreateActionProvider>
+          <PageSearchProvider>
+            <DashboardLayoutInner />
+          </PageSearchProvider>
+        </CreateActionProvider>
+      </LayoutProvider>
+    </AppDataProvider>
   );
 }
 
@@ -272,7 +261,7 @@ export function StatCard({
             }
           : undefined
       }
-      className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 sm:p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow min-w-0 overflow-hidden h-auto self-start ${
+      className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 sm:p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow min-w-0 w-full overflow-hidden h-full ${
         interactive ? 'cursor-pointer hover:border-[var(--primary)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30' : ''
       }`}
     >
@@ -309,7 +298,7 @@ export function Button({ children, type = 'button', onClick, className = '', dis
 
 export function Card({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <div id={id} className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-sm)] min-w-0 h-auto self-start ${className}`}>
+    <div id={id} className={`bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-sm)] min-w-0 w-full ${className}`}>
       {children}
     </div>
   );

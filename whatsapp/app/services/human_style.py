@@ -647,6 +647,13 @@ def invalid_event_date_clarify() -> str:
     )
 
 
+def event_date_already_over() -> str:
+    return (
+        "The date you gave has already passed. 😊\n\n"
+        "Please choose a future event date from the list or type a date from today onwards."
+    )
+
+
 def wants_cuisine_options(text: str) -> bool:
     t = normalize_customer_text(text)
     if t in {"cuisines", "cuisine", "food", "menu", "menus", "cuisine options"}:

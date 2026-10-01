@@ -122,7 +122,7 @@ function buildDayColumns(
       paxLine: formatPaxTimeLine(column) || (column.pax ? `${column.pax} Pax` : ''),
       amount:
         rawAmount != null ? Math.round(rawAmount * amountScale * 100) / 100 : null,
-      dishNames: dishesForColumn(column, menuItems, extras).map((d) =>
+      dishNames: dishesForColumn(column, menuItems, extras, columns).map((d) =>
         copyType === 'kitchen' && d.served ? `${d.dishName} ✓` : d.dishName,
       ),
       fillSession: isCounterSubHeader(label) ? FILL.counter : FILL.session,

@@ -81,6 +81,9 @@ export default function DishesPage() {
     return entries;
   }, [grouped, cat, search]);
 
+  /** One session tab: use full grid width and two dish columns (like All’s left/right cards). */
+  const singleSessionLayout = cat !== 'ALL';
+
   const categorySelectValue =
     form.category === CUSTOM_OPTION
       ? CUSTOM_OPTION
@@ -382,10 +385,13 @@ export default function DishesPage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 grid-cards-equal">
           {categoryCards.map(([category, items]) => (
-            <Card key={category} className="p-5">
-              <div className="flex items-center justify-between gap-2 mb-3">
+            <Card
+              key={category}
+              className={`card-tile p-5${singleSessionLayout ? ' md:col-span-2 xl:col-span-3' : ''}`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
                 <h3 className="font-semibold text-[var(--primary-dark)]">{category}</h3>
                 <button
                   type="button"
@@ -395,10 +401,17 @@ export default function DishesPage() {
                   <Plus size={14} /> Add dish
                 </button>
               </div>
+              <div className="card-tile__body">
               {items.length === 0 ? (
-                <p className="text-sm text-[var(--muted)] py-2">No dishes yet in this session.</p>
+                <p className="text-sm text-[var(--muted)] py-2 min-h-[4rem]">No dishes yet in this session.</p>
               ) : (
-                <ul className="space-y-2">
+                <ul
+                  className={
+                    singleSessionLayout && items.length > 0
+                      ? 'flex-1 min-h-[4rem] grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2'
+                      : 'space-y-2 flex-1 min-h-[4rem]'
+                  }
+                >
                   {items.map((d) => (
                     <li
                       key={d.id}
@@ -433,6 +446,7 @@ export default function DishesPage() {
                   ))}
                 </ul>
               )}
+              </div>
             </Card>
           ))}
         </div>

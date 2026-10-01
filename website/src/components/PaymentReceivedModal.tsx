@@ -8,6 +8,8 @@ import {
   orderDiscount,
 } from '../utils/orderBilling';
 import { Card } from './Layout';
+import { PaymentRecordFields, paymentPayloadExtras, type PaymentRecordDraft } from './PaymentRecordFields';
+import { defaultPaymentPaidAtLocal } from '../utils/paymentRecord';
 
 export function PaymentReceivedModal({
   orders,
@@ -29,6 +31,12 @@ export function PaymentReceivedModal({
   const [discount, setDiscount] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [payerName, setPayerName] = useState('');
+  const [paymentMeta, setPaymentMeta] = useState<PaymentRecordDraft>({
+    paymentMode: '',
+    paidAt: defaultPaymentPaidAtLocal(),
+    paymentNotes: '',
+    receivedAccount: '',
+  });
 
   const pending = useMemo(
     () =>
@@ -71,6 +79,12 @@ export function PaymentReceivedModal({
     setDiscount(existingDiscount > 0 ? String(existingDiscount) : '');
     setPayAmount(remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
     setPayerName(current.customerName || '');
+    setPaymentMeta({
+      paymentMode: '',
+      paidAt: defaultPaymentPaidAtLocal(),
+      paymentNotes: '',
+      receivedAccount: '',
+    });
     setSplitMode(paid > 0);
     setError(null);
   }, [current?.id, forceOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -93,6 +107,7 @@ export function PaymentReceivedModal({
         amount,
         payerName: payerName.trim() || current.customerName,
         discountAmount: effectiveDiscount,
+        ...paymentPayloadExtras(paymentMeta),
       });
       await onResolved(updated);
       if (forcedMode) onCloseForce?.();
@@ -209,9 +224,27 @@ export function PaymentReceivedModal({
           />
         </label>
 
-        <p className="text-xs text-[var(--muted)] mt-3">
-          Confirmed amounts are added to dashboard revenue. Partial balances stay under Partial payments until cleared.
-        </p>
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)] mb-3">
+            Payment details (admin)
+          </p>
+          <PaymentRecordFields value={paymentMeta} onChange={setPaymentMeta} />
+        </div>
+
+        <details className="mt-3 text-xs text-[var(--muted)]">
+          <summary className="cursor-pointer font-semibold text-[var(--foreground)]">Full vs partial payment</summary>
+          <ul className="mt-2 space-y-1.5 list-disc pl-4 leading-relaxed">
+            <li>
+              <strong>Full payment</strong> — records the remaining balance (or the amount you enter). When balance reaches ₹0, the order is marked paid.
+            </li>
+            <li>
+              <strong>Split / partial</strong> — records an installment only. The order stays on Dashboard → Partial payments until the rest is collected.
+            </li>
+            <li>
+              <strong>Revenue received</strong> counts cash logged. <strong>Booked total</strong> on the order is the menu value (may be higher until fully paid).
+            </li>
+          </ul>
+        </details>
         {error && <p className="text-sm text-[var(--danger)] mt-3">{error}</p>}
 
         <div className="flex flex-col sm:flex-row gap-2 mt-6">

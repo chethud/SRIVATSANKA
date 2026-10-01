@@ -146,7 +146,7 @@ function SessionBlock({
   onOrderUpdated: (order: Enquiry) => void;
   onDishesCatalogUpdated?: () => Promise<void>;
 }) {
-  const items = dishesForColumn(column, menuItems, extras);
+  const items = dishesForColumn(column, menuItems, extras, columns);
   const [deleting, setDeleting] = useState(false);
   const [removed, setRemoved] = useState(false);
 

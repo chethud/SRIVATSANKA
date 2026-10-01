@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { updateEnquiry, type Enquiry } from '../../api/client';
 import {
   activeOrderExtraItems,
+  isOverallTotalExtra,
   mergeOrderExtraItems,
   serializeOrderNotes,
   type OrderExtraItem,
@@ -33,6 +34,8 @@ function normalizeForSave(items: OrderExtraItem[]): OrderExtraItem[] {
       quantity: row.quantity.trim(),
       amount: row.amount != null && !Number.isNaN(row.amount) && row.amount > 0 ? row.amount : null,
       enabled: row.enabled ?? false,
+      overallTotal:
+        row.overallTotal === true || /\bgrand\s*total\b/i.test(row.title.trim()),
     }))
     .filter((row) => row.isCustom ? row.title || row.description || row.quantity || row.enabled : true);
 }
@@ -82,7 +85,30 @@ export function OrderExtrasSection({
   }
 
   function updateItem(id: string, patch: Partial<OrderExtraItem>) {
-    setItems((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    setItems((prev) =>
+      prev.map((row) => {
+        if (row.id === id) {
+          const next = { ...row, ...patch };
+          if (typeof patch.title === 'string' && /\bgrand\s*total\b/i.test(patch.title.trim())) {
+            next.overallTotal = true;
+          }
+          return next;
+        }
+        if (patch.overallTotal === true) {
+          return { ...row, overallTotal: false };
+        }
+        return row;
+      }),
+    );
+  }
+
+  function setOverallTotalLine(id: string, on: boolean) {
+    setItems((prev) =>
+      prev.map((row) => ({
+        ...row,
+        overallTotal: row.id === id ? on : on ? false : row.overallTotal,
+      })),
+    );
   }
 
   function toggleItem(id: string, checked: boolean) {
@@ -191,6 +217,19 @@ export function OrderExtrasSection({
                         className="form-input w-full pl-8 pr-3 py-2 rounded-lg text-sm font-semibold"
                       />
                     </div>
+                    <label className="flex items-start gap-2 mt-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={row.overallTotal === true || isOverallTotalExtra(row)}
+                        onChange={(e) => setOverallTotalLine(row.id, e.target.checked)}
+                        disabled={saving || !row.amount}
+                        className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] shrink-0"
+                      />
+                      <span className="text-xs text-[var(--muted)] leading-snug">
+                        This amount is the <strong>overall total</strong> on order copy (not added with session
+                        totals). Or title the row <strong>Grand Total</strong>.
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -355,7 +394,14 @@ export function OrderExtrasTable({
                     {row.quantity}
                   </td>
                   {!hideAmounts && (
-                    <td className="p-3 font-semibold text-right">{formatColumnAmount(row.amount) || '—'}</td>
+                    <td className="p-3 font-semibold text-right">
+                      {formatColumnAmount(row.amount) || '—'}
+                      {isOverallTotalExtra(row) && (
+                        <span className="block text-[10px] font-bold uppercase tracking-wide text-[var(--primary)] mt-1">
+                          Overall total
+                        </span>
+                      )}
+                    </td>
                   )}
                 </tr>
               );

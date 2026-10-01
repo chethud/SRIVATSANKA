@@ -46,11 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const authWatchdog = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 6000);
 
     async function bootstrap() {
       try {
         if (isSupabaseAuth && supabase) {
-          const { data } = await supabase.auth.getSession();
+          const { data } = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Supabase session check timed out')), 5000);
+            }),
+          ]);
           if (cancelled) return;
           if (data.session) {
             applySupabaseSession(data.session, setToken, setUsername, setAuthenticated);
@@ -87,6 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setAuthenticated(false);
             }
           });
+      } catch {
+        if (!cancelled) {
+          setAuthToken(null);
+          setToken(null);
+          setUsername(null);
+          setAuthenticated(false);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -110,12 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return () => {
         cancelled = true;
+        window.clearTimeout(authWatchdog);
         listener.subscription.unsubscribe();
       };
     }
 
     return () => {
       cancelled = true;
+      window.clearTimeout(authWatchdog);
     };
   }, []);
 

@@ -75,6 +75,15 @@ async def lifespan(_app: FastAPI):
             "GEMINI_API_KEY not configured — WhatsApp will use template replies. "
             "Set GEMINI_API_KEY in whatsapp/.env"
         )
+    from app.services.chat_handoff import BOT_PAUSE_ENABLED, clear_all_bot_pauses
+
+    if not BOT_PAUSE_ENABLED:
+        async with SessionLocal() as session:
+            cleared = await clear_all_bot_pauses(session)
+            if cleared:
+                log.info("Cleared %s leftover WhatsApp bot-pause flag(s)", cleared)
+            else:
+                log.info("WhatsApp bot pause disabled — owner replies will not stop auto-replies")
     if settings.is_production:
         log.info("Running in PRODUCTION mode (dev routes and OpenAPI docs disabled)")
     yield

@@ -1,34 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { MessageCircle, X } from 'lucide-react';
+import { MessageCircle, Trash2, X } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { useAppData } from '../context/AppDataContext';
-import { ErrorBanner, FilterChips, LoadingScreen } from '../components/ui';
+import { ErrorBanner, FilterToolbar, LoadingScreen } from '../components/ui';
 import { useCreateActionListener } from '../hooks/useCreateActionListener';
 import { usePageSearch } from '../context/PageSearchContext';
-import { createEnquiry, updateEnquiryStatus, retryOwnerNotification, formatDate, formatDateTime } from '../api/client';
+import {
+  createEnquiry,
+  deleteEnquiry,
+  updateEnquiry,
+  updateEnquiryStatus,
+  retryOwnerNotification,
+  formatDate,
+  formatDateTime,
+  type Enquiry,
+} from '../api/client';
+import { CustomerEventFormFields } from '../components/CustomerEventFormFields';
+import { emptyCustomerEventForm } from '../utils/eventTypes';
 import { isUnviewedEnquiry, sortEnquiriesForAttention } from '../utils/attention';
 import { ENQUIRY_STATUS_FILTERS, statusOptionsForDropdown } from '../utils/enquiryStatus';
 import { MONTH_FILTERS, matchesMonthFilter } from '../utils/monthFilter';
 import { buildSerialNumberMap } from '../utils/serialNumbers';
 import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
-
-const EVENT_TYPES = ['Wedding', 'House Warming', 'Baby Shower', 'Reception', 'Corporate Lunch', 'Naming Ceremony', 'Other'];
-
-function defaultEventDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  return d.toISOString().slice(0, 10);
-}
-
-function defaultCallbackAt() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function callbackDisplay(enquiry: { preferredCallbackAt: string; notes?: string | null }) {
   const when = formatDateTime(enquiry.preferredCallbackAt);
@@ -44,15 +39,6 @@ function normalizePhoneDigits(value: string): string {
   return value.replace(/\D/g, '');
 }
 
-const emptyForm = () => ({
-  customerName: '',
-  phoneNumber: '',
-  eventType: EVENT_TYPES[0],
-  eventDate: defaultEventDate(),
-  eventLocation: '',
-  preferredCallbackAt: defaultCallbackAt(),
-});
-
 export default function EnquiriesPage() {
   const { loading, error, enquiries, refresh, markEnquiryViewed } = useAppData();
   const [searchParams] = useSearchParams();
@@ -65,11 +51,14 @@ export default function EnquiriesPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const markedSeenRef = useRef(new Set<string>());
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(emptyCustomerEventForm);
+  const [adminNoteDraft, setAdminNoteDraft] = useState('');
+  const [savingAdminNote, setSavingAdminNote] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [retryMsg, setRetryMsg] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   useCreateActionListener('enquiry', () => setShowForm(true));
   usePageSearch('Search name, event, phone...', search, setSearch);
@@ -113,6 +102,10 @@ export default function EnquiriesPage() {
   }, [enquiries, search, statusFilter, monthFilter, attentionOnly]);
 
   const detail = enquiries.find((e) => e.id === selected);
+
+  useEffect(() => {
+    if (detail) setAdminNoteDraft(detail.adminNote ?? '');
+  }, [detail?.id, detail?.adminNote]);
   const cuisinePreferences = useMemo(
     () => (detail?.dishes ?? []).filter((d) => PREFERENCE_CATEGORIES.has(d.category)),
     [detail],
@@ -127,6 +120,24 @@ export default function EnquiriesPage() {
   async function changeStatus(id: string, status: string) {
     await updateEnquiryStatus(id, status);
     refresh();
+  }
+
+  async function handleDeleteEnquiry(enquiry: Enquiry) {
+    if (deletingId) return;
+    const ok = window.confirm(
+      `Delete enquiry for ${enquiry.customerName}?\n\nThis permanently removes the enquiry and related dishes, payments, and notifications. This cannot be undone.`,
+    );
+    if (!ok) return;
+    setDeletingId(enquiry.id);
+    try {
+      await deleteEnquiry(enquiry.id);
+      if (selected === enquiry.id) setSelected(null);
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete the enquiry. Please try again.');
+    } finally {
+      setDeletingId('');
+    }
   }
 
   async function retryAlert(id: string) {
@@ -167,8 +178,9 @@ export default function EnquiriesPage() {
         guestCount: 0,
         preferredCallbackAt: preferredCallbackAt.toISOString(),
         notes: 'Created manually by owner',
+        adminNote: form.adminNote.trim() || undefined,
       });
-      setForm(emptyForm());
+      setForm(emptyCustomerEventForm());
       setShowForm(false);
       setSelected(created.id);
       await refresh();
@@ -196,53 +208,7 @@ export default function EnquiriesPage() {
         <Card id="page-create-form" className="p-6 mb-6">
           <h3 className="font-semibold mb-4 text-[var(--foreground)]">New enquiry (owner)</h3>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              required
-              placeholder="Customer name"
-              value={form.customerName}
-              onChange={(e) => setForm({ ...form, customerName: e.target.value })}
-              className="form-input px-3 py-2 rounded-lg"
-            />
-            <input
-              required
-              placeholder="Phone number"
-              value={form.phoneNumber}
-              onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
-              className="form-input px-3 py-2 rounded-lg"
-            />
-            <select
-              value={form.eventType}
-              onChange={(e) => setForm({ ...form, eventType: e.target.value })}
-              className="form-select px-3 py-2 rounded-lg"
-            >
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <input
-              required
-              type="date"
-              value={form.eventDate}
-              onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
-              className="form-input px-3 py-2 rounded-lg"
-            />
-            <input
-              required
-              placeholder="Event location"
-              value={form.eventLocation}
-              onChange={(e) => setForm({ ...form, eventLocation: e.target.value })}
-              className="form-input px-3 py-2 rounded-lg md:col-span-2"
-            />
-            <div className="md:col-span-2">
-              <label className="text-xs text-[var(--muted)] block mb-1">Preferred callback</label>
-              <input
-                required
-                type="datetime-local"
-                value={form.preferredCallbackAt}
-                onChange={(e) => setForm({ ...form, preferredCallbackAt: e.target.value })}
-                className="form-input w-full px-3 py-2 rounded-lg"
-              />
-            </div>
+            <CustomerEventFormFields form={form} setForm={setForm} />
             <div className="md:col-span-2 flex gap-3">
               <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save enquiry'}</Button>
               <button
@@ -256,10 +222,12 @@ export default function EnquiriesPage() {
           </form>
         </Card>
       )}
-      <div className="flex flex-col gap-3 mb-6">
-        <FilterChips options={MONTH_FILTERS} selected={monthFilter} onSelect={setMonthFilter} />
-        <FilterChips options={ENQUIRY_STATUS_FILTERS} selected={statusFilter} onSelect={setStatusFilter} />
-      </div>
+      <FilterToolbar
+        sections={[
+          { label: 'Period', options: MONTH_FILTERS, selected: monthFilter, onSelect: setMonthFilter },
+          { label: 'Status', options: ENQUIRY_STATUS_FILTERS, selected: statusFilter, onSelect: setStatusFilter },
+        ]}
+      />
 
       {filtered.length === 0 ? (
         <EmptyState message={attentionOnly ? 'No new enquiries waiting — all caught up.' : 'No enquiries match your filters.'} />
@@ -322,6 +290,17 @@ export default function EnquiriesPage() {
                         <option key={s.id} value={s.id}>{s.label}</option>
                       ))}
                     </select>
+                    <button
+                      type="button"
+                      disabled={Boolean(deletingId)}
+                      onClick={() => void handleDeleteEnquiry(e)}
+                      className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60"
+                      aria-label={`Delete enquiry for ${e.customerName}`}
+                      title="Delete"
+                    >
+                      <Trash2 size={11} />
+                      {deletingId === e.id ? '…' : 'Delete'}
+                    </button>
                   </div>
                   <p className="text-xs text-[var(--primary)] mt-3 font-medium">Tap for full details</p>
                 </div>
@@ -338,6 +317,7 @@ export default function EnquiriesPage() {
                   <th className="text-left p-4">Customer</th>
                   <th className="text-left p-4">Event</th>
                   <th className="text-left p-4 min-w-[9rem]">Status</th>
+                  <th className="text-left p-4 w-14"> </th>
                 </tr>
               </thead>
               <tbody>
@@ -385,6 +365,18 @@ export default function EnquiriesPage() {
                           <option key={s.id} value={s.id}>{s.label}</option>
                         ))}
                       </select>
+                    </td>
+                    <td className="p-4" onClick={(ev) => ev.stopPropagation()}>
+                      <button
+                        type="button"
+                        disabled={Boolean(deletingId)}
+                        onClick={() => void handleDeleteEnquiry(e)}
+                        className="inline-flex items-center justify-center p-1 rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60"
+                        aria-label={`Delete enquiry for ${e.customerName}`}
+                        title={deletingId === e.id ? 'Deleting…' : 'Delete'}
+                      >
+                        <Trash2 size={12} />
+                      </button>
                     </td>
                   </tr>
                   );
@@ -441,11 +433,15 @@ export default function EnquiriesPage() {
                         Open WhatsApp chat
                       </Link>
                       <div>
+                        <dt className="text-[var(--muted)]">Enquired on</dt>
+                        <dd>{formatDateTime(detail.createdAt)}</dd>
+                      </div>
+                      <div>
                         <dt className="text-[var(--muted)]">Event</dt>
                         <dd>{detail.eventType}</dd>
                       </div>
                       <div>
-                        <dt className="text-[var(--muted)]">Date</dt>
+                        <dt className="text-[var(--muted)]">Event date (occasion)</dt>
                         <dd>{formatDate(detail.eventDate)}</dd>
                       </div>
                       <div>
@@ -489,6 +485,36 @@ export default function EnquiriesPage() {
                         </div>
                       )}
                       <div>
+                        <dt className="text-[var(--muted)] mb-1">Admin note</dt>
+                        <dd>
+                          <textarea
+                            rows={3}
+                            value={adminNoteDraft}
+                            onChange={(e) => setAdminNoteDraft(e.target.value)}
+                            className="form-input w-full px-3 py-2 rounded-lg text-sm resize-y"
+                            placeholder="Internal notes for this enquiry"
+                          />
+                          <button
+                            type="button"
+                            disabled={savingAdminNote}
+                            onClick={async () => {
+                              setSavingAdminNote(true);
+                              try {
+                                await updateEnquiry(detail.id, { adminNote: adminNoteDraft.trim() || null });
+                                await refresh();
+                              } catch (err) {
+                                alert(err instanceof Error ? err.message : 'Could not save note');
+                              } finally {
+                                setSavingAdminNote(false);
+                              }
+                            }}
+                            className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white disabled:opacity-60"
+                          >
+                            {savingAdminNote ? 'Saving…' : 'Save note'}
+                          </button>
+                        </dd>
+                      </div>
+                      <div>
                         <dt className="text-[var(--muted)] mb-1">Status</dt>
                         <dd>
                           <select
@@ -501,6 +527,19 @@ export default function EnquiriesPage() {
                             ))}
                           </select>
                         </dd>
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={Boolean(deletingId)}
+                          onClick={() => void handleDeleteEnquiry(detail)}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60"
+                          aria-label={`Delete enquiry for ${detail.customerName}`}
+                          title="Delete enquiry"
+                        >
+                          <Trash2 size={11} />
+                          {deletingId === detail.id ? '…' : 'Delete'}
+                        </button>
                       </div>
                       <p className="text-xs text-[var(--muted)] pt-1">Pax is set per meal session on the order menu.</p>
                     </dl>

@@ -42,7 +42,7 @@ export function DashboardKpiCard({
             }
           : undefined
       }
-      className={`relative overflow-hidden rounded-[var(--radius-xl)] p-5 border border-[var(--border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow h-auto self-start ${
+      className={`relative overflow-hidden rounded-[var(--radius-xl)] p-5 border border-[var(--border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow min-w-0 w-full h-full ${
         interactive ? 'cursor-pointer hover:border-[var(--primary)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30' : ''
       }`}
       style={{ background: bg }}

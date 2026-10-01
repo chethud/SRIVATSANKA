@@ -75,7 +75,7 @@ DASHBOARD_PASSWORD=Admin@123
 JWT_SECRET=your-long-secure-random-jwt-secret
 JWT_EXPIRE_HOURS=168
 
-SEED_EXCEL_REFS_ON_STARTUP=true
+SEED_EXCEL_REFS_ON_STARTUP=false
 
 # Custom variable for backup script
 S3_BACKUP_BUCKET=kannans-db-backups-987292391022

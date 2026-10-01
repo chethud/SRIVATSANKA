@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
-export type CreateActionType = 'enquiry' | 'vendor' | 'worker' | 'dish' | 'session' | 'invoice' | 'photoEvent';
+export type CreateActionType =
+  | 'enquiry'
+  | 'order'
+  | 'vendor'
+  | 'worker'
+  | 'dish'
+  | 'session'
+  | 'invoice'
+  | 'photoEvent';
 
 type CreateActionContextValue = {
   pendingAction: CreateActionType | null;

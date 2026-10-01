@@ -1,20 +1,25 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Check, ChevronRight, Pencil, Trash2, Upload, X } from 'lucide-react';
 import { PageHeader, EmptyState, Card, Button } from '../components/Layout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { OrderScheduleBadge } from '../components/OrderScheduleBadge';
-import { FilterChips } from '../components/ui';
+import { FilterToolbar } from '../components/ui';
 import { useAppData } from '../context/AppDataContext';
 import {
+  createEnquiry,
   deleteEnquiry,
   formatDate,
   importOrderExcel,
   recognizeOrderExcel,
   updateEnquiry,
+  updateEnquiryStatus,
   type Enquiry,
   type OrderExcelRecognizePreview,
 } from '../api/client';
+import { CustomerEventFormFields } from '../components/CustomerEventFormFields';
+import { useCreateActionListener } from '../hooks/useCreateActionListener';
+import { emptyCustomerEventForm } from '../utils/eventTypes';
 import { isUnviewedOrder, sortOrdersForAttention } from '../utils/attention';
 import { MONTH_FILTERS, matchesMonthFilter } from '../utils/monthFilter';
 import { isOrderCompleted, sortOrdersBySchedule } from '../utils/orderSchedule';
@@ -40,10 +45,17 @@ export default function OrdersPage() {
   const [importMode, setImportMode] = useState<'new' | 'existing'>('new');
   const [existingOrderId, setExistingOrderId] = useState('');
   const [importError, setImportError] = useState('');
+  const [importPhone, setImportPhone] = useState('');
   const [deletingId, setDeletingId] = useState('');
   const [editingId, setEditingId] = useState('');
   const [editingName, setEditingName] = useState('');
   const [savingNameId, setSavingNameId] = useState('');
+  const [showNewOrderForm, setShowNewOrderForm] = useState(false);
+  const [newOrderForm, setNewOrderForm] = useState(emptyCustomerEventForm);
+  const [newOrderSaving, setNewOrderSaving] = useState(false);
+  const [newOrderError, setNewOrderError] = useState('');
+
+  useCreateActionListener('order', () => setShowNewOrderForm(true));
 
   const allOrders = useMemo(
     () => enquiries.filter((e) => e.status === 'CONVERTED'),
@@ -75,6 +87,7 @@ export default function OrdersPage() {
     try {
       const result = await recognizeOrderExcel(file);
       setPreview(result);
+      setImportPhone(result.order.phoneNumber ?? '');
       setImportMode('new');
       setExistingOrderId(allOrders[0]?.id ?? '');
     } catch (err) {
@@ -137,7 +150,42 @@ export default function OrdersPage() {
     setImportMode('new');
     setExistingOrderId('');
     setImportError('');
+    setImportPhone('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleCreateOrder(e: FormEvent) {
+    e.preventDefault();
+    setNewOrderSaving(true);
+    setNewOrderError('');
+    try {
+      const eventDate = new Date(`${newOrderForm.eventDate}T12:00:00`);
+      const preferredCallbackAt = new Date(newOrderForm.preferredCallbackAt);
+      if (Number.isNaN(eventDate.getTime()) || Number.isNaN(preferredCallbackAt.getTime())) {
+        setNewOrderError('Enter a valid event date and callback time.');
+        return;
+      }
+      const created = await createEnquiry({
+        customerName: newOrderForm.customerName.trim(),
+        phoneNumber: newOrderForm.phoneNumber.trim(),
+        eventType: newOrderForm.eventType,
+        eventDate: eventDate.toISOString(),
+        eventLocation: newOrderForm.eventLocation.trim(),
+        guestCount: 0,
+        preferredCallbackAt: preferredCallbackAt.toISOString(),
+        notes: 'Order created manually by admin',
+        adminNote: newOrderForm.adminNote.trim() || undefined,
+      });
+      const converted = await updateEnquiryStatus(created.id, 'CONVERTED');
+      setNewOrderForm(emptyCustomerEventForm());
+      setShowNewOrderForm(false);
+      await refresh();
+      navigate(`/orders/${converted.id}`);
+    } catch (err) {
+      setNewOrderError(err instanceof Error ? err.message : 'Could not create order.');
+    } finally {
+      setNewOrderSaving(false);
+    }
   }
 
   async function submitImport() {
@@ -152,7 +200,7 @@ export default function OrdersPage() {
       const result = await importOrderExcel({
         mode: importMode,
         existingEnquiryId: importMode === 'existing' ? existingOrderId : undefined,
-        order: preview.order,
+        order: { ...preview.order, phoneNumber: importPhone.trim() },
       });
       await refresh();
       resetImportFlow();
@@ -185,7 +233,39 @@ export default function OrdersPage() {
           if (file) void handleExcelSelect(file);
         }}
       />
+      {newOrderError && (
+        <p className="text-sm text-[var(--danger)] mb-4">{newOrderError}</p>
+      )}
+      {showNewOrderForm && (
+        <Card id="page-create-form" className="p-6 mb-6">
+          <h3 className="font-semibold mb-4 text-[var(--foreground)]">New order</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Creates a converted order immediately — add menu, venue, and payments on the order page.
+          </p>
+          <form onSubmit={handleCreateOrder} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CustomerEventFormFields form={newOrderForm} setForm={setNewOrderForm} />
+            <div className="md:col-span-2 flex gap-3">
+              <Button type="submit" disabled={newOrderSaving}>
+                {newOrderSaving ? 'Creating…' : 'Create order'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewOrderForm(false);
+                  setNewOrderError('');
+                }}
+                className="px-4 py-2.5 text-sm border border-[var(--border)] rounded-xl hover:bg-[var(--sidebar-hover)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </Card>
+      )}
       <div className="mb-6 flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={() => setShowNewOrderForm(true)} disabled={newOrderSaving}>
+          New order
+        </Button>
         <Button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -225,6 +305,18 @@ export default function OrdersPage() {
                 <div className="flex justify-between gap-3">
                   <dt className="text-[var(--muted)]">Customer</dt>
                   <dd className="text-right font-medium">{preview.order.customerName}</dd>
+                </div>
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:justify-between sm:items-center">
+                  <dt className="text-[var(--muted)]">Contact phone</dt>
+                  <dd className="sm:text-right">
+                    <input
+                      type="tel"
+                      value={importPhone}
+                      onChange={(e) => setImportPhone(e.target.value)}
+                      className="form-input w-full sm:w-48 px-2 py-1.5 rounded-lg text-sm tabular-nums"
+                      placeholder="Phone number"
+                    />
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-[var(--muted)]">Event</dt>
@@ -334,10 +426,12 @@ export default function OrdersPage() {
       {importError && !preview && (
         <p className="mb-6 text-sm text-[var(--danger)]">{importError}</p>
       )}
-      <div className="flex flex-col gap-3 mb-6">
-        <FilterChips options={SCHEDULE_FILTERS} selected={scheduleFilter} onSelect={setScheduleFilter} />
-        <FilterChips options={MONTH_FILTERS} selected={monthFilter} onSelect={setMonthFilter} />
-      </div>
+      <FilterToolbar
+        sections={[
+          { label: 'Orders', options: SCHEDULE_FILTERS, selected: scheduleFilter, onSelect: setScheduleFilter },
+          { label: 'Period', options: MONTH_FILTERS, selected: monthFilter, onSelect: setMonthFilter },
+        ]}
+      />
       {orders.length === 0 ? (
         <EmptyState
           message={
@@ -358,15 +452,11 @@ export default function OrdersPage() {
             return (
               <Card
                 key={e.id}
-                className={`relative w-full self-stretch p-5 hover:border-[var(--primary)] transition-colors flex items-center justify-between gap-4 ${
+                className={`w-full self-stretch p-5 hover:border-[var(--primary)] transition-colors flex items-center justify-between gap-4 ${
                   unread ? 'attention-unread' : completed ? 'opacity-90' : ''
                 }`}
               >
-                <OrderScheduleBadge
-                  eventDate={e.eventDate}
-                  className="absolute top-3 right-28 sm:right-36"
-                />
-                <div className="min-w-0 flex-1 pr-24 sm:pr-28">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-[var(--muted)] tabular-nums">#{serial}</span>
                     {editing ? (
@@ -421,7 +511,7 @@ export default function OrdersPage() {
                         </button>
                       </>
                     )}
-                    {unread && <AttentionBadge label="New order" />}
+                    {unread ? <AttentionBadge label="New order" /> : null}
                   </div>
                   <Link to={`/orders/${e.id}`} className="block">
                     <p className="text-sm text-[var(--muted)]">
@@ -433,24 +523,27 @@ export default function OrdersPage() {
                     </p>
                   </Link>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    disabled={Boolean(deletingId)}
-                    onClick={() => void handleDeleteOrder(e)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 min-h-[2.5rem]"
-                    aria-label={`Delete order for ${e.customerName}`}
-                  >
-                    <Trash2 size={14} />
-                    <span className="hidden sm:inline">{deleting ? 'Deleting…' : 'Delete'}</span>
-                  </button>
-                  <Link
-                    to={`/orders/${e.id}`}
-                    className="p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
-                    aria-label={`Open order for ${e.customerName}`}
-                  >
-                    <ChevronRight size={20} />
-                  </Link>
+                <div className="flex flex-col items-end gap-2 shrink-0 self-stretch justify-center">
+                  <OrderScheduleBadge eventDate={e.eventDate} />
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={Boolean(deletingId)}
+                      onClick={() => void handleDeleteOrder(e)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 min-h-[2.5rem]"
+                      aria-label={`Delete order for ${e.customerName}`}
+                    >
+                      <Trash2 size={14} />
+                      <span className="hidden sm:inline">{deleting ? 'Deleting…' : 'Delete'}</span>
+                    </button>
+                    <Link
+                      to={`/orders/${e.id}`}
+                      className="p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+                      aria-label={`Open order for ${e.customerName}`}
+                    >
+                      <ChevronRight size={20} />
+                    </Link>
+                  </div>
                 </div>
               </Card>
             );

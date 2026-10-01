@@ -12,11 +12,7 @@ import {
   UpcomingEventsList,
   type DashboardTab,
 } from '../components/dashboard/DashboardSections';
-import {
-  ProfitRadialSnapshot,
-  RevenueExpenseInteractiveChart,
-  RevenueForecastChart,
-} from '../components/charts';
+import { ProfitRadialSnapshot, RevenueExpenseInteractiveChart } from '../components/charts';
 import { MoneyHistoryModal } from '../components/MoneyHistoryModal';
 import { BRAND_NAME } from '../brand';
 import { PaymentReceivedModal } from '../components/PaymentReceivedModal';
@@ -26,13 +22,13 @@ import { ErrorBanner, LoadingScreen } from '../components/ui';
 import { formatCurrency } from '../api/client';
 import {
   buildChartSeries,
-  buildForecast,
   calcTrend,
   type ChartPeriod,
   getConvertedOrders,
   getRecentOrders,
   getTodaysEvents,
   getUpcomingEvents,
+  totalBookedOrderValue,
 } from '../utils/dashboardData';
 import { isPartialPaymentOrder } from '../utils/orderBilling';
 
@@ -50,12 +46,11 @@ export default function DashboardPage() {
   const prevM = monthly[monthly.length - 2];
 
   const chartData = useMemo(() => buildChartSeries(analytics, chartMode), [analytics, chartMode]);
-  const forecastData = useMemo(() => buildForecast(analytics), [analytics]);
-
+  const bookedValue = useMemo(() => totalBookedOrderValue(enquiries), [enquiries]);
   if (loading && !stats) return <LoadingScreen />;
 
   const profit = analytics?.net_profit ?? 0;
-  const revenue = analytics?.order_revenue ?? analytics?.total_revenue ?? 0;
+  const revenueReceived = analytics?.order_revenue ?? analytics?.total_revenue ?? 0;
   const expenses = analytics?.total_expenses ?? 0;
   const revenueItems = (analytics?.revenue_items ?? []).filter(
     (i) => !i.source || i.source === 'order',
@@ -108,7 +103,7 @@ export default function DashboardPage() {
       ) : (
         <>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 grid-cards-equal">
         <DashboardKpiCard
           label="New enquiries"
           value={String(stats?.new_enquiries ?? 0)}
@@ -129,14 +124,23 @@ export default function DashboardPage() {
           gradient={2}
         />
         <DashboardKpiCard
-          label="Total revenue"
-          value={formatCurrency(revenue)}
-          numericValue={revenue}
+          label="Revenue received"
+          value={formatCurrency(revenueReceived)}
+          numericValue={revenueReceived}
           formatValue={formatCurrency}
-          subtext="from orders"
+          subtext="cash logged on orders"
           icon={TrendingUp}
-          trend={calcTrend(lastM?.revenue ?? revenue, prevM?.revenue ?? 0)}
+          trend={calcTrend(lastM?.revenue ?? revenueReceived, prevM?.revenue ?? 0)}
           onClick={() => setHistory('revenue')}
+        />
+        <DashboardKpiCard
+          label="Booked order value"
+          value={formatCurrency(bookedValue)}
+          numericValue={bookedValue}
+          formatValue={formatCurrency}
+          subtext="order copy totals (incl. unpaid)"
+          icon={Wallet}
+          gradient={2}
         />
         <DashboardKpiCard
           label="Bill expenses"
@@ -151,7 +155,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 grid-cards-equal">
         <GlassCard title="Upcoming events" action={<Link to="/orders" className="text-xs font-semibold text-[var(--primary)]">Calendar</Link>}>
           <UpcomingEventsList events={getUpcomingEvents(enquiries)} />
         </GlassCard>
@@ -166,7 +170,7 @@ export default function DashboardPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 grid-cards-equal">
         <GlassCard
           className="xl:col-span-2"
           title="Revenue vs expense"
@@ -181,15 +185,10 @@ export default function DashboardPage() {
         </GlassCard>
 
         <GlassCard title="Profit snapshot">
-          <ProfitRadialSnapshot profit={profit} revenue={revenue} expenses={expenses} />
+          <ProfitRadialSnapshot profit={profit} revenue={revenueReceived} expenses={expenses} />
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 items-start">
-        <GlassCard title="Revenue forecast" action={<span className="text-xs text-[var(--muted)]">Projected</span>}>
-          <RevenueForecastChart data={forecastData} />
-        </GlassCard>
-      </div>
         </>
       )}
     </div>

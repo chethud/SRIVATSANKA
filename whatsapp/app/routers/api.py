@@ -51,7 +51,7 @@ def _block_in_production() -> None:
 def _enquiry_billing_figures(e: Enquiry, menu_prices: dict[str, float] | None = None) -> tuple[float, float, float]:
     """Return (billing_total, amount_paid, amount_due)."""
     prices = menu_prices or {}
-    from_notes = billing_total_from_notes(e.notes)
+    from_notes = billing_total_from_notes(e.notes, getattr(e, "dish_items", None))
     if from_notes is not None and from_notes > 0:
         billing = from_notes
     else:
@@ -70,6 +70,8 @@ def _enquiry_to_out(e: Enquiry, menu_prices: dict[str, float] | None = None) -> 
             amount=p.amount,
             payerName=p.payerName,
             notes=p.notes,
+            paymentMode=getattr(p, "paymentMode", None),
+            receivedAccount=getattr(p, "receivedAccount", None),
             paidAt=p.paidAt,
         )
         for p in (getattr(e, "payments", None) or [])
@@ -86,6 +88,7 @@ def _enquiry_to_out(e: Enquiry, menu_prices: dict[str, float] | None = None) -> 
         status=e.status.value if hasattr(e.status, "value") else str(e.status),
         ownerViewedAt=e.ownerViewedAt,
         notes=e.notes,
+        adminNote=getattr(e, "adminNote", None),
         deliveredAt=getattr(e, "deliveredAt", None),
         paymentReceived=bool(getattr(e, "paymentReceived", False)),
         discountAmount=float(getattr(e, "discountAmount", 0) or 0),
@@ -258,6 +261,7 @@ async def create_enquiry(
         preferredCallbackAt=as_naive_utc(payload.preferredCallbackAt),
         status=EnquiryStatus.NEW,
         notes=payload.notes or "Created manually by owner",
+        adminNote=(payload.adminNote or "").strip() or None,
     )
     db.add(enquiry)
     await db.flush()
@@ -399,11 +403,15 @@ async def update_enquiry(
         raise HTTPException(status_code=404, detail="Enquiry not found")
     if payload.notes is not None:
         enquiry.notes = payload.notes
+    if payload.adminNote is not None:
+        enquiry.adminNote = payload.adminNote.strip() or None
     if payload.customerName is not None:
         cleaned = payload.customerName.strip()
         if not cleaned:
             raise HTTPException(status_code=400, detail="Customer name cannot be empty")
         enquiry.customerName = cleaned
+    if payload.phoneNumber is not None:
+        enquiry.phoneNumber = payload.phoneNumber.strip()
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)
@@ -506,12 +514,18 @@ async def confirm_enquiry_payment(
         installment = max(0.0, billing - float(enquiry.discountAmount or 0))
 
     if installment > 0:
+        mode = (payload.paymentMode or "").strip().lower()
+        if mode and mode not in {"cash", "online"}:
+            raise HTTPException(status_code=400, detail="paymentMode must be cash or online")
+        paid_at = payload.paidAt if payload.paidAt is not None else datetime.now()
         payment = EnquiryPayment(
             enquiryId=enquiry.id,
             amount=installment,
             payerName=(payload.payerName or "").strip() or enquiry.customerName,
             notes=(payload.notes or "").strip() or None,
-            paidAt=datetime.now(),
+            paymentMode=mode or None,
+            receivedAccount=(payload.receivedAccount or "").strip() or None,
+            paidAt=paid_at,
         )
         db.add(payment)
         if enquiry.deliveredAt is None:

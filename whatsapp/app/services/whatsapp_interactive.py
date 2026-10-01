@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 # Reply button titles must be <= 20 chars; list row titles <= 24.
+WHATSAPP_MAX_LIST_ROWS = 10
 
 EVENT_ROWS = (
     ("event_wedding", "Wedding", "Ceremony, reception & coordination"),
@@ -111,6 +112,7 @@ class InteractiveSpec:
 
     def to_payload(self) -> dict:
         if self.kind == "list":
+            rows = list(self.rows)[:WHATSAPP_MAX_LIST_ROWS]
             action = {
                 "button": self.list_button[:20],
                 "sections": [
@@ -122,7 +124,7 @@ class InteractiveSpec:
                                 "title": title[:24],
                                 **({"description": desc[:72]} if desc else {}),
                             }
-                            for row_id, title, desc in self.rows
+                            for row_id, title, desc in rows
                         ],
                     }
                 ],

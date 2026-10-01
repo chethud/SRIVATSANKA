@@ -6,16 +6,12 @@ import {
   numberToIndianWords,
   shortInvoiceNo,
 } from './invoiceCompany';
-import {
-  activeOrderExtraItems,
-  parseOrderNotes,
-  sumExtraItemAmounts,
-} from './orderNotes';
+import { activeOrderExtraItems, parseOrderNotes } from './orderNotes';
+import { orderCopyBillingBase } from './orderBilling';
 import {
   dishesForColumn,
   formatPaxTimeLine,
   resolveMenuColumns,
-  sumOrderCopyTotals,
 } from './orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from './mealSessions';
 
@@ -49,7 +45,8 @@ function buildInvoiceLines(
   const showExtras = copyType === 'billing' || copyType === 'ours';
 
   for (const col of columns) {
-    const items = dishesForColumn(col, menuItems, extras);
+    const items = dishesForColumn(col, menuItems, extras, columns);
+    if (showExtras && items.length === 0) continue;
     const dishNames = items.map((d) => d.dishName).filter(Boolean);
     const paxLine = formatPaxTimeLine(col);
     const guestLabel = enquiry.eventType ? ` for ${enquiry.eventType}` : '';
@@ -337,20 +334,9 @@ export async function buildTaxInvoiceWorkbook(
 
   let subTotal = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   if (subTotal === 0) {
-    const extras = parseOrderNotes(enquiry.notes);
-    const columns = resolveMenuColumns(
-      extras,
-      enquiry,
-      (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category)),
-    );
-    const sessionTotal = sumOrderCopyTotals(columns);
-    const extrasTotal = extras.extrasEnabled ? sumExtraItemAmounts(extras.extraItems) : null;
-    const parts = [sessionTotal, extrasTotal].filter((a): a is number => a != null);
-    if (parts.length > 0) {
-      subTotal = scaleMoney(
-        parts.reduce((s, a) => s + a, 0),
-        amountScale,
-      );
+    const base = orderCopyBillingBase(enquiry);
+    if (base > 0) {
+      subTotal = scaleMoney(base, amountScale);
     }
   }
 

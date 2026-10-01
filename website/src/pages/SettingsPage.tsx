@@ -6,8 +6,31 @@ import { fetchWhatsAppStatus, updateOwnerPhone, formatPhoneDisplay, normalizePho
 import { ErrorBanner } from '../components/ui';
 import { BRAND_NAME, BRAND_TAGLINE } from '../brand';
 
+function ApiStatusChip({
+  connected,
+  onRefresh,
+}: {
+  connected: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] shadow-[var(--shadow-sm)] hover:border-[var(--primary)]/40 transition-colors"
+      title="Refresh dashboard data"
+    >
+      <span
+        className={`h-2 w-2 rounded-full shrink-0 ${connected ? 'bg-[var(--success-text)]' : 'bg-[var(--danger)]'}`}
+        aria-hidden
+      />
+      API {connected ? 'Connected' : 'Offline'}
+    </button>
+  );
+}
+
 export default function SettingsPage() {
-  const { connected, stats, lastSync, refresh } = useAppData();
+  const { connected, refresh } = useAppData();
   const { fontScale, setFontScale } = useTheme();
   const [wa, setWa] = useState<WhatsAppStatus | null>(null);
   const [ownerPhone, setOwnerPhone] = useState('');
@@ -26,7 +49,7 @@ export default function SettingsPage() {
         })
         .catch(() => setWa(null));
     }
-  }, [connected, lastSync, editingOwnerPhone]);
+  }, [connected, editingOwnerPhone]);
 
   async function saveOwnerPhone() {
     setSavingOwnerPhone(true);
@@ -46,61 +69,13 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Live connection status and integrations" />
+      <PageHeader
+        title="Settings"
+        description="Business profile and display preferences"
+        actions={<ApiStatusChip connected={connected} onRefresh={() => void refresh()} />}
+      />
       <ErrorBanner message={!connected ? 'API offline — start FastAPI on port 8001' : ''} />
-      <div className="space-y-6 max-w-2xl">
-        <Card className="p-6">
-          <h3 className="font-semibold mb-2">Display</h3>
-          <p className="text-sm text-[var(--muted)] mb-4">
-            Increase or decrease text size across the whole dashboard. Saved on this device.
-          </p>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)] mb-2">
-            Font size
-          </p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Font size">
-            {FONT_SCALE_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setFontScale(opt.id)}
-                className={`px-3.5 py-2 rounded-lg text-sm font-semibold border transition-colors ${
-                  fontScale === opt.id
-                    ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
-                    : 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-sm text-[var(--muted)] mt-3">
-            Preview: The quick brown fox jumps over the lazy dog.
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4">System Status</h3>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-[var(--muted)]">API</dt>
-              <dd className={connected ? 'text-[var(--logo-forest)] font-medium' : 'text-[var(--danger)]'}>
-                {connected ? 'Connected' : 'Offline'}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-[var(--muted)]">New Enquiries</dt>
-              <dd>{stats?.new_enquiries ?? '—'}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-[var(--muted)]">Menu Dishes</dt>
-              <dd>{stats?.total_dishes ?? '—'}</dd>
-            </div>
-            <button type="button" onClick={() => refresh()} className="text-sm text-[var(--primary)] hover:underline mt-2">
-              Force refresh now
-            </button>
-          </dl>
-        </Card>
-
+      <div className="space-y-4 max-w-2xl">
         <Card className="p-6">
           <h3 className="font-semibold mb-4">Business Profile</h3>
           <div className="space-y-4">
@@ -164,6 +139,30 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        <Card className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm">Display</h3>
+              <p className="text-xs text-[var(--muted)] mt-0.5">Font size — saved on this device</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Font size">
+              {FONT_SCALE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setFontScale(opt.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    fontScale === opt.id
+                      ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                      : 'bg-[var(--background)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
       </div>
     </>
   );

@@ -20,6 +20,8 @@ export type OrderExtraItem = {
   /** User-added row (not from preset list) */
   isCustom?: boolean;
   quantity: string;
+  /** When set, this line is the order copy overall total (not added on top of sessions). */
+  overallTotal?: boolean;
 };
 
 export const DEFAULT_ORDER_EXTRA_PRESETS = [
@@ -81,8 +83,54 @@ export function activeOrderExtraItems(items: OrderExtraItem[] | undefined): Orde
   return mergeOrderExtraItems(items).filter((row) => row.enabled && row.title.trim());
 }
 
+const AUTHORITATIVE_TOTAL_EXTRA =
+  /\b(grand\s*total|overall\s*total|total\s*amount|total\s*bill|contract\s*total|final\s*total|package\s*total)\b/i;
+
+/** Extra line that states the full order value (not an add-on to session totals). */
+export function isAuthoritativeTotalExtra(row: OrderExtraItem): boolean {
+  const title = row.title.trim();
+  if (!title) return false;
+  if (AUTHORITATIVE_TOTAL_EXTRA.test(title)) return true;
+  if (/^total$/i.test(title)) return true;
+  const desc = row.description.trim();
+  return desc ? AUTHORITATIVE_TOTAL_EXTRA.test(desc) : false;
+}
+
+/** Grand-total / overall-total line — footer uses this amount only (no session + extras sum). */
+export function isOverallTotalExtra(row: OrderExtraItem): boolean {
+  if (row.overallTotal === true) return true;
+  if (isAuthoritativeTotalExtra(row)) return true;
+  return /\bgrand\s*total\b/i.test(row.title.trim());
+}
+
+/** Amount from the grand-total extra row (last match wins). */
+export function overallTotalFromExtras(extras: OrderExtras): number | null {
+  if (!extras.extrasEnabled) return null;
+  const amounts = activeOrderExtraItems(extras.extraItems)
+    .filter(isOverallTotalExtra)
+    .map((row) => row.amount)
+    .filter((a): a is number => typeof a === 'number' && !Number.isNaN(a) && a > 0);
+  if (amounts.length === 0) return null;
+  return amounts[amounts.length - 1];
+}
+
+/** @deprecated use overallTotalFromExtras */
+export function authoritativeTotalFromExtras(extras: OrderExtras): number | null {
+  return overallTotalFromExtras(extras);
+}
+
 export function sumExtraItemAmounts(items: OrderExtraItem[] | undefined): number | null {
   const amounts = activeOrderExtraItems(items)
+    .map((row) => row.amount)
+    .filter((a): a is number => a != null && !Number.isNaN(a) && a > 0);
+  if (amounts.length === 0) return null;
+  return amounts.reduce((sum, amount) => sum + amount, 0);
+}
+
+/** Extras that add to session totals (excludes grand-total / contract lines). */
+export function sumBillableExtraItemAmounts(items: OrderExtraItem[] | undefined): number | null {
+  const amounts = activeOrderExtraItems(items)
+    .filter((row) => !isOverallTotalExtra(row))
     .map((row) => row.amount)
     .filter((a): a is number => a != null && !Number.isNaN(a) && a > 0);
   if (amounts.length === 0) return null;
@@ -132,6 +180,8 @@ export type OrderExtras = {
   /** @deprecated use assignedWorkerIds */
   primaryWorkerId?: string | null;
   assignedWorkerIds?: string[];
+  /** Headcount for staff roles like Extra cleaners / Extra servers (workerId → count). */
+  staffHeadcounts?: Record<string, number>;
   dispatchPhase?: DispatchPhase;
   itemDispatch?: Record<string, DispatchItemStatus>;
 };
@@ -247,6 +297,7 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'venueMapLink' in parsed ||
     'primaryWorkerId' in parsed ||
     'assignedWorkerIds' in parsed ||
+    'staffHeadcounts' in parsed ||
     'dispatchPhase' in parsed ||
     'itemDispatch' in parsed
   );
@@ -294,6 +345,14 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
           : parsed.primaryWorkerId
             ? [parsed.primaryWorkerId]
             : [],
+        staffHeadcounts:
+          parsed.staffHeadcounts && typeof parsed.staffHeadcounts === 'object'
+            ? Object.fromEntries(
+                Object.entries(parsed.staffHeadcounts)
+                  .map(([k, v]) => [k, Math.max(0, Math.floor(Number(v) || 0))] as const)
+                  .filter(([, n]) => n > 0),
+              )
+            : {},
         dispatchPhase: parsed.dispatchPhase ?? 'planned',
         itemDispatch: parsed.itemDispatch ?? {},
       };

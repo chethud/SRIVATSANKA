@@ -1,18 +1,47 @@
 import type { Enquiry } from '../api/client';
-import { parseOrderNotes, sumExtraItemAmounts } from './orderNotes';
-import { resolveMenuColumns, sumOrderCopyTotals } from './orderMenuGrid';
+import { PREFERENCE_CATEGORIES } from './mealSessions';
+import {
+  overallTotalFromExtras,
+  parseOrderNotes,
+  sumBillableExtraItemAmounts,
+} from './orderNotes';
+import { resolveMenuColumns, sumBillableSessionTotals } from './orderMenuGrid';
+
+/** Session totals + extras exactly as shown on order / our copy (unscaled). */
+export function orderCopyBillingBase(order: Enquiry): number {
+  const extras = parseOrderNotes(order.notes);
+  const overall = overallTotalFromExtras(extras);
+  if (overall != null) return overall;
+
+  const menuItems = (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
+  const columns = resolveMenuColumns(extras, order, menuItems);
+  const sessions = sumBillableSessionTotals(columns, menuItems, extras) ?? 0;
+  const extrasSum = extras.extrasEnabled ? (sumBillableExtraItemAmounts(extras.extraItems) ?? 0) : 0;
+  return sessions + extrasSum;
+}
+
+export function orderCopyBillingBreakdown(order: Enquiry): {
+  sessions: number;
+  extras: number;
+  contractTotal: number | null;
+} {
+  const extras = parseOrderNotes(order.notes);
+  const contractTotal = overallTotalFromExtras(extras);
+  const menuItems = (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
+  const columns = resolveMenuColumns(extras, order, menuItems);
+  const sessions = sumBillableSessionTotals(columns, menuItems, extras) ?? 0;
+  const extrasSum = extras.extrasEnabled ? (sumBillableExtraItemAmounts(extras.extraItems) ?? 0) : 0;
+  return { sessions, extras: extrasSum, contractTotal };
+}
 
 /** Order-copy billing total (session amounts + extras), matching Excel/billing view. */
 export function orderBillingTotal(order: Enquiry): number {
+  const fromNotes = orderCopyBillingBase(order);
+  if (fromNotes > 0) return fromNotes;
+
   if (typeof order.billingTotal === 'number' && order.billingTotal > 0) {
     return order.billingTotal;
   }
-  const extras = parseOrderNotes(order.notes);
-  const columns = resolveMenuColumns(extras, order, order.dishes ?? []);
-  const sessions = sumOrderCopyTotals(columns) ?? 0;
-  const extrasSum = sumExtraItemAmounts(extras.extraItems) ?? 0;
-  const fromNotes = sessions + extrasSum;
-  if (fromNotes > 0) return fromNotes;
 
   const perGuest = (order.dishes ?? []).reduce(
     (s, d) => s + (d.unitPrice ?? 0) * Math.max(1, d.quantity || 1),

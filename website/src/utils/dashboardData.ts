@@ -11,6 +11,15 @@ export function getConvertedOrders(enquiries: Enquiry[]) {
   return enquiries.filter((e) => e.status === 'CONVERTED');
 }
 
+/** Contract value on converted orders — same rules as order copy overall total. */
+export function totalBookedOrderValue(enquiries: Enquiry[]): number {
+  return getConvertedOrders(enquiries).reduce((sum, enquiry) => {
+    const billing = orderBillingTotal(enquiry);
+    const discount = orderDiscount(enquiry);
+    return sum + Math.max(0, billing - discount);
+  }, 0);
+}
+
 export function getRecentOrders(enquiries: Enquiry[], limit = 6) {
   return [...getConvertedOrders(enquiries)]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

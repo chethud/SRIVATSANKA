@@ -233,11 +233,14 @@ class EnquiryCreateIn(BaseModel):
     guestCount: int = 0
     preferredCallbackAt: datetime
     notes: str | None = None
+    adminNote: str | None = None
 
 
 class EnquiryUpdateIn(BaseModel):
     notes: str | None = None
+    adminNote: str | None = None
     customerName: str | None = None
+    phoneNumber: str | None = None
 
 
 class EnquiryPaymentIn(BaseModel):
@@ -248,6 +251,9 @@ class EnquiryPaymentIn(BaseModel):
     payerName: str | None = None
     discountAmount: float | None = None
     notes: str | None = None
+    paymentMode: str | None = None  # cash | online
+    receivedAccount: str | None = None
+    paidAt: datetime | None = None
 
 
 class EnquiryPaymentOut(BaseModel):
@@ -255,6 +261,8 @@ class EnquiryPaymentOut(BaseModel):
     amount: float
     payerName: str | None = None
     notes: str | None = None
+    paymentMode: str | None = None
+    receivedAccount: str | None = None
     paidAt: datetime
 
 
@@ -270,6 +278,7 @@ class EnquiryOut(BaseModel):
     status: str
     ownerViewedAt: datetime | None = None
     notes: str | None = None
+    adminNote: str | None = None
     deliveredAt: datetime | None = None
     paymentReceived: bool = False
     discountAmount: float = 0
@@ -363,26 +372,43 @@ class EventPhotoAlbumsOut(BaseModel):
 class VendorIn(BaseModel):
     name: str
     businessName: str | None = None
-    phoneNumber: str
+    phoneNumber: str = ""
+    phoneNumbers: list[str] = []
     category: str
     notes: str | None = None
 
 
-class VendorOut(VendorIn):
+class VendorOut(BaseModel):
     id: str
+    name: str
+    businessName: str | None = None
+    phoneNumber: str
+    phoneNumbers: list[str] = []
+    category: str
+    notes: str | None = None
     createdAt: datetime
+
+
+class VendorCategoryIn(BaseModel):
+    name: str
 
 
 class WorkerIn(BaseModel):
     name: str
-    phoneNumber: str
+    phoneNumber: str = ""
     role: str
     dailyWage: float = 0
     isLead: bool = False
+    isActive: bool = True
 
 
 class WorkerUpdateIn(BaseModel):
+    name: str | None = None
+    phoneNumber: str | None = None
+    role: str | None = None
+    dailyWage: float | None = None
     isLead: bool | None = None
+    isActive: bool | None = None
 
 
 class WorkerOut(WorkerIn):
@@ -465,6 +491,7 @@ class MonthlyChartPoint(BaseModel):
 class AnalyticsOut(BaseModel):
     total_revenue: float
     order_revenue: float
+    booked_order_value: float = 0
     uploaded_revenue: float
     total_expenses: float
     global_expenses: float

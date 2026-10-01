@@ -21,7 +21,7 @@ export function GlassCard({
 }) {
   return (
     <div
-      className={`rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow h-auto self-start ${className}`}
+      className={`rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow min-w-0 w-full h-full ${className}`}
     >
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 pt-4 sm:pt-5 pb-0">

@@ -4,6 +4,7 @@ export type { CreateActionType };
 
 export function getCreateActionForPath(pathname: string): CreateActionType | null {
   if (pathname.startsWith('/enquiries')) return 'enquiry';
+  if (pathname.startsWith('/orders')) return 'order';
   if (pathname.startsWith('/vendors')) return 'vendor';
   if (pathname.startsWith('/workers')) return 'worker';
   if (pathname.startsWith('/dishes')) return 'dish';
@@ -21,6 +22,8 @@ export function getCreateButtonLabel(pathname: string): string {
   switch (action) {
     case 'enquiry':
       return 'New enquiry';
+    case 'order':
+      return 'New order';
     case 'vendor':
       return 'New vendor';
     case 'worker':

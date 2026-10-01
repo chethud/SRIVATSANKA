@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas import ChatConversationOut, ChatMessageOut, OwnerChatMessageIn
-from app.services.chat_handoff import pause_bot_for_phone, resume_bot_for_phone
+from app.services.chat_handoff import BOT_PAUSE_ENABLED, pause_bot_for_phone, resume_bot_for_phone
 from app.services.enquiry_service import mark_enquiry_seen_for_phone
 from app.services.chat_log import delete_conversation, get_messages, list_conversations, log_owner_message
 from app.services.whatsapp_client import normalize_phone, send_whatsapp_message
@@ -51,8 +51,13 @@ async def send_owner_message(
     await log_owner_message(db, normalized, text)
     await pause_bot_for_phone(db, normalized)
     await mark_enquiry_seen_for_phone(db, normalized)
-    logger.info("Owner replied to %s via dashboard chat — bot auto-reply paused", normalized)
-    return {"ok": True, "phoneNumber": normalized, "botPaused": True}
+    paused = BOT_PAUSE_ENABLED
+    logger.info(
+        "Owner replied to %s via dashboard chat — bot auto-reply %s",
+        normalized,
+        "paused" if paused else "still active",
+    )
+    return {"ok": True, "phoneNumber": normalized, "botPaused": paused}
 
 
 @router.post("/conversations/{phone}/pause")
@@ -66,8 +71,13 @@ async def pause_bot_for_conversation(
         raise HTTPException(status_code=400, detail="Invalid phone number")
     await pause_bot_for_phone(db, normalized)
     await mark_enquiry_seen_for_phone(db, normalized)
-    logger.info("Bot auto-reply paused for %s (owner taking over)", normalized)
-    return {"ok": True, "phoneNumber": normalized, "botPaused": True}
+    paused = BOT_PAUSE_ENABLED
+    logger.info(
+        "Bot auto-reply %s for %s (owner taking over)",
+        "paused" if paused else "left active",
+        normalized,
+    )
+    return {"ok": True, "phoneNumber": normalized, "botPaused": paused}
 
 
 @router.post("/conversations/{phone}/resume")

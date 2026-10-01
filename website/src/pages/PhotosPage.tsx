@@ -327,27 +327,29 @@ export default function PhotosPage() {
           )}
         </>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 grid-cards-equal">
           {eventCards.map((item) => (
             <button
               key={item.eventType}
               type="button"
               onClick={() => setSelected(item.eventType)}
-              className="text-left"
+              className="card-tile text-left"
             >
-              <Card className="overflow-hidden hover:border-[var(--primary)]/40 transition-colors">
+              <Card className="card-tile overflow-hidden hover:border-[var(--primary)]/40 transition-colors">
                 <img
                   src={item.coverUrl}
                   alt={item.eventType}
-                  className="w-full h-52 object-cover bg-[var(--sidebar-hover)]"
+                  className="w-full h-52 shrink-0 object-cover bg-[var(--sidebar-hover)]"
                 />
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-[var(--foreground)]">{item.eventType}</h3>
-                  <p className="text-xs text-[var(--muted)] mt-1">{item.blurb}</p>
-                  <p className="text-xs text-[var(--muted)] mt-1">
+                <div className="card-tile__body p-4">
+                  <h3 className="text-sm font-medium text-[var(--foreground)] line-clamp-1">{item.eventType}</h3>
+                  <p className="text-xs text-[var(--muted)] mt-1 line-clamp-2 min-h-[2.5rem] leading-relaxed">
+                    {item.blurb}
+                  </p>
+                  <p className="text-xs text-[var(--muted)] mt-1 tabular-nums">
                     {item.count}/{MAX_PHOTOS_PER_EVENT} photos
                   </p>
-                  <p className="text-xs text-[var(--primary)] mt-2 font-medium inline-flex items-center gap-1">
+                  <p className="card-tile__foot pt-2 text-xs text-[var(--primary)] font-medium inline-flex items-center gap-1">
                     <ImagePlus size={14} />
                     Open {item.eventType}
                   </p>
@@ -371,16 +373,16 @@ function PhotoGrid({
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 grid-cards-equal">
       {photos.map((photo) => (
-        <Card key={photo.id} className="overflow-hidden">
+        <Card key={photo.id} className="card-tile overflow-hidden">
           <img
             src={photo.url}
             alt={photo.caption || eventType}
-            className="w-full h-52 object-cover bg-[var(--sidebar-hover)]"
+            className="w-full h-52 shrink-0 object-cover bg-[var(--sidebar-hover)]"
           />
-          <div className="p-4 flex items-start justify-between gap-3">
-            <p className="text-sm font-medium text-[var(--foreground)]">
+          <div className="card-tile__body p-4 flex flex-row items-start justify-between gap-3 min-h-[4.5rem]">
+            <p className="text-sm font-medium text-[var(--foreground)] line-clamp-2 min-w-0">
               {photo.caption || photo.fileName}
             </p>
             <button

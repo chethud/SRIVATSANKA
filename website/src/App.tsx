@@ -27,7 +27,7 @@ export default function App() {
       </Route>
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<RequireAuth />}>
-      <Route element={<DashboardLayout />}>
+        <Route element={<DashboardLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="enquiries" element={<EnquiriesPage />} />
         <Route path="orders" element={<OrdersPage />} />
@@ -46,7 +46,7 @@ export default function App() {
         <Route path="bot-tester" element={<BotTesterPage />} />
         <Route path="photos" element={<PhotosPage />} />
         <Route path="settings" element={<SettingsPage />} />
-      </Route>
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

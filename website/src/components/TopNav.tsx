@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Layers, Menu, Moon, Plus, Search, Sun } from 'lucide-react';
+import { Bell, Layers, Menu, Moon, PanelLeft, PanelLeftClose, Plus, Search, Sun } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useCreateAction } from '../context/CreateActionContext';
 import { useLayout } from '../context/LayoutContext';
@@ -21,7 +21,7 @@ export function TopNav() {
   const { notifications, stats, enquiries, markNotificationsRead } = useAppData();
   const { theme, toggleTheme } = useTheme();
   const { triggerCreate } = useCreateAction();
-  const { isMobileNav, mobileNavOpen, toggleMobileNav } = useLayout();
+  const { isMobileNav, mobileNavOpen, toggleMobileNav, sidebarCollapsed, toggleSidebar } = useLayout();
   const { config: pageSearch } = usePageSearchSlot();
   const location = useLocation();
   const navigate = useNavigate();
@@ -151,6 +151,18 @@ export function TopNav() {
           )}
 
           {(pageAction || secondaryAction) && <span className="topnav__divider" aria-hidden />}
+
+          {!isMobileNav && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="topnav__icon-btn"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+            </button>
+          )}
 
           <button
             type="button"

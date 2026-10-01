@@ -11,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.data.meal_sessions import normalize_meal_session_label
 from app.data.seed_excel_reference_orders import excel_reference_order_defs
-from app.models import Enquiry, EnquiryDish, EnquiryStatus
+from app.models import Dish, Enquiry, EnquiryDish, EnquiryStatus
 from app.schemas import OrderExcelImportIn
 
 
@@ -801,6 +802,32 @@ def _serialize_notes(order: dict[str, Any], dish_columns: dict[str, str]) -> str
     )
 
 
+async def _catalog_ids_by_name(session: AsyncSession) -> dict[str, str]:
+    result = await session.execute(select(Dish).where(Dish.isActive.is_(True)))
+    return {d.name.strip().lower(): d.id for d in result.scalars().all()}
+
+
+async def _ensure_dishes_in_catalog(
+    session: AsyncSession,
+    rows: list[Any],
+    catalog: dict[str, str],
+) -> dict[str, str]:
+    for row in rows:
+        name = str(getattr(row, "dishName", "") or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in catalog:
+            continue
+        raw_cat = str(getattr(row, "category", "") or "").strip() or _classify_base_session(name)
+        label = normalize_meal_session_label(raw_cat) or normalize_meal_session_label("Lunch") or "Lunch"
+        dish = Dish(name=name, category=label, price=0.0, description=None, isActive=True)
+        session.add(dish)
+        await session.flush()
+        catalog[key] = dish.id
+    return catalog
+
+
 async def import_normalized_order(session: AsyncSession, payload: OrderExcelImportIn) -> tuple[Enquiry, list[str]]:
     data = payload.order.model_dump(mode="json")
     warnings = [*[]]
@@ -867,12 +894,17 @@ async def import_normalized_order(session: AsyncSession, payload: OrderExcelImpo
     enquiry.notes = _serialize_notes(data, {})
     await session.flush()
 
+    catalog = await _catalog_ids_by_name(session)
+    catalog = await _ensure_dishes_in_catalog(session, payload.order.dishes, catalog)
+
     dish_columns: dict[str, str] = {}
     for row in payload.order.dishes:
+        dish_name = row.dishName.strip()
+        dish_id = catalog.get(dish_name.lower())
         item = EnquiryDish(
             enquiryId=enquiry.id,
-            dishId=None,
-            dishName=row.dishName.strip(),
+            dishId=dish_id,
+            dishName=dish_name,
             category=row.category.strip() or _classify_base_session(row.dishName),
             notes=(row.notes or "").strip() or None,
             quantity=1.0,

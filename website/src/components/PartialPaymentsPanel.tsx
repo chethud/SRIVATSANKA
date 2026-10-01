@@ -11,6 +11,8 @@ import {
 } from '../utils/orderBilling';
 import { GlassCard } from './dashboard/DashboardSections';
 import { Card } from './Layout';
+import { PaymentRecordFields, paymentPayloadExtras, type PaymentRecordDraft } from './PaymentRecordFields';
+import { defaultPaymentPaidAtLocal, paymentModeLabel } from '../utils/paymentRecord';
 
 export function PartialPaymentsPanel({
   enquiries,
@@ -24,7 +26,13 @@ export function PartialPaymentsPanel({
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { amount: string; payer: string; discount: string }>>({});
+  type Draft = {
+    amount: string;
+    payer: string;
+    discount: string;
+    payment: PaymentRecordDraft;
+  };
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   const partials = enquiries.filter(isPartialPaymentOrder);
   const active = partials.find((o) => o.id === activeId) ?? null;
@@ -41,6 +49,12 @@ export function PartialPaymentsPanel({
         amount: String(Math.round(orderAmountDue(o) * 100) / 100),
         payer: o.customerName,
         discount: String(o.discountAmount ?? 0),
+        payment: {
+          paymentMode: '',
+          paidAt: defaultPaymentPaidAtLocal(),
+          paymentNotes: '',
+          receivedAccount: '',
+        },
       }
     );
   }
@@ -56,6 +70,7 @@ export function PartialPaymentsPanel({
         amount,
         payerName: d.payer.trim() || o.customerName,
         discountAmount: Math.max(0, Number(d.discount) || 0),
+        ...paymentPayloadExtras(d.payment),
       });
       await onUpdated(updated);
       if (payAll || orderAmountDue(updated) <= 0) {
@@ -67,6 +82,14 @@ export function PartialPaymentsPanel({
       setBusyId(null);
     }
   }
+
+  const helpBlurb = (
+    <p className="text-sm text-[var(--muted)] mb-4 leading-relaxed">
+      <strong className="text-[var(--foreground)]">Partial payments</strong> are orders with some cash recorded but a balance still due.
+      Record each installment from here or from the order page. Dashboard <strong>Revenue received</strong> includes only amounts you log;
+      <strong> Booked order value</strong> is the full contract total.
+    </p>
+  );
 
   const emptyMessage = (
     <p className={`text-sm text-[var(--muted)] ${embedded ? '' : 'py-8 text-center'}`}>
@@ -153,7 +176,8 @@ export function PartialPaymentsPanel({
                     <ul className="text-sm text-[var(--muted)] space-y-1.5">
                       {active.payments!.map((p) => (
                         <li key={p.id} className="break-words">
-                          {formatCurrency(p.amount)} · {p.payerName || 'Customer'} · {formatDate(p.paidAt)}
+                          {formatCurrency(p.amount)} · {paymentModeLabel(p.paymentMode)} ·{' '}
+                          {p.receivedAccount || '—'} · {p.payerName || 'Customer'} · {formatDate(p.paidAt)}
                         </li>
                       ))}
                     </ul>
@@ -200,6 +224,19 @@ export function PartialPaymentsPanel({
                     />
                   </div>
                 </div>
+
+                <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)] mb-3">
+                    Payment details (admin)
+                  </p>
+                  <PaymentRecordFields
+                    compact
+                    value={d.payment}
+                    onChange={(payment) =>
+                      setDrafts((prev) => ({ ...prev, [active.id]: { ...d, payment } }))
+                    }
+                  />
+                </div>
               </div>
 
               <div className="p-4 sm:p-5 border-t border-[var(--border)] flex flex-wrap gap-2 justify-between">
@@ -245,11 +282,17 @@ export function PartialPaymentsPanel({
   if (embedded) return body;
 
   if (partials.length === 0) {
-    return <GlassCard title="Partial payments">{emptyMessage}</GlassCard>;
+    return (
+      <GlassCard title="Partial payments">
+        {helpBlurb}
+        {emptyMessage}
+      </GlassCard>
+    );
   }
 
   return (
     <GlassCard title="Partial payments" action={<span className="text-xs text-[var(--muted)]">{partials.length} open</span>}>
+      {helpBlurb}
       <div className="max-h-[18rem] overflow-y-auto overscroll-contain pr-1 -mr-1">
         {list}
       </div>

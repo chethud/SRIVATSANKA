@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ChefHat, Clock, MapPin, Phone, Pencil, FileText, UtensilsCrossed, Calendar,
+  ArrowLeft, ChefHat, Clock, MapPin, Pencil, FileText, UtensilsCrossed, Calendar,
   FileSpreadsheet, Printer, RotateCcw,
 } from 'lucide-react';
 import type { Dish, Enquiry, Worker } from '../../api/client';
@@ -10,6 +10,7 @@ import {
   formatDate,
   formatDateTime,
   markEnquiryDelivered,
+  removeOrderFromRevenue,
   updateEnquiry,
   updateEnquiryStatus,
 } from '../../api/client';
@@ -18,6 +19,7 @@ import { Button } from '../Layout';
 import { PaymentReceivedModal } from '../PaymentReceivedModal';
 import { OrderCopyView } from '../OrderCopyView';
 import { OrderDispatchSection } from './OrderDispatchSection';
+import { OrderPaymentSection } from './OrderPaymentSection';
 import { OrderExtrasSection } from './OrderExtrasSection';
 import { OrderRegionalStyleSection } from './OrderRegionalStyleSection';
 import { OrderVenueMapSection } from './OrderVenueMapSection';
@@ -36,6 +38,7 @@ import {
 } from '../../utils/orderNotes';
 import { MEAL_SESSIONS, PREFERENCE_CATEGORIES, resolveSessionTabs } from '../../utils/mealSessions';
 import { resolveMenuColumns } from '../../utils/orderMenuGrid';
+import { orderAmountPaid } from '../../utils/orderBilling';
 import { downloadOrderCopyExcel } from '../../utils/orderCopies';
 
 export type OrderPageView = 'details' | 'kitchen' | 'billing' | 'ours';
@@ -81,10 +84,18 @@ export function OrderDetailView({
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [deliveryBusy, setDeliveryBusy] = useState(false);
+  const [paymentClearBusy, setPaymentClearBusy] = useState(false);
   const [bookAgainBusy, setBookAgainBusy] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState(order.phoneNumber ?? '');
+  const [phoneSaving, setPhoneSaving] = useState(false);
   const { refresh } = useAppData();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setPhoneDraft(order.phoneNumber ?? '');
+  }, [order.id, order.phoneNumber]);
 
   async function handleBookAgain() {
     const ok = window.confirm(
@@ -204,11 +215,11 @@ export function OrderDetailView({
     return { datePart, sessionLines };
   }, [extras, orderedSessions]);
 
-  const sessionPaxSummary = useMemo(() => {
+  const sessionPaxItems = useMemo(() => {
     const cols = resolveMenuColumns(extras, order, menuItems);
-    const withPax = cols.filter((c) => c.pax != null && c.pax > 0);
-    if (withPax.length === 0) return 'Set per session when adding menu';
-    return withPax.map((c) => `${c.sessionLabel} · ${c.pax}`).join('\n');
+    return cols
+      .filter((c) => c.pax != null && c.pax > 0)
+      .map((c) => ({ label: c.sessionLabel, pax: c.pax as number }));
   }, [extras, order, menuItems]);
 
   const dateTimeSummary = useMemo(() => {
@@ -268,6 +279,27 @@ export function OrderDetailView({
     }
   }
 
+  async function handleMarkPaymentNotReceived() {
+    const paid = orderAmountPaid(order);
+    const message =
+      paid > 0
+        ? `Remove ${paid.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })} from revenue and mark this order as payment not received?`
+        : 'Mark this order as payment not received?';
+    if (!confirm(message)) return;
+    setPaymentClearBusy(true);
+    try {
+      const updated = await removeOrderFromRevenue(order.id);
+      onOrderUpdated(updated);
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not update payment status');
+    } finally {
+      setPaymentClearBusy(false);
+    }
+  }
+
+  const hasPaymentLogged = order.paymentReceived || orderAmountPaid(order) > 0;
+
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
       {showPaymentPopup && (
@@ -289,71 +321,178 @@ export function OrderDetailView({
       </Link>
 
       <div className="order-hero">
-        <div>
-          <h1 className="order-view-title text-3xl md:text-4xl text-[var(--foreground)] tracking-tight">
-            {order.customerName}
-          </h1>
-          <p className="order-hero-meta">{formatOrderId(order.id)}</p>
-          {order.eventType && <p className="order-hero-event">{order.eventType}</p>}
+        <div className="order-hero__head">
+          <h1 className="order-hero__title">{order.customerName}</h1>
+          <div className="order-hero__chips">
+            <span className="order-hero-meta">{formatOrderId(order.id)}</span>
+            {order.eventType && <span className="order-hero-event">{order.eventType}</span>}
+            <span className="order-status-badge">{statusLabel(order.status)}</span>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="order-status-badge">{statusLabel(order.status)}</span>
-          <button
-            type="button"
-            disabled={bookAgainBusy}
-            onClick={() => void handleBookAgain()}
-            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--sidebar-hover)] disabled:opacity-60 min-h-[2.5rem]"
-          >
-            <RotateCcw size={14} />
-            {bookAgainBusy ? 'Booking…' : 'Book again'}
-          </button>
-          {order.paymentReceived ? (
-            <span className="text-xs font-medium text-[var(--success-text)]">Payment received</span>
-          ) : order.deliveredAt ? (
-            <div className="flex flex-col items-end gap-1.5">
-              <span className="text-xs font-medium text-amber-800">Delivered · awaiting payment</span>
-              <button
-                type="button"
-                onClick={() => setShowPaymentPopup(true)}
-                className="px-3 py-2.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] min-h-[2.5rem]"
-              >
-                Record payment
-              </button>
-            </div>
-          ) : (
+
+        <div className="order-hero__actions">
+          <div className="order-hero__status">
+            {order.paymentReceived ? (
+              <span className="order-hero__status-pill order-hero__status-pill--paid">Payment received</span>
+            ) : order.deliveredAt ? (
+              <span className="order-hero__status-pill order-hero__status-pill--due">Payment not received</span>
+            ) : (
+              <span className="order-hero__status-pill order-hero__status-pill--open">Not yet delivered</span>
+            )}
+          </div>
+          <div className="order-hero__buttons">
             <button
               type="button"
-              disabled={deliveryBusy}
-              onClick={() => void handleMarkDelivered()}
-              className="px-3 py-2.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 min-h-[2.5rem]"
+              disabled={bookAgainBusy}
+              onClick={() => void handleBookAgain()}
+              className="order-hero__btn order-hero__btn--secondary"
             >
-              {deliveryBusy ? 'Saving…' : 'Mark as delivered'}
+              <RotateCcw size={14} />
+              {bookAgainBusy ? 'Booking…' : 'Book again'}
             </button>
-          )}
+            {hasPaymentLogged && (
+              <button
+                type="button"
+                disabled={paymentClearBusy}
+                onClick={() => void handleMarkPaymentNotReceived()}
+                className="order-hero__btn order-hero__btn--secondary"
+              >
+                {paymentClearBusy ? 'Saving…' : 'Mark payment not received'}
+              </button>
+            )}
+            {!order.paymentReceived && order.deliveredAt && (
+              <button type="button" onClick={() => setShowPaymentPopup(true)} className="order-hero__btn order-hero__btn--primary">
+                Record payment
+              </button>
+            )}
+            {!order.paymentReceived && !order.deliveredAt && (
+              <button
+                type="button"
+                disabled={deliveryBusy}
+                onClick={() => void handleMarkDelivered()}
+                className="order-hero__btn order-hero__btn--primary"
+              >
+                {deliveryBusy ? 'Saving…' : 'Mark as delivered'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="order-stat-grid">
-        {[
-          { icon: Clock, label: 'Date & time', value: dateTimeSummary },
-          { icon: UtensilsCrossed, label: 'Session pax', value: sessionPaxSummary },
-          { icon: MapPin, label: 'Venue', value: order.eventLocation },
-          { icon: Phone, label: 'Contact', value: order.phoneNumber },
-        ].map(({ icon: Icon, label, value }) => (
-          <div key={label} className="order-stat-card">
-            <div className="order-stat-icon">
-              <Icon size={18} />
-            </div>
-            <div className="min-w-0">
-              <p className="order-stat-label">{label}</p>
-              <p
-                className={`order-stat-value${label === 'Session pax' ? ' order-stat-value--sessions' : ''}`}
-              >
-                {value}
-              </p>
+        <div className="order-stat-card order-stat-card--datetime">
+          <div className="order-stat-icon">
+            <Clock size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="order-stat-label">Date &amp; time</p>
+            <p className="order-stat-value order-stat-value--datetime">{dateTimeSummary}</p>
+            {scheduleSummary.sessionLines.length > 0 && (
+              <ul className="order-stat-schedule-lines">
+                {scheduleSummary.sessionLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="order-stat-card order-stat-card--location">
+          <div className="order-stat-icon">
+            <MapPin size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="order-stat-label">Venue &amp; contact</p>
+            <div className="order-stat-location-rows">
+              <div>
+                <p className="order-stat-sublabel">Venue</p>
+                <p className="order-stat-value">{order.eventLocation || '—'}</p>
+              </div>
+              <div>
+                <p className="order-stat-sublabel">Phone</p>
+                {editingPhone ? (
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <input
+                      type="tel"
+                      value={phoneDraft}
+                      onChange={(e) => setPhoneDraft(e.target.value)}
+                      className="form-input flex-1 min-w-[10rem] px-2 py-1.5 rounded-lg text-sm tabular-nums"
+                      placeholder="Contact number"
+                    />
+                    <button
+                      type="button"
+                      disabled={phoneSaving}
+                      className="order-btn-ghost text-xs"
+                      onClick={() => {
+                        void (async () => {
+                          setPhoneSaving(true);
+                          try {
+                            const updated = await updateEnquiry(order.id, {
+                              phoneNumber: phoneDraft.trim(),
+                            });
+                            onOrderUpdated(updated);
+                            setEditingPhone(false);
+                          } catch {
+                            alert('Could not save phone number.');
+                          } finally {
+                            setPhoneSaving(false);
+                          }
+                        })();
+                      }}
+                    >
+                      {phoneSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      className="order-btn-ghost text-xs"
+                      onClick={() => {
+                        setPhoneDraft(order.phoneNumber ?? '');
+                        setEditingPhone(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="order-stat-value tabular-nums flex items-center gap-2 flex-wrap">
+                    {order.phoneNumber || '—'}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhoneDraft(order.phoneNumber ?? '');
+                        setEditingPhone(true);
+                      }}
+                      className="text-xs font-semibold text-[var(--primary)] hover:underline"
+                    >
+                      Edit
+                    </button>
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        ))}
+        </div>
+
+        <div className="order-stat-card order-stat-card--sessions">
+          <div className="order-stat-icon">
+            <UtensilsCrossed size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="order-stat-label">Session pax</p>
+            {sessionPaxItems.length === 0 ? (
+              <p className="order-stat-value">Set per session when adding menu</p>
+            ) : (
+              <ul className="order-stat-sessions">
+                {sessionPaxItems.map((item, idx) => (
+                  <li key={`${item.label}-${item.pax}-${idx}`}>
+                    <span className="order-stat-sessions__label">{item.label}</span>
+                    <span className="order-stat-sessions__pax">{item.pax}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="order-copy-bar">
@@ -405,7 +544,7 @@ export function OrderDetailView({
             </Button>
           </div>
           <div className="order-copy-surface print:border-0 print:shadow-none print:p-0">
-            <OrderCopyView enquiry={order} copyType={pageView} />
+            <OrderCopyView enquiry={order} copyType={pageView} workers={workers} />
           </div>
         </div>
       ) : (
@@ -586,6 +725,13 @@ export function OrderDetailView({
       </div>
 
       <OrderExtrasSection orderId={order.id} extras={extras} onOrderUpdated={onOrderUpdated} />
+
+      <OrderPaymentSection
+        order={order}
+        onRecordPayment={() => setShowPaymentPopup(true)}
+        onMarkNotReceived={hasPaymentLogged ? () => void handleMarkPaymentNotReceived() : undefined}
+        markNotReceivedBusy={paymentClearBusy}
+      />
 
       <OrderDispatchSection
         orderId={order.id}

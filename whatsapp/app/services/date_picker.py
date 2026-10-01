@@ -9,7 +9,8 @@ from zoneinfo import ZoneInfo
 EVENT_YEAR_HORIZON = 10  # current year through current+10 inclusive → 11 years
 YEAR_PAGE_SIZE = 8
 MONTH_PAGE_1 = tuple(range(1, 10))  # Jan–Sep + More
-DAY_PAGE_SIZE = 10
+# WhatsApp list messages allow at most 10 rows (including "More").
+DAY_PAGE_SIZE = 9
 IST = ZoneInfo("Asia/Kolkata")
 
 
@@ -122,3 +123,11 @@ def valid_calendar_day(year: int, month: int, day: int) -> bool:
         return True
     except ValueError:
         return False
+
+
+def event_date_is_past(year: int, month: int, day: int, *, ref: date | None = None) -> bool:
+    """True when the calendar day is strictly before today (IST)."""
+    if not valid_calendar_day(year, month, day):
+        return False
+    ref = ref or today_ist()
+    return date(year, month, day) < ref

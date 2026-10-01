@@ -96,6 +96,8 @@ async def _migrate_sqlite_columns() -> None:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN paymentReceived BOOLEAN DEFAULT 0")
                 if "discountAmount" not in ecols:
                     alters.append("ALTER TABLE Enquiry ADD COLUMN discountAmount FLOAT DEFAULT 0")
+                if "adminNote" not in ecols:
+                    alters.append("ALTER TABLE Enquiry ADD COLUMN adminNote TEXT")
                 extra_enquiry = {
                     "dateStatus": "ALTER TABLE Enquiry ADD COLUMN dateStatus VARCHAR",
                     "venueName": "ALTER TABLE Enquiry ADD COLUMN venueName VARCHAR",
@@ -136,6 +138,12 @@ async def _migrate_sqlite_columns() -> None:
                         """
                     )
                 )
+            if "EnquiryPayment" in tables:
+                pcols = {c["name"] for c in insp.get_columns("EnquiryPayment")}
+                if "paymentMode" not in pcols:
+                    alters.append("ALTER TABLE EnquiryPayment ADD COLUMN paymentMode VARCHAR")
+                if "receivedAccount" not in pcols:
+                    alters.append("ALTER TABLE EnquiryPayment ADD COLUMN receivedAccount VARCHAR")
             if "EnquiryDish" in tables:
                 cols = {c["name"] for c in insp.get_columns("EnquiryDish")}
                 if "quantity" not in cols:
@@ -146,10 +154,16 @@ async def _migrate_sqlite_columns() -> None:
                     alters.append("ALTER TABLE EnquiryDish ADD COLUMN served BOOLEAN DEFAULT 0")
                 if "quantityUnit" not in cols:
                     alters.append("ALTER TABLE EnquiryDish ADD COLUMN quantityUnit VARCHAR DEFAULT 'pcs'")
+            if "Vendor" in tables:
+                vcols = {c["name"] for c in insp.get_columns("Vendor")}
+                if "phoneNumbersJson" not in vcols:
+                    alters.append("ALTER TABLE Vendor ADD COLUMN phoneNumbersJson TEXT")
             if "Worker" in tables:
                 wcols = {c["name"] for c in insp.get_columns("Worker")}
                 if "isLead" not in wcols:
                     alters.append("ALTER TABLE Worker ADD COLUMN isLead BOOLEAN DEFAULT 0")
+                if "isActive" not in wcols:
+                    alters.append("ALTER TABLE Worker ADD COLUMN isActive BOOLEAN DEFAULT 1")
             if "WorkerAssignment" in tables:
                 acols = {c["name"] for c in insp.get_columns("WorkerAssignment")}
                 if "wage" not in acols:
@@ -310,6 +324,22 @@ async def _migrate_dish_category_to_labels() -> None:
         await conn.run_sync(run)
 
 
+async def _migrate_vendor_phone_numbers() -> None:
+    import sqlalchemy as sa
+
+    async with engine.begin() as conn:
+        def run(connection) -> None:
+            insp = sa.inspect(connection)
+            if "Vendor" not in insp.get_table_names():
+                return
+            cols = {c["name"] for c in insp.get_columns("Vendor")}
+            if "phoneNumbersJson" in cols:
+                return
+            connection.execute(sa.text('ALTER TABLE "Vendor" ADD COLUMN "phoneNumbersJson" TEXT'))
+
+        await conn.run_sync(run)
+
+
 async def _migrate_notification_enquiry_id() -> None:
     import sqlalchemy as sa
 
@@ -346,6 +376,8 @@ async def _migrate_enquiry_payment_columns() -> None:
                     connection.execute(
                         sa.text('ALTER TABLE "Enquiry" ADD COLUMN "discountAmount" DOUBLE PRECISION DEFAULT 0')
                     )
+                if "adminNote" not in cols:
+                    connection.execute(sa.text('ALTER TABLE "Enquiry" ADD COLUMN "adminNote" TEXT'))
                 extra = {
                     "dateStatus": 'ALTER TABLE "Enquiry" ADD COLUMN "dateStatus" VARCHAR',
                     "venueName": 'ALTER TABLE "Enquiry" ADD COLUMN "venueName" VARCHAR',
@@ -391,6 +423,14 @@ async def _migrate_enquiry_payment_columns() -> None:
                         """
                     )
                 )
+            if "EnquiryPayment" in tables:
+                pcols = {c["name"] for c in insp.get_columns("EnquiryPayment")}
+                if "paymentMode" not in pcols:
+                    connection.execute(sa.text('ALTER TABLE "EnquiryPayment" ADD COLUMN "paymentMode" VARCHAR'))
+                if "receivedAccount" not in pcols:
+                    connection.execute(
+                        sa.text('ALTER TABLE "EnquiryPayment" ADD COLUMN "receivedAccount" VARCHAR')
+                    )
 
         await conn.run_sync(run)
 
@@ -422,6 +462,7 @@ async def init_db() -> None:
         await _migrate_notification_enquiry_id()
         await _migrate_enquiry_payment_columns()
         await _migrate_invoice_file_data()
+    await _migrate_vendor_phone_numbers()
     await _migrate_dish_category_to_labels()
 
     from app.data.seed_dishes import seed_dishes

@@ -127,10 +127,10 @@ export default function InvoicesPage() {
         }}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-start">
-        <div className="flex flex-col min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 grid-cards-equal">
+        <div className="card-tile flex flex-col min-w-0">
           {!preview ? (
-            <Card className="p-4 sm:p-6 lg:p-8">
+            <Card className="card-tile p-4 sm:p-6 lg:p-8">
               <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                 <FileText size={20} className="text-[var(--order-accent)]" />
                 Upload expense invoice
@@ -138,17 +138,19 @@ export default function InvoicesPage() {
               <p className="text-sm text-[var(--muted)] mb-6">
                 Photo or PDF of a business expense. We will detect the date, description, amount, and purpose — then you confirm.
               </p>
-              <Button
-                type="button"
-                disabled={recognizing}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload size={18} className="mr-2 inline" />
-                {recognizing ? 'Reading invoice…' : 'Choose file to upload'}
-              </Button>
+              <div className="card-tile__foot mt-auto pt-4">
+                <Button
+                  type="button"
+                  disabled={recognizing}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={18} className="mr-2 inline" />
+                  {recognizing ? 'Reading invoice…' : 'Choose file to upload'}
+                </Button>
+              </div>
             </Card>
           ) : (
-            <Card className="p-4 sm:p-6">
+            <Card className="card-tile p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-1">Review recognized details</h3>
               <p className="text-sm text-[var(--muted)] mb-4">
                 File: <span className="font-medium text-[var(--foreground)]">{preview.fileName}</span>
@@ -259,13 +261,13 @@ export default function InvoicesPage() {
           )}
         </div>
 
-        <Card className="p-4 sm:p-6 lg:p-8 flex flex-col min-w-0 max-h-[22rem]">
+        <Card className="card-tile p-4 sm:p-6 lg:p-8 min-w-0">
           <h3 className="text-lg font-semibold mb-2 shrink-0">Split payments pending</h3>
           <p className="text-sm text-[var(--muted)] mb-4 shrink-0">
             Orders with a remaining balance after a partial payment
             {partialCount > 0 ? ` · ${partialCount} open` : ''}
           </p>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 -mr-1">
+          <div className="card-tile__body min-h-[10rem] max-h-[16rem] overflow-y-auto overscroll-contain pr-1 -mr-1">
             <PartialPaymentsPanel
               embedded
               enquiries={enquiries}

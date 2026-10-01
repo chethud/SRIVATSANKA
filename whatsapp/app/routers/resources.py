@@ -10,6 +10,7 @@ from app.schemas import (
     AnalyticsOut,
     ExpenseIn,
     ExpenseOut,
+    VendorCategoryIn,
     VendorIn,
     VendorOut,
     WorkerAssignmentIn,
@@ -34,28 +35,102 @@ async def get_analytics(db: AsyncSession = Depends(get_db)) -> AnalyticsOut:
 
 # ─── Vendors ───────────────────────────────────────────────────────────────────
 
+def _vendor_out(v: Vendor) -> VendorOut:
+    from app.services.vendor_directory import parse_vendor_phones
+
+    phones = parse_vendor_phones(v.phoneNumber, v.phoneNumbersJson)
+    return VendorOut(
+        id=v.id,
+        name=v.name,
+        businessName=v.businessName,
+        phoneNumber=phones[0] if phones else v.phoneNumber,
+        phoneNumbers=phones,
+        category=v.category,
+        notes=v.notes,
+        createdAt=v.createdAt,
+    )
+
+
+def _apply_vendor_payload(v: Vendor, payload: VendorIn) -> None:
+    from app.services.vendor_directory import serialize_vendor_phones
+
+    phones = [p.strip() for p in payload.phoneNumbers if p and p.strip()]
+    if not phones and payload.phoneNumber.strip():
+        phones = [payload.phoneNumber.strip()]
+    primary, phone_json = serialize_vendor_phones(phones)
+    v.name = payload.name.strip()
+    v.businessName = (payload.businessName or "").strip() or None
+    v.category = payload.category.strip()
+    v.notes = (payload.notes or "").strip() or None
+    v.phoneNumber = primary
+    v.phoneNumbersJson = phone_json
+
+
+@router.get("/vendor-categories", response_model=list[str])
+async def list_vendor_categories(db: AsyncSession = Depends(get_db)) -> list[str]:
+    from app.services.vendor_directory import list_vendor_category_names
+
+    return await list_vendor_category_names(db)
+
+
+@router.post("/vendor-categories", response_model=list[str])
+async def create_vendor_category(
+    payload: VendorCategoryIn,
+    db: AsyncSession = Depends(get_db),
+) -> list[str]:
+    from app.services.vendor_directory import add_vendor_category_name
+
+    try:
+        return await add_vendor_category_name(db, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/vendors", response_model=list[VendorOut])
 async def list_vendors(db: AsyncSession = Depends(get_db)) -> list[VendorOut]:
     result = await db.execute(select(Vendor).order_by(Vendor.category, Vendor.name))
-    return [
-        VendorOut(
-            id=v.id, name=v.name, businessName=v.businessName,
-            phoneNumber=v.phoneNumber, category=v.category, notes=v.notes, createdAt=v.createdAt,
-        )
-        for v in result.scalars().all()
-    ]
+    return [_vendor_out(v) for v in result.scalars().all()]
 
 
 @router.post("/vendors", response_model=VendorOut)
 async def create_vendor(payload: VendorIn, db: AsyncSession = Depends(get_db)) -> VendorOut:
-    v = Vendor(**payload.model_dump())
+    from app.services.vendor_directory import add_vendor_category_name
+
+    if not payload.name.strip() or not payload.category.strip():
+        raise HTTPException(status_code=400, detail="Name and category are required")
+    v = Vendor(name="", phoneNumber="", category="")
+    try:
+        _apply_vendor_payload(v, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await add_vendor_category_name(db, v.category)
     db.add(v)
     await db.commit()
     await db.refresh(v)
-    return VendorOut(
-        id=v.id, name=v.name, businessName=v.businessName,
-        phoneNumber=v.phoneNumber, category=v.category, notes=v.notes, createdAt=v.createdAt,
-    )
+    return _vendor_out(v)
+
+
+@router.patch("/vendors/{vendor_id}", response_model=VendorOut)
+async def update_vendor(
+    vendor_id: str,
+    payload: VendorIn,
+    db: AsyncSession = Depends(get_db),
+) -> VendorOut:
+    from app.services.vendor_directory import add_vendor_category_name
+
+    v = await db.get(Vendor, vendor_id)
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    if not payload.name.strip() or not payload.category.strip():
+        raise HTTPException(status_code=400, detail="Name and category are required")
+    try:
+        _apply_vendor_payload(v, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await add_vendor_category_name(db, v.category)
+    await db.commit()
+    await db.refresh(v)
+    return _vendor_out(v)
 
 
 @router.delete("/vendors/{vendor_id}")
@@ -70,16 +145,23 @@ async def delete_vendor(vendor_id: str, db: AsyncSession = Depends(get_db)) -> d
 
 # ─── Workers ───────────────────────────────────────────────────────────────────
 
+def _worker_out(w: Worker) -> WorkerOut:
+    return WorkerOut(
+        id=w.id,
+        name=w.name,
+        phoneNumber=w.phoneNumber,
+        role=w.role,
+        dailyWage=w.dailyWage,
+        isLead=w.isLead,
+        isActive=w.isActive,
+        createdAt=w.createdAt,
+    )
+
+
 @router.get("/workers", response_model=list[WorkerOut])
 async def list_workers(db: AsyncSession = Depends(get_db)) -> list[WorkerOut]:
-    result = await db.execute(select(Worker).order_by(Worker.name))
-    return [
-        WorkerOut(
-            id=w.id, name=w.name, phoneNumber=w.phoneNumber,
-            role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
-        )
-        for w in result.scalars().all()
-    ]
+    result = await db.execute(select(Worker).order_by(Worker.isActive.desc(), Worker.name))
+    return [_worker_out(w) for w in result.scalars().all()]
 
 
 @router.post("/workers", response_model=WorkerOut)
@@ -88,10 +170,7 @@ async def create_worker(payload: WorkerIn, db: AsyncSession = Depends(get_db)) -
     db.add(w)
     await db.commit()
     await db.refresh(w)
-    return WorkerOut(
-        id=w.id, name=w.name, phoneNumber=w.phoneNumber,
-        role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
-    )
+    return _worker_out(w)
 
 
 @router.patch("/workers/{worker_id}", response_model=WorkerOut)
@@ -103,18 +182,16 @@ async def update_worker(
     w = await db.get(Worker, worker_id)
     if not w:
         raise HTTPException(404, "Worker not found")
-    if payload.isLead is not None:
-        if payload.isLead:
-            others = await db.execute(select(Worker).where(Worker.id != worker_id))
-            for other in others.scalars().all():
-                other.isLead = False
-        w.isLead = payload.isLead
+    data = payload.model_dump(exclude_unset=True)
+    if data.get("isLead"):
+        others = await db.execute(select(Worker).where(Worker.id != worker_id))
+        for other in others.scalars().all():
+            other.isLead = False
+    for key, value in data.items():
+        setattr(w, key, value)
     await db.commit()
     await db.refresh(w)
-    return WorkerOut(
-        id=w.id, name=w.name, phoneNumber=w.phoneNumber,
-        role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
-    )
+    return _worker_out(w)
 
 
 def _assignment_out(a: WorkerAssignment, enquiry: Enquiry | None) -> WorkerAssignmentOut:
@@ -160,10 +237,7 @@ async def get_worker_profile(worker_id: str, db: AsyncSession = Depends(get_db))
     total_wages = sum(float(a.wage or 0) for a, _ in pending)
 
     return WorkerProfileOut(
-        worker=WorkerOut(
-            id=w.id, name=w.name, phoneNumber=w.phoneNumber,
-            role=w.role, dailyWage=w.dailyWage, isLead=w.isLead, createdAt=w.createdAt,
-        ),
+        worker=_worker_out(w),
         assignments=assignments,
         totalDuties=len(pending),
         upcomingDuties=upcoming,

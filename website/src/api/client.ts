@@ -135,6 +135,8 @@ export interface EnquiryPayment {
   amount: number;
   payerName?: string | null;
   notes?: string | null;
+  paymentMode?: string | null;
+  receivedAccount?: string | null;
   paidAt: string;
 }
 
@@ -150,6 +152,7 @@ export interface Enquiry {
   status: string;
   ownerViewedAt?: string | null;
   notes?: string | null;
+  adminNote?: string | null;
   deliveredAt?: string | null;
   paymentReceived?: boolean;
   discountAmount?: number;
@@ -196,6 +199,7 @@ export interface Vendor {
   name: string;
   businessName: string | null;
   phoneNumber: string;
+  phoneNumbers?: string[];
   category: string;
   notes: string | null;
   createdAt: string;
@@ -208,8 +212,13 @@ export interface Worker {
   role: string;
   dailyWage: number;
   isLead?: boolean;
+  isActive?: boolean;
   createdAt: string;
 }
+
+export type WorkerUpdatePayload = Partial<
+  Pick<Worker, 'name' | 'phoneNumber' | 'role' | 'dailyWage' | 'isLead' | 'isActive'>
+>;
 
 export interface Expense {
   id: string;
@@ -241,6 +250,7 @@ export interface MonthlyChartPoint {
 export interface Analytics {
   total_revenue: number;
   order_revenue: number;
+  booked_order_value?: number;
   uploaded_revenue: number;
   total_expenses: number;
   global_expenses: number;
@@ -431,6 +441,7 @@ export async function createEnquiry(data: {
   guestCount?: number;
   preferredCallbackAt: string;
   notes?: string;
+  adminNote?: string;
 }): Promise<Enquiry> {
   return apiFetch<Enquiry>('/api/enquiries', {
     method: 'POST',
@@ -441,7 +452,12 @@ export async function createEnquiry(data: {
 
 export async function updateEnquiry(
   id: string,
-  data: { notes?: string | null; customerName?: string | null },
+  data: {
+    notes?: string | null;
+    adminNote?: string | null;
+    customerName?: string | null;
+    phoneNumber?: string | null;
+  },
 ): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}`, {
     method: 'PATCH',
@@ -470,6 +486,9 @@ export async function confirmEnquiryPayment(
     payerName?: string | null;
     discountAmount?: number | null;
     notes?: string | null;
+    paymentMode?: string | null;
+    receivedAccount?: string | null;
+    paidAt?: string | null;
   } | boolean = true,
 ): Promise<Enquiry> {
   const body =
@@ -527,9 +546,9 @@ export async function deleteUpload(uploadId: string): Promise<void> {
   await apiFetch<{ ok: boolean }>(`/api/uploads/${uploadId}`, { method: 'DELETE' });
 }
 
-/** Remove an order payment from revenue (does not delete the order). */
+/** Clear payment ledger and mark payment not received (order stays converted). */
 export async function removeOrderFromRevenue(enquiryId: string): Promise<Enquiry> {
-  return confirmEnquiryPayment(enquiryId, { received: false });
+  return confirmEnquiryPayment(enquiryId, { received: false, amount: null });
 }
 
 export async function markEnquiryViewed(id: string): Promise<Enquiry> {
@@ -753,9 +772,46 @@ export async function cancelPendingInvoice(pendingId: string) {
   return apiFetch<{ ok: boolean }>(`/api/invoices/pending/${pendingId}`, { method: 'DELETE' });
 }
 
-export async function createVendor(data: Omit<Vendor, 'id' | 'createdAt'>) {
+export async function fetchVendorCategories() {
+  return apiFetch<string[]>('/api/vendor-categories');
+}
+
+export async function addVendorCategory(name: string) {
+  return apiFetch<string[]>('/api/vendor-categories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function createVendor(data: {
+  name: string;
+  businessName: string | null;
+  phoneNumber?: string;
+  phoneNumbers: string[];
+  category: string;
+  notes: string | null;
+}) {
   return apiFetch<Vendor>('/api/vendors', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateVendor(
+  id: string,
+  data: {
+    name: string;
+    businessName: string | null;
+    phoneNumber?: string;
+    phoneNumbers: string[];
+    category: string;
+    notes: string | null;
+  },
+) {
+  return apiFetch<Vendor>(`/api/vendors/${id}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
@@ -773,7 +829,7 @@ export async function createWorker(data: Omit<Worker, 'id' | 'createdAt'>) {
   });
 }
 
-export async function updateWorker(id: string, data: { isLead?: boolean }) {
+export async function updateWorker(id: string, data: WorkerUpdatePayload) {
   return apiFetch<Worker>(`/api/workers/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

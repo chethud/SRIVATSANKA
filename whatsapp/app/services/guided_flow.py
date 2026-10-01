@@ -42,6 +42,7 @@ from app.services.human_style import (
     immediate_callback_reply,
     intent_b_planning_reply,
     help_options_reply,
+    event_date_already_over,
     invalid_event_date_clarify,
     is_ambiguous_yes,
     is_food_menu_question,
@@ -112,6 +113,7 @@ from app.services.date_picker import (
     parse_day_id,
     parse_month_id,
     parse_year_id,
+    event_date_is_past,
     valid_calendar_day,
 )
 from app.services.message_intent import (
@@ -1095,6 +1097,18 @@ def _ask_event_day(session: ConversationSession, user_text: str) -> AgentTurnRes
     return AgentTurnResult(reply=reply, fields=session.fields)
 
 
+def _past_event_date_turn(
+    session: ConversationSession,
+    user_text: str,
+    *,
+    slot_key: str = "event_day",
+) -> AgentTurnResult:
+    reply = event_date_already_over()
+    track_question(session, reply, slot_key=slot_key)
+    record_exchange(session, user_text, reply)
+    return AgentTurnResult(reply=reply, fields=session.fields)
+
+
 def _ask_confirm_event_date(
     session: ConversationSession,
     user_text: str,
@@ -1103,6 +1117,8 @@ def _ask_confirm_event_date(
     month: int,
     day: int,
 ) -> AgentTurnResult:
+    if event_date_is_past(year, month, day):
+        return _past_event_date_turn(session, user_text, slot_key="event_day")
     label = format_event_date(year, month, day)
     session.pending_event_year = year
     session.pending_event_month = f"{year:04d}-{month:02d}"
@@ -1122,6 +1138,11 @@ def _ask_confirm_event_date(
 
 
 def _continue_after_event_date(session: ConversationSession, user_text: str) -> AgentTurnResult:
+    year = int(session.pending_event_year or session.fields.event_year or 0)
+    month = int(session.fields.event_month or str(session.pending_event_month or "0").split("-")[-1] or 0)
+    day = int(session.pending_event_day or 0)
+    if year and month and day and event_date_is_past(year, month, day):
+        return _past_event_date_turn(session, user_text, slot_key="event_date_confirm")
     next_prompt = _next_detail_prompt(session)
     label = session.fields.event_date
     reply = f"Perfect. I've noted {label}."
@@ -1268,6 +1289,11 @@ async def _handle_event_date_turn(
 
     if asked == "event_date_confirm":
         if is_name_confirm_yes(text) or text.lower().strip() in {"confirm", "ok", "okay"}:
+            year = int(session.pending_event_year or session.fields.event_year or 0)
+            month = int(session.fields.event_month or str(session.pending_event_month or "0").split("-")[-1] or 0)
+            day = int(session.pending_event_day or 0)
+            if year and month and day and event_date_is_past(year, month, day):
+                return _past_event_date_turn(session, text, slot_key="event_date_confirm")
             return _continue_after_event_date(session, text)
         if is_name_confirm_no(text) or "change" in text.lower():
             data = session.fields.model_dump()

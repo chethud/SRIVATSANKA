@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Menu, Plus, RefreshCw, Send, Trash2, User, X } from 'lucide-react';
+import { ArrowLeft, Menu, Plus, RefreshCw, Send, Trash2, X } from 'lucide-react';
 import { useAppData } from '../context/AppDataContext';
 import { useLayout } from '../context/LayoutContext';
 import { WhatsAppIcon } from '../components/WhatsAppIcon';
@@ -39,9 +39,48 @@ function profileInitials(name: string | null | undefined, phone: string) {
   return (digits.slice(-2) || '?').toUpperCase();
 }
 
-function whatsappDpUrl(name: string | null | undefined, phone: string) {
-  const label = name?.trim() || formatPhoneDisplay(phone) || phone;
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=25D366&color=ffffff&size=512&bold=true&format=png`;
+/** Stable WhatsApp-like palette from phone digits (no external avatar API). */
+const AVATAR_COLORS = [
+  '#00a884',
+  '#027eb5',
+  '#02a698',
+  '#7c4dff',
+  '#e05c5c',
+  '#c4561a',
+  '#0288d1',
+  '#5e8e3e',
+];
+
+function avatarColor(phone: string): string {
+  const digits = normalizePhoneInput(phone) || phone;
+  let hash = 0;
+  for (let i = 0; i < digits.length; i += 1) {
+    hash = (hash * 31 + digits.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? AVATAR_COLORS[0];
+}
+
+function ChatAvatar({
+  name,
+  phone,
+  className = '',
+  large = false,
+}: {
+  name?: string | null;
+  phone: string;
+  className?: string;
+  large?: boolean;
+}) {
+  const letters = profileInitials(name, phone);
+  return (
+    <span
+      className={`wa-chats__avatar wa-chats__avatar--local${large ? ' wa-chats__avatar--large' : ''} ${className}`.trim()}
+      style={{ backgroundColor: avatarColor(phone) }}
+      aria-hidden
+    >
+      {letters}
+    </span>
+  );
 }
 
 export default function BotTesterPage() {
@@ -60,7 +99,6 @@ export default function BotTesterPage() {
   const [pausing, setPausing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [dpFailed, setDpFailed] = useState(false);
   const [error, setError] = useState('');
   const threadRef = useRef<HTMLDivElement>(null);
   const autoSelectedRef = useRef(false);
@@ -150,7 +188,6 @@ export default function BotTesterPage() {
     setInput('');
     setError('');
     setProfileOpen(false);
-    setDpFailed(false);
   }
 
   function clearSelectedConversation() {
@@ -159,7 +196,6 @@ export default function BotTesterPage() {
     setInput('');
     setError('');
     setProfileOpen(false);
-    setDpFailed(false);
     setSearchParams({}, { replace: true });
   }
 
@@ -262,8 +298,6 @@ export default function BotTesterPage() {
   const botPaused = Boolean(active?.botPaused);
   const ownerReplying = botPaused || sendMode === 'owner';
   const profileName = active?.customerName ?? null;
-  const profileDp = selectedPhone ? whatsappDpUrl(profileName, selectedPhone) : '';
-  const profileLetters = selectedPhone ? profileInitials(profileName, selectedPhone) : '?';
   const showThread = Boolean(selectedPhone);
   const showList = !isMobileNav || !showThread;
 
@@ -291,16 +325,7 @@ export default function BotTesterPage() {
             <X size={22} />
           </button>
           <div className="wa-dp-body" onClick={(e) => e.stopPropagation()}>
-            {!dpFailed ? (
-              <img
-                src={profileDp}
-                alt={profileName || formatPhoneDisplay(selectedPhone)}
-                className="wa-dp-photo"
-                onError={() => setDpFailed(true)}
-              />
-            ) : (
-              <div className="wa-dp-fallback">{profileLetters}</div>
-            )}
+            <ChatAvatar name={profileName} phone={selectedPhone} large className="wa-dp-photo" />
             <p className="wa-dp-name">{profileName || formatPhoneDisplay(selectedPhone)}</p>
             {profileName && (
               <p className="wa-dp-phone">{formatPhoneDisplay(selectedPhone)}</p>
@@ -401,9 +426,7 @@ export default function BotTesterPage() {
                     onClick={() => selectConversation(c.phoneNumber)}
                     className={`wa-chats__row ${activeRow ? 'wa-chats__row--active' : ''}`}
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--background)] border border-[var(--border)] flex items-center justify-center shrink-0">
-                      <User size={16} className="text-[var(--muted)]" />
-                    </div>
+                    <ChatAvatar name={c.customerName} phone={c.phoneNumber} className="wa-chats__avatar--list" />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-sm truncate">{formatPhoneDisplay(c.phoneNumber)}</p>
                       {c.customerName && (
@@ -452,16 +475,7 @@ export default function BotTesterPage() {
                     onClick={() => setProfileOpen(true)}
                     title="View profile photo"
                   >
-                    {!dpFailed ? (
-                      <img
-                        src={profileDp}
-                        alt=""
-                        className="wa-chats__avatar"
-                        onError={() => setDpFailed(true)}
-                      />
-                    ) : (
-                      <span className="wa-chats__avatar wa-chats__avatar--fallback">{profileLetters}</span>
-                    )}
+                    <ChatAvatar name={profileName} phone={selectedPhone} />
                     <div className="min-w-0 text-left">
                       <p className="font-semibold truncate">{formatPhoneDisplay(selectedPhone)}</p>
                       {active?.customerName && (

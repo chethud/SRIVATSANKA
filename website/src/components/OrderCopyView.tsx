@@ -1,18 +1,19 @@
 import { useMemo } from 'react';
-import { formatDate, type Enquiry } from '../api/client';
+import { formatDate, type Enquiry, type Worker } from '../api/client';
+import { orderCopyBillingBase, orderCopyBillingBreakdown } from '../utils/orderBilling';
+import { workerNeedsHeadcount } from '../utils/workerStaff';
 import { BrandLogo } from './BrandLogo';
 import {
   eventDatesForStyles,
   parseOrderNotes,
+  resolveAssignedWorkerIds,
   resolveStyleForDate,
-  sumExtraItemAmounts,
 } from '../utils/orderNotes';
 import {
   dishesForColumn,
   formatColumnAmount,
   formatPaxTimeLine,
   resolveMenuColumns,
-  sumOrderCopyTotals,
 } from '../utils/orderMenuGrid';
 import { PREFERENCE_CATEGORIES } from '../utils/mealSessions';
 import { OrderExtrasTable } from './order/OrderExtrasSection';
@@ -33,7 +34,15 @@ function scaleAmount(amount: number | null | undefined, scale: number): number |
   return Math.round(amount * scale * 100) / 100;
 }
 
-export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyType: OrderCopyKind }) {
+export function OrderCopyView({
+  enquiry,
+  copyType,
+  workers = [],
+}: {
+  enquiry: Enquiry;
+  copyType: OrderCopyKind;
+  workers?: Worker[];
+}) {
   const title =
     copyType === 'kitchen' ? 'Kitchen Copy' : copyType === 'ours' ? 'Our Copy' : 'Order Copy';
   const showMoney = copyType === 'billing' || copyType === 'ours';
@@ -42,17 +51,35 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
   const kitchenSpecs = kitchenSpecificationNotes(extras.dietary);
   const menuItems = (enquiry.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, enquiry, menuItems);
+  const billingBreakdown = useMemo(
+    () => (showMoney ? orderCopyBillingBreakdown(enquiry) : null),
+    [enquiry, showMoney],
+  );
+
   const grandTotal = useMemo(() => {
     if (!showMoney) return null;
-    const sessionTotal = sumOrderCopyTotals(columns);
-    const extrasTotal = extras.extrasEnabled ? sumExtraItemAmounts(extras.extraItems) : null;
-    const parts = [sessionTotal, extrasTotal].filter((a): a is number => a != null);
-    if (parts.length === 0) return null;
-    return scaleAmount(
-      parts.reduce((sum, amount) => sum + amount, 0),
-      amountScale,
-    );
-  }, [amountScale, columns, extras.extrasEnabled, extras.extraItems, showMoney]);
+    const base = orderCopyBillingBase(enquiry);
+    if (base <= 0) return null;
+    return scaleAmount(base, amountScale);
+  }, [amountScale, enquiry, showMoney]);
+
+  const kitchenStaffLines = useMemo(() => {
+    if (copyType !== 'kitchen' || workers.length === 0) return [];
+    const ids = resolveAssignedWorkerIds(extras);
+    const headcounts = extras.staffHeadcounts ?? {};
+    const lines: string[] = [];
+    for (const id of ids) {
+      const w = workers.find((x) => x.id === id);
+      if (!w) continue;
+      if (workerNeedsHeadcount(w.name)) {
+        const n = headcounts[id] ?? 1;
+        lines.push(`${w.name}: ${n}`);
+      } else {
+        lines.push(w.name);
+      }
+    }
+    return lines;
+  }, [copyType, extras, workers]);
 
   const stylesByDate = useMemo(() => {
     return eventDatesForStyles(extras, enquiry.eventDate)
@@ -111,7 +138,7 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
         ) : (
           <div className="copy-sessions">
           {columns.map((col, index) => {
-            const items = dishesForColumn(col, menuItems, extras);
+            const items = dishesForColumn(col, menuItems, extras, columns);
             const paxLine = formatPaxTimeLine(col);
             const dayStyle = shownDayStyle[index];
             const displayAmount = scaleAmount(
@@ -179,6 +206,28 @@ export function OrderCopyView({ enquiry, copyType }: { enquiry: Enquiry; copyTyp
             {copyType === 'ours' ? 'Overall total (50%)' : 'Overall total'}
           </p>
           <p className="copy-overall-total-amount">{formatColumnAmount(grandTotal)}</p>
+          {billingBreakdown &&
+            billingBreakdown.contractTotal == null &&
+            billingBreakdown.sessions > 0 &&
+            billingBreakdown.extras > 0 && (
+              <p className="copy-overall-total-hint text-sm text-[var(--muted)] mt-1">
+                Sessions {formatColumnAmount(scaleAmount(billingBreakdown.sessions, amountScale) ?? 0)} + extras{' '}
+                {formatColumnAmount(scaleAmount(billingBreakdown.extras, amountScale) ?? 0)}
+              </p>
+            )}
+        </div>
+      )}
+
+      {copyType === 'kitchen' && kitchenStaffLines.length > 0 && (
+        <div className="copy-regional-style">
+          <div className="copy-grid-meta font-bold text-center border-b border-[var(--border)] bg-[var(--table-header-bg)]">
+            Assigned staff
+          </div>
+          <div className="px-4 py-3 space-y-1">
+            {kitchenStaffLines.map((line) => (
+              <p key={line} className="text-center copy-client-line font-semibold">{line}</p>
+            ))}
+          </div>
         </div>
       )}
 

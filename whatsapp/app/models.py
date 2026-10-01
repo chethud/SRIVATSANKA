@@ -52,6 +52,7 @@ class Enquiry(Base):
     ownerViewedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reminderSent: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    adminNote: Mapped[str | None] = mapped_column(Text, nullable=True)
     dateStatus: Mapped[str | None] = mapped_column(String, nullable=True)
     venueName: Mapped[str | None] = mapped_column(String, nullable=True)
     venueArea: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -94,6 +95,8 @@ class EnquiryPayment(Base):
     amount: Mapped[float] = mapped_column(Float)
     payerName: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paymentMode: Mapped[str | None] = mapped_column(String, nullable=True)  # cash | online
+    receivedAccount: Mapped[str | None] = mapped_column(String, nullable=True)
     paidAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -202,6 +205,7 @@ class Vendor(Base):
     name: Mapped[str] = mapped_column(String)
     businessName: Mapped[str | None] = mapped_column(String, nullable=True)
     phoneNumber: Mapped[str] = mapped_column(String)
+    phoneNumbersJson: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(String)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -216,6 +220,7 @@ class Worker(Base):
     role: Mapped[str] = mapped_column(String)
     dailyWage: Mapped[float] = mapped_column(Float, default=0)
     isLead: Mapped[bool] = mapped_column(Boolean, default=False)
+    isActive: Mapped[bool] = mapped_column(Boolean, default=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assignments: Mapped[list["WorkerAssignment"]] = relationship(

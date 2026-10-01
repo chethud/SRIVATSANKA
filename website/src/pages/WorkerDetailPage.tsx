@@ -127,13 +127,13 @@ export default function WorkerDetailPage() {
         description={`${worker.role} · ${worker.phoneNumber}`}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 grid-cards-equal">
         {[
           { icon: User, label: 'Role', value: worker.role },
           { icon: Phone, label: 'Phone', value: worker.phoneNumber },
           { icon: ClipboardList, label: 'Open duties', value: String(profile.totalDuties) },
         ].map(({ icon: Icon, label, value }) => (
-          <Card key={label} className="p-4">
+          <Card key={label} className="card-tile p-4">
             <Icon size={18} className="text-[var(--order-accent)] mb-2" />
             <p className="text-[10px] uppercase tracking-wide text-[var(--order-accent)]">{label}</p>
             <p className="text-sm font-semibold mt-1">{value}</p>

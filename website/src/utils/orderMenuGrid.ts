@@ -109,21 +109,53 @@ export function resolveMenuColumns(
   return sortMenuColumns(inferred);
 }
 
+/** Each dish appears on at most one session column (saved map + first-match fallback). */
+export function buildEffectiveDishColumnMap(
+  columns: MenuColumn[],
+  items: EnquiryDish[],
+  extras: OrderExtras,
+): Record<string, string> {
+  const sorted = sortMenuColumns(columns);
+  const map: Record<string, string> = { ...(extras.dishColumns ?? {}) };
+
+  for (const dish of items) {
+    if (map[dish.id]) continue;
+    const match = sorted.find(
+      (c) =>
+        c.baseSession === dish.category ||
+        c.sessionLabel === dish.category ||
+        c.sessionLabel === dish.dishName,
+    );
+    if (match) map[dish.id] = match.id;
+  }
+
+  return map;
+}
+
 export function dishesForColumn(
   column: MenuColumn,
   items: EnquiryDish[],
   extras: OrderExtras,
+  allColumns?: MenuColumn[],
 ): EnquiryDish[] {
-  const map = extras.dishColumns ?? {};
-  const hasAssignments = Object.keys(map).length > 0;
+  const columns = allColumns?.length
+    ? allColumns
+    : (extras.menuColumns ?? []).map((c) => mapColumn(c, extras));
 
-  if (hasAssignments) {
-    return items.filter((d) => map[d.id] === column.id);
+  if (columns.length === 0) {
+    return items.filter(
+      (d) => d.category === column.baseSession || d.category === column.sessionLabel,
+    );
   }
 
-  return items.filter(
-    (d) => d.category === column.baseSession || d.category === column.sessionLabel,
-  );
+  const map = buildEffectiveDishColumnMap(columns, items, extras);
+  if (Object.keys(map).length === 0) {
+    return items.filter(
+      (d) => d.category === column.baseSession || d.category === column.sessionLabel,
+    );
+  }
+
+  return items.filter((d) => map[d.id] === column.id);
 }
 
 export function findOrCreateColumn(
@@ -289,4 +321,28 @@ export function sumOrderCopyTotals(columns: MenuColumn[]): number | null {
     .filter((a): a is number => a != null && !Number.isNaN(a));
   if (amounts.length === 0) return null;
   return amounts.reduce((sum, amount) => sum + amount, 0);
+}
+
+/** Sum session amounts only for columns that have dishes (matches order copy / billing view). */
+export function sumBillableSessionTotals(
+  columns: MenuColumn[],
+  menuItems: EnquiryDish[],
+  extras: OrderExtras,
+): number | null {
+  const seen = new Set<string>();
+  let total = 0;
+  let found = false;
+
+  for (const col of columns) {
+    const items = dishesForColumn(col, menuItems, extras, columns);
+    if (items.length === 0 || col.amount == null || Number.isNaN(col.amount)) continue;
+    const dishKey = items.map((d) => d.id).sort().join(',');
+    const signature = `${dishKey}|${Math.round(col.amount)}`;
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    total += col.amount;
+    found = true;
+  }
+
+  return found ? total : null;
 }

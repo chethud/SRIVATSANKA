@@ -122,8 +122,8 @@ class Settings(BaseSettings):
 
     # Demo dashboard data (Settings → Load demo data, or POST /dev/seed)
     seed_demo_on_startup: bool = False
-    # Ensure 4 Excel-reference converted orders exist after each deploy/restart
-    seed_excel_refs_on_startup: bool = True
+    # Optional: seed 4 Excel-reference sample orders on API start (off by default)
+    seed_excel_refs_on_startup: bool = False
     dev_seed_token: str = ""  # optional X-Dev-Seed-Token header when set
 
     # development | production
