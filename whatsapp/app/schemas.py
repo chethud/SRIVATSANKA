@@ -231,7 +231,7 @@ class EnquiryCreateIn(BaseModel):
     eventDate: datetime
     eventLocation: str
     guestCount: int = 0
-    preferredCallbackAt: datetime
+    preferredCallbackAt: datetime | None = None
     notes: str | None = None
     adminNote: str | None = None
 

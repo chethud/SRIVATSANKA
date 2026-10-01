@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Enquiry } from '../api/client';
 import { confirmEnquiryPayment, formatCurrency } from '../api/client';
 import {
+  isOrderPaymentComplete,
   orderAmountPaid,
   orderBillingTotal,
   orderDiscount,
@@ -44,7 +45,7 @@ export function PaymentReceivedModal({
         (o) =>
           o.status === 'CONVERTED' &&
           Boolean(o.deliveredAt) &&
-          !o.paymentReceived &&
+          !isOrderPaymentComplete(o) &&
           orderAmountPaid(o) <= 0 &&
           !dismissed.includes(o.id),
       ),
@@ -59,7 +60,7 @@ export function PaymentReceivedModal({
           o.id === forceOrderId &&
           o.status === 'CONVERTED' &&
           Boolean(o.deliveredAt) &&
-          !o.paymentReceived,
+          !isOrderPaymentComplete(o),
       ) ?? null
     );
   }, [orders, forceOrderId]);
@@ -77,7 +78,7 @@ export function PaymentReceivedModal({
   useEffect(() => {
     if (!current) return;
     setDiscount(existingDiscount > 0 ? String(existingDiscount) : '');
-    setPayAmount(remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
+    setPayAmount(paid > 0 ? '' : remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
     setPayerName(current.customerName || '');
     setPaymentMeta({
       paymentMode: '',
@@ -96,9 +97,23 @@ export function PaymentReceivedModal({
     setError(null);
     try {
       const typed = Math.max(0, Number(payAmount) || 0);
-      const amount = fullPay ? (typed > 0 ? typed : remaining) : typed;
+      const amount = fullPay ? remaining : typed;
       if (amount <= 0) {
-        setError('Enter a payment amount greater than 0');
+        setError(
+          fullPay
+            ? 'Nothing left to collect on this order'
+            : 'Enter the installment amount (must be less than the full balance for a partial payment)',
+        );
+        setBusy(false);
+        return;
+      }
+      if (!fullPay && amount >= remaining - 0.009) {
+        setError('For the full balance, use Full payment instead of Split / partial');
+        setBusy(false);
+        return;
+      }
+      if (!fullPay && amount > remaining) {
+        setError('Installment cannot be more than the balance due');
         setBusy(false);
         return;
       }
@@ -181,7 +196,7 @@ export function PaymentReceivedModal({
             type="button"
             onClick={() => {
               setSplitMode(false);
-              setPayAmount(String(Math.round(remaining * 100) / 100));
+              setPayAmount(remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
             }}
             className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border ${
               !splitMode ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)]'
@@ -191,7 +206,10 @@ export function PaymentReceivedModal({
           </button>
           <button
             type="button"
-            onClick={() => setSplitMode(true)}
+            onClick={() => {
+              setSplitMode(true);
+              setPayAmount('');
+            }}
             className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border ${
               splitMode ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)]'
             }`}
@@ -223,6 +241,11 @@ export function PaymentReceivedModal({
             placeholder="Customer name"
           />
         </label>
+        {splitMode && remaining > 0 && (
+          <p className="text-xs text-[var(--muted)] mt-1">
+            Enter less than {formatCurrency(remaining)} to log a partial installment.
+          </p>
+        )}
 
         <div className="mt-4 pt-4 border-t border-[var(--border)]">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)] mb-3">

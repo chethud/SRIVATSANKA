@@ -52,9 +52,8 @@ export function CustomerEventFormFields({
         className="form-input px-3 py-2 rounded-lg md:col-span-2"
       />
       <div className="md:col-span-2">
-        <label className="text-xs text-[var(--muted)] block mb-1">Preferred callback</label>
+        <label className="text-xs text-[var(--muted)] block mb-1">Preferred callback (optional)</label>
         <input
-          required
           type="datetime-local"
           value={form.preferredCallbackAt}
           onChange={(e) => setForm({ ...form, preferredCallbackAt: e.target.value })}

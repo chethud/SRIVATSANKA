@@ -1,20 +1,26 @@
-import { formatCurrency, formatDateTime, type Enquiry } from '../../api/client';
+import { useState } from 'react';
+import { confirmEnquiryPayment, formatCurrency, formatDateTime, updateEnquiry, type Enquiry } from '../../api/client';
 import { paymentModeLabel } from '../../utils/paymentRecord';
 import {
   orderAmountDue,
   orderAmountPaid,
   orderBillingTotal,
+  orderCopyBillingBase,
   orderDiscount,
+  isOrderPaymentComplete,
   isPartialPaymentOrder,
 } from '../../utils/orderBilling';
+import { parseOrderNotes, serializeOrderNotes } from '../../utils/orderNotes';
 
 export function OrderPaymentSection({
   order,
+  onOrderUpdated,
   onRecordPayment,
   onMarkNotReceived,
   markNotReceivedBusy = false,
 }: {
   order: Enquiry;
+  onOrderUpdated?: (order: Enquiry) => void;
   onRecordPayment?: () => void;
   onMarkNotReceived?: () => void;
   markNotReceivedBusy?: boolean;
@@ -25,12 +31,95 @@ export function OrderPaymentSection({
   const due = orderAmountDue(order);
   const payments = order.payments ?? [];
   const partial = isPartialPaymentOrder(order);
+  const extras = parseOrderNotes(order.notes);
+  const menuBooked = orderCopyBillingBase({
+    ...order,
+    notes: serializeOrderNotes({ ...extras, bookedTotalOverride: null }),
+  });
+
+  const [editing, setEditing] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [draftDiscount, setDraftDiscount] = useState('');
+  const [draftBooked, setDraftBooked] = useState('');
+  const [useBookedOverride, setUseBookedOverride] = useState(false);
+
+  function openEdit() {
+    setEditError('');
+    setDraftDiscount(String(order.discountAmount ?? 0));
+    const override = extras.bookedTotalOverride;
+    if (typeof override === 'number' && override > 0) {
+      setUseBookedOverride(true);
+      setDraftBooked(String(override));
+    } else {
+      setUseBookedOverride(false);
+      setDraftBooked(menuBooked > 0 ? String(menuBooked) : '');
+    }
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!onOrderUpdated) return;
+    setSaveBusy(true);
+    setEditError('');
+    try {
+      const nextDiscount = Math.max(0, Number(draftDiscount) || 0);
+      let nextExtras = extras;
+      if (useBookedOverride) {
+        const booked = Math.max(0, Number(draftBooked) || 0);
+        if (booked <= 0) {
+          setEditError('Enter a booked total greater than zero, or turn off manual booked total.');
+          return;
+        }
+        nextExtras = { ...extras, bookedTotalOverride: booked };
+      } else {
+        nextExtras = { ...extras, bookedTotalOverride: null };
+      }
+
+      const notesChanged =
+        nextExtras.bookedTotalOverride !== extras.bookedTotalOverride ||
+        (nextExtras.bookedTotalOverride == null && extras.bookedTotalOverride != null);
+
+      let latest = order;
+      if (notesChanged) {
+        latest = await updateEnquiry(order.id, { notes: serializeOrderNotes(nextExtras) });
+      }
+
+      const discountChanged = Math.abs(nextDiscount - (order.discountAmount ?? 0)) > 0.009;
+      if (discountChanged) {
+        latest = await confirmEnquiryPayment(order.id, {
+          received: true,
+          amount: 0,
+          discountAmount: nextDiscount,
+        });
+      }
+
+      onOrderUpdated(latest);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Could not save payment details');
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  const canEdit = order.status === 'CONVERTED' && Boolean(onOrderUpdated);
+  const canRecord = Boolean(onRecordPayment) && !isOrderPaymentComplete(order) && order.status === 'CONVERTED';
 
   return (
     <div className="order-section">
       <div className="order-section-head">
         <div className="order-section-title">Payments</div>
         <div className="flex flex-wrap gap-2">
+          {canEdit && !editing && (
+            <button
+              type="button"
+              onClick={openEdit}
+              className="order-hero__btn order-hero__btn--secondary !text-xs !py-1.5 !px-3"
+            >
+              Edit payment details
+            </button>
+          )}
           {onMarkNotReceived && (
             <button
               type="button"
@@ -41,7 +130,7 @@ export function OrderPaymentSection({
               {markNotReceivedBusy ? 'Saving…' : 'Mark payment not received'}
             </button>
           )}
-          {onRecordPayment && !order.paymentReceived && order.deliveredAt && (
+          {canRecord && (
             <button type="button" onClick={onRecordPayment} className="order-hero__btn order-hero__btn--primary !text-xs !py-1.5 !px-3">
               Record payment
             </button>
@@ -49,9 +138,72 @@ export function OrderPaymentSection({
         </div>
       </div>
       <p className="order-section-sub">
-        <strong>Booked total</strong> is the order value (menu + extras, minus discount).{' '}
-        <strong>Received</strong> is cash logged — partial payments count only what you record until the balance is cleared.
+        <strong>Booked total</strong> matches the order copy overall total (session totals + extras).{' '}
+        <strong>Balance due</strong> is booked total minus discount minus received. Use{' '}
+        <strong>Edit payment details</strong> to adjust discount or set a manual booked total.
       </p>
+
+      {editing && (
+        <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--background-alt)] p-4 space-y-3">
+          <p className="text-sm font-semibold">Edit payment details</p>
+          {menuBooked > 0 && !useBookedOverride && (
+            <p className="text-xs text-[var(--muted)]">
+              From menu: {formatCurrency(menuBooked)} — enable manual booked total only if you need to override.
+            </p>
+          )}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={useBookedOverride}
+              onChange={(e) => setUseBookedOverride(e.target.checked)}
+            />
+            Set booked total manually
+          </label>
+          {useBookedOverride && (
+            <div>
+              <label className="text-xs text-[var(--muted)] block mb-1">Booked total (₹)</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={draftBooked}
+                onChange={(e) => setDraftBooked(e.target.value)}
+                className="form-input w-full max-w-xs px-3 py-2 rounded-lg"
+              />
+            </div>
+          )}
+          <div>
+            <label className="text-xs text-[var(--muted)] block mb-1">Discount (₹)</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={draftDiscount}
+              onChange={(e) => setDraftDiscount(e.target.value)}
+              className="form-input w-full max-w-xs px-3 py-2 rounded-lg"
+            />
+          </div>
+          {editError && <p className="text-sm text-red-700">{editError}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saveBusy}
+              onClick={() => void saveEdit()}
+              className="order-hero__btn order-hero__btn--primary !text-xs !py-1.5 !px-3"
+            >
+              {saveBusy ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              disabled={saveBusy}
+              onClick={() => setEditing(false)}
+              className="order-hero__btn order-hero__btn--secondary !text-xs !py-1.5 !px-3"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
         <div className="rounded-lg border border-[var(--border)] bg-[var(--background-alt)] p-3">

@@ -258,7 +258,7 @@ async def create_enquiry(
         eventDate=as_naive_utc(payload.eventDate),
         eventLocation=location,
         guestCount=max(0, payload.guestCount),
-        preferredCallbackAt=as_naive_utc(payload.preferredCallbackAt),
+        preferredCallbackAt=as_naive_utc(payload.preferredCallbackAt or payload.eventDate),
         status=EnquiryStatus.NEW,
         notes=payload.notes or "Created manually by owner",
         adminNote=(payload.adminNote or "").strip() or None,
@@ -495,23 +495,25 @@ async def confirm_enquiry_payment(
         return _enquiry_to_out(result.scalar_one(), menu_prices)
 
     installment: float | None
-    if payload.amount is not None:
+    amount_was_explicit = payload.amount is not None
+    if amount_was_explicit:
         try:
             installment = float(payload.amount)
         except (TypeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail="Invalid payment amount") from exc
     else:
-        # Full remaining balance (or whole bill if nothing left calculated)
+        # No amount sent — treat as collect full remaining balance
         installment = remaining_before if remaining_before > 0 else max(0.0, billing - float(enquiry.discountAmount or 0))
 
     if installment < 0:
         raise HTTPException(status_code=400, detail="Payment amount cannot be negative")
 
-    # Always write a ledger row when confirming money received
-    if installment <= 0 and remaining_before > 0:
-        installment = remaining_before
-    if installment <= 0 and billing > 0 and paid_so_far <= 0:
-        installment = max(0.0, billing - float(enquiry.discountAmount or 0))
+    # Only auto-fill when caller did not send an explicit installment amount
+    if not amount_was_explicit:
+        if installment <= 0 and remaining_before > 0:
+            installment = remaining_before
+        if installment <= 0 and billing > 0 and paid_so_far <= 0:
+            installment = max(0.0, billing - float(enquiry.discountAmount or 0))
 
     if installment > 0:
         mode = (payload.paymentMode or "").strip().lower()
@@ -534,10 +536,12 @@ async def confirm_enquiry_payment(
         # Ensure relationship is up to date in this session
         await db.refresh(enquiry, attribute_names=["payments"])
     elif payload.received:
-        raise HTTPException(
-            status_code=400,
-            detail="Payment amount is 0 — set the order-copy totals or enter an amount",
-        )
+        discount_only = amount_was_explicit and installment == 0 and payload.discountAmount is not None
+        if not discount_only:
+            raise HTTPException(
+                status_code=400,
+                detail="Payment amount is 0 — set the order-copy totals or enter an amount",
+            )
 
     billing, paid, due = _enquiry_billing_figures(enquiry, menu_prices)
     enquiry.paymentReceived = paid > 0 and due <= 0.009

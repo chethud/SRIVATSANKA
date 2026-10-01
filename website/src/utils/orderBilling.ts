@@ -13,6 +13,9 @@ export function orderCopyBillingBase(order: Enquiry): number {
   const overall = overallTotalFromExtras(extras);
   if (overall != null) return overall;
 
+  const override = extras.bookedTotalOverride;
+  if (typeof override === 'number' && override > 0) return override;
+
   const menuItems = (order.dishes ?? []).filter((d) => !PREFERENCE_CATEGORIES.has(d.category));
   const columns = resolveMenuColumns(extras, order, menuItems);
   const sessions = sumBillableSessionTotals(columns, menuItems, extras) ?? 0;
@@ -51,23 +54,35 @@ export function orderBillingTotal(order: Enquiry): number {
 }
 
 export function orderAmountPaid(order: Enquiry): number {
-  if (typeof order.amountPaid === 'number') return order.amountPaid;
-  return (order.payments ?? []).reduce((s, p) => s + (p.amount || 0), 0);
+  const rows = order.payments ?? [];
+  const fromRows = rows.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  if (rows.length > 0) return fromRows;
+  if (typeof order.amountPaid === 'number' && order.amountPaid > 0) return order.amountPaid;
+  return 0;
 }
 
 export function orderDiscount(order: Enquiry): number {
   return Math.max(0, order.discountAmount ?? 0);
 }
 
+/** Balance due — always from order-copy billing math (not stale API amountDue). */
 export function orderAmountDue(order: Enquiry): number {
-  if (typeof order.amountDue === 'number') return Math.max(0, order.amountDue);
-  return Math.max(0, orderBillingTotal(order) - orderDiscount(order) - orderAmountPaid(order));
+  const billing = orderBillingTotal(order);
+  const discount = orderDiscount(order);
+  const paid = orderAmountPaid(order);
+  return Math.max(0, billing - discount - paid);
 }
 
+/** Some cash logged and a balance still due (ignores stale paymentReceived flag). */
 export function isPartialPaymentOrder(order: Enquiry): boolean {
   if (order.status !== 'CONVERTED') return false;
-  if (order.paymentReceived) return false;
   const paid = orderAmountPaid(order);
-  const due = orderAmountDue(order);
-  return paid > 0 && due > 0.009;
+  if (paid <= 0) return false;
+  return orderAmountDue(order) > 0.009;
+}
+
+/** Paid in full by ledger + order-copy billing (use for UI, not API paymentReceived alone). */
+export function isOrderPaymentComplete(order: Enquiry): boolean {
+  if (order.status !== 'CONVERTED') return false;
+  return orderAmountPaid(order) > 0 && orderAmountDue(order) <= 0.009;
 }

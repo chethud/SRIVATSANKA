@@ -184,6 +184,8 @@ export type OrderExtras = {
   staffHeadcounts?: Record<string, number>;
   dispatchPhase?: DispatchPhase;
   itemDispatch?: Record<string, DispatchItemStatus>;
+  /** Manual booked total when menu math should not be used (optional). */
+  bookedTotalOverride?: number | null;
 };
 
 export function resolveAssignedWorkerIds(extras: OrderExtras): string[] {
@@ -299,7 +301,8 @@ function hasStructuredNotes(parsed: Partial<OrderExtras>): boolean {
     'assignedWorkerIds' in parsed ||
     'staffHeadcounts' in parsed ||
     'dispatchPhase' in parsed ||
-    'itemDispatch' in parsed
+    'itemDispatch' in parsed ||
+    'bookedTotalOverride' in parsed
   );
 }
 
@@ -355,6 +358,10 @@ export function parseOrderNotes(notes: string | null | undefined): OrderExtras {
             : {},
         dispatchPhase: parsed.dispatchPhase ?? 'planned',
         itemDispatch: parsed.itemDispatch ?? {},
+        bookedTotalOverride:
+          typeof parsed.bookedTotalOverride === 'number' && !Number.isNaN(parsed.bookedTotalOverride)
+            ? Math.max(0, parsed.bookedTotalOverride)
+            : null,
       };
     }
   } catch {

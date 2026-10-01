@@ -39,7 +39,7 @@ export function emptyCustomerEventForm(): CustomerEventFormState {
     eventType: EVENT_TYPES[0],
     eventDate: defaultEventDateIso(),
     eventLocation: '',
-    preferredCallbackAt: defaultCallbackAtLocal(),
+    preferredCallbackAt: '',
     adminNote: '',
   };
 }

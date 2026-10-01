@@ -169,6 +169,10 @@ def billing_total_from_notes(notes: str | None, dish_items: list[Any] | None = N
     if overall is not None:
         return overall
 
+    override = _safe_float(data.get("bookedTotalOverride"))
+    if override is not None and override > 0:
+        return override
+
     items = _menu_items_only(list(dish_items or []))
     dish_columns_raw = data.get("dishColumns") or {}
     dish_columns = (
@@ -185,16 +189,18 @@ def billing_total_from_notes(notes: str | None, dish_items: list[Any] | None = N
     found = False
 
     for col in columns:
-        if items and not _dishes_for_column(col, items, dish_columns, columns):
-            continue
         amt = _safe_float(col.get("amount"))
         if amt is None:
             continue
-        dish_ids = sorted(
-            str(getattr(d, "id", ""))
-            for d in _dishes_for_column(col, items, dish_columns, columns)
-        )
-        signature = f"{','.join(dish_ids)}|{int(round(amt))}"
+        col_dishes = _dishes_for_column(col, items, dish_columns, columns)
+        if col_dishes:
+            dish_ids = sorted(str(getattr(d, "id", "")) for d in col_dishes)
+            signature = f"{','.join(dish_ids)}|{int(round(amt))}"
+        else:
+            col_id = str(col.get("id") or "")
+            if not col_id:
+                continue
+            signature = f"col:{col_id}|{int(round(amt))}"
         if signature in seen:
             continue
         seen.add(signature)

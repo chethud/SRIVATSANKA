@@ -164,10 +164,19 @@ export default function EnquiriesPage() {
     setFormError('');
     try {
       const eventDate = new Date(`${form.eventDate}T12:00:00`);
-      const preferredCallbackAt = new Date(form.preferredCallbackAt);
-      if (Number.isNaN(eventDate.getTime()) || Number.isNaN(preferredCallbackAt.getTime())) {
-        setFormError('Enter a valid event date and preferred callback time.');
+      if (Number.isNaN(eventDate.getTime())) {
+        setFormError('Enter a valid event date.');
         return;
+      }
+      const callbackRaw = form.preferredCallbackAt.trim();
+      let preferredCallbackAt: string | undefined;
+      if (callbackRaw) {
+        const callbackDate = new Date(callbackRaw);
+        if (Number.isNaN(callbackDate.getTime())) {
+          setFormError('Enter a valid callback time or leave it blank.');
+          return;
+        }
+        preferredCallbackAt = callbackDate.toISOString();
       }
       const created = await createEnquiry({
         customerName: form.customerName.trim(),
@@ -176,7 +185,7 @@ export default function EnquiriesPage() {
         eventDate: eventDate.toISOString(),
         eventLocation: form.eventLocation.trim(),
         guestCount: 0,
-        preferredCallbackAt: preferredCallbackAt.toISOString(),
+        preferredCallbackAt,
         notes: 'Created manually by owner',
         adminNote: form.adminNote.trim() || undefined,
       });

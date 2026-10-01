@@ -160,10 +160,19 @@ export default function OrdersPage() {
     setNewOrderError('');
     try {
       const eventDate = new Date(`${newOrderForm.eventDate}T12:00:00`);
-      const preferredCallbackAt = new Date(newOrderForm.preferredCallbackAt);
-      if (Number.isNaN(eventDate.getTime()) || Number.isNaN(preferredCallbackAt.getTime())) {
-        setNewOrderError('Enter a valid event date and callback time.');
+      if (Number.isNaN(eventDate.getTime())) {
+        setNewOrderError('Enter a valid event date.');
         return;
+      }
+      const callbackRaw = newOrderForm.preferredCallbackAt.trim();
+      let preferredCallbackAt: string | undefined;
+      if (callbackRaw) {
+        const callbackDate = new Date(callbackRaw);
+        if (Number.isNaN(callbackDate.getTime())) {
+          setNewOrderError('Enter a valid callback time or leave it blank.');
+          return;
+        }
+        preferredCallbackAt = callbackDate.toISOString();
       }
       const created = await createEnquiry({
         customerName: newOrderForm.customerName.trim(),
@@ -172,7 +181,7 @@ export default function OrdersPage() {
         eventDate: eventDate.toISOString(),
         eventLocation: newOrderForm.eventLocation.trim(),
         guestCount: 0,
-        preferredCallbackAt: preferredCallbackAt.toISOString(),
+        preferredCallbackAt,
         notes: 'Order created manually by admin',
         adminNote: newOrderForm.adminNote.trim() || undefined,
       });

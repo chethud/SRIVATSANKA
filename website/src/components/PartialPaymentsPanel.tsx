@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import type { Enquiry } from '../api/client';
 import { confirmEnquiryPayment, formatCurrency, formatDate } from '../api/client';
 import {
+  isOrderPaymentComplete,
   isPartialPaymentOrder,
   orderAmountDue,
   orderAmountPaid,
@@ -35,6 +36,11 @@ export function PartialPaymentsPanel({
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   const partials = enquiries.filter(isPartialPaymentOrder);
+  const settledOrders = enquiries.filter(
+    (e) => e.status === 'CONVERTED' && isOrderPaymentComplete(e),
+  );
+  const totalReceivedOpen = partials.reduce((sum, o) => sum + orderAmountPaid(o), 0);
+  const totalDueOpen = partials.reduce((sum, o) => sum + orderAmountDue(o), 0);
   const active = partials.find((o) => o.id === activeId) ?? null;
 
   useEffect(() => {
@@ -46,7 +52,7 @@ export function PartialPaymentsPanel({
   function draftFor(o: Enquiry) {
     return (
       drafts[o.id] ?? {
-        amount: String(Math.round(orderAmountDue(o) * 100) / 100),
+        amount: '',
         payer: o.customerName,
         discount: String(o.discountAmount ?? 0),
         payment: {
@@ -64,7 +70,28 @@ export function PartialPaymentsPanel({
     setBusyId(o.id);
     try {
       const remaining = orderAmountDue(o);
-      const amount = payAll ? remaining : Math.max(0, Number(d.amount) || 0);
+      let amount: number;
+      if (payAll) {
+        amount = remaining;
+      } else {
+        amount = Math.max(0, Number(d.amount) || 0);
+        if (amount <= 0) {
+          alert('Enter the installment amount to record');
+          return;
+        }
+        if (amount >= remaining - 0.009) {
+          alert('For the remaining balance, use Clear balance (or enter an amount less than the due total)');
+          return;
+        }
+        if (amount > remaining) {
+          alert('Installment cannot exceed the balance due');
+          return;
+        }
+      }
+      if (amount <= 0) {
+        alert('No balance left to collect');
+        return;
+      }
       const updated = await confirmEnquiryPayment(o.id, {
         received: true,
         amount,
@@ -84,18 +111,61 @@ export function PartialPaymentsPanel({
   }
 
   const helpBlurb = (
-    <p className="text-sm text-[var(--muted)] mb-4 leading-relaxed">
-      <strong className="text-[var(--foreground)]">Partial payments</strong> are orders with some cash recorded but a balance still due.
-      Record each installment from here or from the order page. Dashboard <strong>Revenue received</strong> includes only amounts you log;
-      <strong> Booked order value</strong> is the full contract total.
-    </p>
+    <div className="mb-4 space-y-3">
+      <p className="text-sm text-[var(--muted)] leading-relaxed">
+        <strong className="text-[var(--foreground)]">Partial payments</strong> are orders with some cash recorded but a balance still due.
+        Record each installment from here or from the order page.
+      </p>
+      {partials.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--success-bg)] px-3 py-2.5">
+            <p className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">Received (open orders)</p>
+            <p className="font-bold tabular-nums text-[var(--success-text)] mt-0.5">
+              {formatCurrency(totalReceivedOpen)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-[var(--border)] bg-amber-50 px-3 py-2.5">
+            <p className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">Still due</p>
+            <p className="font-bold tabular-nums text-amber-900 mt-0.5">{formatCurrency(totalDueOpen)}</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   const emptyMessage = (
-    <p className={`text-sm text-[var(--muted)] ${embedded ? '' : 'py-8 text-center'}`}>
-      No open balances. Split payments will appear here until the order is fully paid.
+    <p className={`text-sm text-[var(--muted)] ${embedded ? '' : 'py-4 text-center'}`}>
+      No open balances. Log a <strong>partial</strong> installment (less than the full due) and the order will appear here until
+      the balance is cleared.
     </p>
   );
+
+  const settledSection =
+    settledOrders.length > 0 ? (
+      <div className="mt-6 pt-6 border-t border-[var(--border)]">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)] mb-3">
+          Fully received ({settledOrders.length})
+        </p>
+        <ul className="space-y-2 max-h-[14rem] overflow-y-auto overscroll-contain pr-1">
+          {settledOrders.map((o) => (
+            <li
+              key={o.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2"
+            >
+              <Link
+                to={`/orders/${o.id}`}
+                className="font-semibold text-[var(--foreground)] hover:text-[var(--primary)] min-w-0 break-words"
+              >
+                {o.customerName}
+              </Link>
+              <span className="tabular-nums font-semibold text-[var(--success-text)] shrink-0">
+                {formatCurrency(orderAmountPaid(o))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
 
   const list = (
     <div className="space-y-2">
@@ -104,12 +174,17 @@ export function PartialPaymentsPanel({
           key={o.id}
           type="button"
           onClick={() => setActiveId(o.id)}
-          className="w-full flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-left hover:border-[var(--primary)]/40 hover:bg-[var(--primary-light)]/40 transition-colors min-h-[3rem]"
+          className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-left hover:border-[var(--primary)]/40 hover:bg-[var(--primary-light)]/40 transition-colors"
         >
           <span className="font-semibold text-[var(--foreground)] min-w-0 break-words">{o.customerName}</span>
-          <span className="shrink-0 tabular-nums font-semibold text-amber-900">
-            {formatCurrency(orderAmountDue(o))}
-          </span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm shrink-0">
+            <span className="tabular-nums text-[var(--success-text)] font-semibold">
+              Received {formatCurrency(orderAmountPaid(o))}
+            </span>
+            <span className="tabular-nums text-amber-900 font-semibold">
+              Due {formatCurrency(orderAmountDue(o))}
+            </span>
+          </div>
         </button>
       ))}
     </div>
@@ -191,7 +266,7 @@ export function PartialPaymentsPanel({
                       type="number"
                       min={0}
                       className="w-full rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm min-h-[2.5rem]"
-                      placeholder="Amount now"
+                      placeholder={`Partial amount (due ${formatCurrency(orderAmountDue(active))})`}
                       value={d.amount}
                       onChange={(e) =>
                         setDrafts((prev) => ({ ...prev, [active.id]: { ...d, amount: e.target.value } }))
@@ -275,27 +350,29 @@ export function PartialPaymentsPanel({
   const body = (
     <>
       {partials.length === 0 ? emptyMessage : list}
+      {settledSection}
       {modal}
     </>
   );
 
   if (embedded) return body;
 
-  if (partials.length === 0) {
-    return (
-      <GlassCard title="Partial payments">
-        {helpBlurb}
-        {emptyMessage}
-      </GlassCard>
-    );
-  }
-
   return (
-    <GlassCard title="Partial payments" action={<span className="text-xs text-[var(--muted)]">{partials.length} open</span>}>
+    <GlassCard
+      title="Partial payments"
+      action={
+        partials.length > 0 ? (
+          <span className="text-xs text-[var(--muted)]">{partials.length} open</span>
+        ) : undefined
+      }
+    >
       {helpBlurb}
-      <div className="max-h-[18rem] overflow-y-auto overscroll-contain pr-1 -mr-1">
-        {list}
-      </div>
+      {partials.length > 0 ? (
+        <div className="max-h-[18rem] overflow-y-auto overscroll-contain pr-1 -mr-1">{list}</div>
+      ) : (
+        emptyMessage
+      )}
+      {settledSection}
       {modal}
     </GlassCard>
   );

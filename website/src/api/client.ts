@@ -439,7 +439,7 @@ export async function createEnquiry(data: {
   eventDate: string;
   eventLocation: string;
   guestCount?: number;
-  preferredCallbackAt: string;
+  preferredCallbackAt?: string | null;
   notes?: string;
   adminNote?: string;
 }): Promise<Enquiry> {
@@ -493,13 +493,16 @@ export async function confirmEnquiryPayment(
 ): Promise<Enquiry> {
   const body =
     typeof payload === 'boolean'
-      ? { received: payload }
+      ? { received: payload, amount: null }
       : {
           received: payload.received ?? true,
-          amount: payload.amount,
-          payerName: payload.payerName,
-          discountAmount: payload.discountAmount,
-          notes: payload.notes,
+          amount: payload.amount ?? null,
+          payerName: payload.payerName ?? null,
+          discountAmount: payload.discountAmount ?? null,
+          notes: payload.notes ?? null,
+          paymentMode: payload.paymentMode ?? null,
+          receivedAccount: payload.receivedAccount ?? null,
+          paidAt: payload.paidAt ?? null,
         };
   return apiFetch<Enquiry>(`/api/enquiries/${id}/payment`, {
     method: 'PATCH',

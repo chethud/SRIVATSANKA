@@ -334,10 +334,12 @@ export function sumBillableSessionTotals(
   let found = false;
 
   for (const col of columns) {
+    if (col.amount == null || Number.isNaN(col.amount)) continue;
     const items = dishesForColumn(col, menuItems, extras, columns);
-    if (items.length === 0 || col.amount == null || Number.isNaN(col.amount)) continue;
-    const dishKey = items.map((d) => d.id).sort().join(',');
-    const signature = `${dishKey}|${Math.round(col.amount)}`;
+    const signature =
+      items.length > 0
+        ? `${items.map((d) => d.id).sort().join(',')}|${Math.round(col.amount)}`
+        : `col:${col.id}|${Math.round(col.amount)}`;
     if (seen.has(signature)) continue;
     seen.add(signature);
     total += col.amount;

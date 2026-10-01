@@ -38,7 +38,11 @@ import {
 } from '../../utils/orderNotes';
 import { MEAL_SESSIONS, PREFERENCE_CATEGORIES, resolveSessionTabs } from '../../utils/mealSessions';
 import { resolveMenuColumns } from '../../utils/orderMenuGrid';
-import { orderAmountPaid } from '../../utils/orderBilling';
+import {
+  isOrderPaymentComplete,
+  isPartialPaymentOrder,
+  orderAmountPaid,
+} from '../../utils/orderBilling';
 import { downloadOrderCopyExcel } from '../../utils/orderCopies';
 
 export type OrderPageView = 'details' | 'kitchen' | 'billing' | 'ours';
@@ -298,7 +302,8 @@ export function OrderDetailView({
     }
   }
 
-  const hasPaymentLogged = order.paymentReceived || orderAmountPaid(order) > 0;
+  const paymentComplete = isOrderPaymentComplete(order);
+  const hasPaymentLogged = orderAmountPaid(order) > 0;
 
   return (
     <div className="order-view max-w-5xl mx-auto pb-12">
@@ -332,8 +337,12 @@ export function OrderDetailView({
 
         <div className="order-hero__actions">
           <div className="order-hero__status">
-            {order.paymentReceived ? (
+            {paymentComplete ? (
               <span className="order-hero__status-pill order-hero__status-pill--paid">Payment received</span>
+            ) : isPartialPaymentOrder(order) ? (
+              <span className="order-hero__status-pill order-hero__status-pill--partial">
+                Partial payment received
+              </span>
             ) : order.deliveredAt ? (
               <span className="order-hero__status-pill order-hero__status-pill--due">Payment not received</span>
             ) : (
@@ -360,12 +369,12 @@ export function OrderDetailView({
                 {paymentClearBusy ? 'Saving…' : 'Mark payment not received'}
               </button>
             )}
-            {!order.paymentReceived && order.deliveredAt && (
+            {!paymentComplete && order.status === 'CONVERTED' && (
               <button type="button" onClick={() => setShowPaymentPopup(true)} className="order-hero__btn order-hero__btn--primary">
                 Record payment
               </button>
             )}
-            {!order.paymentReceived && !order.deliveredAt && (
+            {!paymentComplete && !order.deliveredAt && (
               <button
                 type="button"
                 disabled={deliveryBusy}
@@ -728,6 +737,7 @@ export function OrderDetailView({
 
       <OrderPaymentSection
         order={order}
+        onOrderUpdated={onOrderUpdated}
         onRecordPayment={() => setShowPaymentPopup(true)}
         onMarkNotReceived={hasPaymentLogged ? () => void handleMarkPaymentNotReceived() : undefined}
         markNotReceivedBusy={paymentClearBusy}

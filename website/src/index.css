@@ -579,6 +579,12 @@ div.grid:not([class*='items-']) {
   color: var(--foreground);
 }
 
+.order-hero__status-pill--partial {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  background: color-mix(in srgb, var(--primary-light) 55%, var(--card));
+  color: var(--primary);
+}
+
 .order-hero__status-pill--open {
   color: var(--muted);
 }
