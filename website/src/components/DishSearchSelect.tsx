@@ -1,6 +1,11 @@
-import { useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Plus, Search } from 'lucide-react';
 import type { Dish } from '../api/client';
+
+type ListOption =
+  | { kind: 'dish'; dish: Dish }
+  | { kind: 'custom'; name: string }
+  | { kind: 'blocked' };
 
 export function DishSearchSelect({
   dishes,
@@ -31,6 +36,8 @@ export function DishSearchSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [highlight, setHighlight] = useState(0);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const selected = dishes.find((d) => d.id === value);
   const trimmedQuery = query.trim();
@@ -64,6 +71,31 @@ export function DishSearchSelect({
     }
     return [...sessionDishes, ...otherDishes].slice(0, 12);
   }, [dishes, trimmedQuery, sessionKey]);
+
+  const options = useMemo((): ListOption[] => {
+    const rows: ListOption[] = filtered.map((dish) => ({ kind: 'dish', dish }));
+    if (queryBlocked) {
+      rows.push({ kind: 'blocked' });
+    } else if (
+      trimmedQuery &&
+      filtered.every((d) => d.name.toLowerCase() !== trimmedQuery.toLowerCase())
+    ) {
+      rows.push({ kind: 'custom', name: trimmedQuery });
+    }
+    return rows;
+  }, [filtered, queryBlocked, trimmedQuery]);
+
+  const selectableCount = options.filter((o) => o.kind !== 'blocked').length;
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, open, options.length]);
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.querySelector('[data-highlight="true"]');
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, open]);
 
   function clearSelection() {
     onChange('');
@@ -101,6 +133,24 @@ export function DishSearchSelect({
     onConfirmCustom?.(trimmedQuery);
   }
 
+  function commitHighlighted() {
+    const selectable = options.filter((o) => o.kind !== 'blocked');
+    const opt = selectable[highlight] ?? selectable[0];
+    if (!opt) {
+      commitTypedName();
+      return;
+    }
+    if (opt.kind === 'dish') {
+      pick(opt.dish);
+      onConfirmDish?.(opt.dish);
+      return;
+    }
+    if (opt.kind === 'custom') {
+      pickCustom(opt.name);
+      onConfirmCustom?.(opt.name);
+    }
+  }
+
   const displayValue = open
     ? query
     : selected
@@ -113,9 +163,13 @@ export function DishSearchSelect({
     <div className="relative flex-1 min-w-[220px]">
       <label className="text-xs text-[var(--muted)] font-medium mb-1 block">Dish name</label>
       <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
         <input
           type="text"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls="dish-search-listbox"
+          aria-autocomplete="list"
           value={displayValue}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -133,12 +187,38 @@ export function DishSearchSelect({
             setQuery(selected ? selected.name : hasCustom ? customName : query);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              commitTypedName();
-            }
             if (e.key === 'Escape') {
               setOpen(false);
+              return;
+            }
+            if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+              e.preventDefault();
+              setOpen(true);
+              return;
+            }
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (!open) {
+                setOpen(true);
+                return;
+              }
+              if (selectableCount === 0) return;
+              setHighlight((i) => (i + 1) % selectableCount);
+              return;
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (!open || selectableCount === 0) return;
+              setHighlight((i) => (i - 1 + selectableCount) % selectableCount);
+              return;
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (open && selectableCount > 0) {
+                commitHighlighted();
+              } else {
+                commitTypedName();
+              }
             }
           }}
           placeholder={
@@ -147,9 +227,14 @@ export function DishSearchSelect({
               : 'Search menu or type any dish name…'
           }
           className={`form-input w-full pl-9 py-2.5 rounded-lg text-sm ${
-            selected || hasCustom ? 'pr-16' : 'pr-3'
+            selected || hasCustom ? 'pr-20' : 'pr-10'
           }`}
           autoComplete="off"
+        />
+        <ChevronDown
+          size={16}
+          className={`absolute ${selected || hasCustom ? 'right-14' : 'right-3'} top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none transition-transform ${open ? 'rotate-180' : ''}`}
+          aria-hidden
         />
         {(selected || hasCustom) && (
           <button
@@ -168,58 +253,90 @@ export function DishSearchSelect({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-sm text-[var(--foreground)]">
-            {filtered.length === 0 && !trimmedQuery ? (
+          <ul
+            id="dish-search-listbox"
+            ref={listRef}
+            role="listbox"
+            className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-sm text-[var(--foreground)]"
+          >
+            {options.length === 0 ? (
               <li className="px-3 py-2 text-[var(--muted)]">
                 {sessionCategory
                   ? `No ${sessionCategory} dishes in catalog — type a name to add`
                   : 'Type a dish name'}
               </li>
             ) : (
-              filtered.map((d) => {
-                const sameSession =
-                  sessionKey && d.category.trim().toLowerCase() === sessionKey;
-                return (
-                  <li key={d.id}>
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
-                      onClick={() => pick(d)}
-                    >
-                      <span className="font-medium">{d.name}</span>
-                      {!sameSession && (
-                        <span className="text-[var(--muted)] ml-2">{d.category}</span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })
-            )}
-            {queryBlocked && (
-              <li className="px-3 py-2 text-[var(--muted)] border-t border-[var(--border)]">
-                Already added in this session
-              </li>
-            )}
-            {trimmedQuery &&
-              !queryBlocked &&
-              filtered.every((d) => d.name.toLowerCase() !== trimmedQuery.toLowerCase()) && (
-              <li className="border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-2.5 text-[var(--primary)] hover:bg-[var(--sidebar-hover)] flex items-center gap-2 font-medium"
-                  onClick={() => pickCustom(trimmedQuery)}
-                >
-                  <Plus size={15} />
-                  Use &quot;{trimmedQuery}&quot; on this order
-                </button>
-              </li>
+              <>
+                <li className="px-3 py-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--muted)] border-b border-[var(--border)] bg-[var(--background-alt)] sticky top-0">
+                  ↑↓ to move, Enter to add
+                </li>
+                {(() => {
+                  let selectableIndex = -1;
+                  return options.map((opt, index) => {
+                    if (opt.kind === 'blocked') {
+                      return (
+                        <li
+                          key={`blocked-${index}`}
+                          className="px-3 py-2 text-[var(--muted)] border-t border-[var(--border)]"
+                        >
+                          Already added in this session
+                        </li>
+                      );
+                    }
+                    selectableIndex += 1;
+                    const rowIndex = selectableIndex;
+                    const isHighlight = rowIndex === highlight;
+                    if (opt.kind === 'custom') {
+                      return (
+                        <li key={`custom-${opt.name}`} role="option" aria-selected={isHighlight}>
+                          <button
+                            type="button"
+                            data-highlight={isHighlight ? 'true' : undefined}
+                            className={`w-full text-left px-3 py-2.5 border-t border-[var(--border)] flex items-center gap-2 font-medium ${
+                              isHighlight
+                                ? 'bg-[var(--primary-light)] text-[var(--primary)]'
+                                : 'text-[var(--primary)] hover:bg-[var(--sidebar-hover)]'
+                            }`}
+                            onMouseEnter={() => setHighlight(rowIndex)}
+                            onClick={() => pickCustom(opt.name)}
+                          >
+                            <Plus size={15} />
+                            Use &quot;{opt.name}&quot; on this order
+                          </button>
+                        </li>
+                      );
+                    }
+                    const d = opt.dish;
+                    const sameSession =
+                      sessionKey && d.category.trim().toLowerCase() === sessionKey;
+                    return (
+                      <li key={d.id} role="option" aria-selected={isHighlight}>
+                        <button
+                          type="button"
+                          data-highlight={isHighlight ? 'true' : undefined}
+                          className={`w-full text-left px-3 py-2 text-[var(--foreground)] ${
+                            isHighlight ? 'bg-[var(--primary-light)]' : 'hover:bg-[var(--sidebar-hover)]'
+                          }`}
+                          onMouseEnter={() => setHighlight(rowIndex)}
+                          onClick={() => pick(d)}
+                        >
+                          <span className="font-medium">{d.name}</span>
+                          {!sameSession && (
+                            <span className="text-[var(--muted)] ml-2">{d.category}</span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  });
+                })()}
+              </>
             )}
           </ul>
         </>
       )}
       {hasCustom && (
         <p className="text-xs text-[var(--muted)] mt-1.5">
-          Custom name for this order — toggle “Save to menu catalog” below if you also want it in the dish list.
+          New dish — it will be added to this session and (by default) saved to the master Menu list. Duplicates are blocked.
         </p>
       )}
     </div>

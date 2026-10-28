@@ -1928,6 +1928,41 @@ div.grid:not([class*='items-']) {
   box-shadow: var(--shadow-sm);
 }
 
+/* Match preset extra title typography; light border only on focus */
+.order-extra-title-input {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  padding: 0.125rem 0.375rem;
+  margin: -0.125rem -0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--foreground);
+  outline: none;
+}
+
+.order-extra-title-input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.order-extra-title-input:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--card);
+}
+
+.order-extra-title-input:focus {
+  border-color: var(--primary);
+  background: var(--card);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.order-extra-title-input:disabled {
+  opacity: 0.7;
+}
+
 .order-worker-card {
   display: flex;
   flex-wrap: wrap;

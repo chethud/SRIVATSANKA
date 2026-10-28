@@ -31,7 +31,7 @@ export default function DishesPage() {
   useCreateActionListener('dish', () => {
     openAddDishForSession(cat !== 'ALL' ? cat : 'Breakfast');
   });
-  usePageSearch('Search dishes by name...', search, setSearch);
+  usePageSearch('Search dishes by name, session, or description...', search, setSearch);
 
   useCreateActionListener('session', () => {
     setAddingSession(true);
@@ -61,9 +61,14 @@ export default function DishesPage() {
   );
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return dishes.filter((d) => {
       const matchCat = cat === 'ALL' || d.category === cat;
-      const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase());
+      if (!q) return matchCat;
+      const matchSearch =
+        d.name.toLowerCase().includes(q) ||
+        d.category.toLowerCase().includes(q) ||
+        (d.description ?? '').toLowerCase().includes(q);
       return matchCat && matchSearch;
     });
   }, [dishes, search, cat]);
@@ -159,17 +164,32 @@ export default function DishesPage() {
       setFormError('Enter a session name (e.g. High Tea).');
       return;
     }
+    const dishName = form.name.trim();
+    if (!dishName) {
+      setFormError('Enter a dish name.');
+      return;
+    }
+    const duplicate = dishes.find(
+      (d) =>
+        d.id !== editingDishId &&
+        d.name.trim().toLowerCase() === dishName.toLowerCase() &&
+        d.category.trim().toLowerCase() === category.toLowerCase(),
+    );
+    if (duplicate) {
+      setFormError(`"${duplicate.name}" already exists in ${duplicate.category}.`);
+      return;
+    }
     setSaving(true);
     try {
       if (editingDishId) {
         await updateDish(editingDishId, {
-          name: form.name,
+          name: dishName,
           category,
           description: form.description || null,
         });
       } else {
         await createDish({
-          name: form.name,
+          name: dishName,
           category,
           price: 0,
           description: form.description || undefined,
@@ -194,7 +214,34 @@ export default function DishesPage() {
 
   return (
     <>
-      <PageHeader title="Menu" description={`${dishes.length} dishes`} />
+      <PageHeader
+        title="Menu"
+        description={`${filtered.length} of ${dishes.length} dishes — search by name, session, or description`}
+      />
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by dish name, session, or description"
+          className="form-input min-w-0 flex-1 px-3 py-2.5 rounded-lg sm:max-w-xl"
+          aria-label="Search menu dishes"
+        />
+        <select
+          value={cat}
+          onChange={(e) => setCat(e.target.value)}
+          className="form-select w-full shrink-0 px-3 py-2.5 rounded-lg sm:w-56"
+          aria-label="Filter by meal session"
+        >
+          <option value="ALL">All sessions</option>
+          {catalogSessions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div id="page-add-session" className="order-session-tabs mb-4">
         <button

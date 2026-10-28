@@ -506,7 +506,8 @@ function SessionAddDishForm({
 }) {
   const [dishId, setDishId] = useState('');
   const [customDishName, setCustomDishName] = useState('');
-  const [saveToCatalog, setSaveToCatalog] = useState(false);
+  /** New typed dishes always go to the master Menu list (voice-note request). */
+  const [saveToCatalog, setSaveToCatalog] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -514,12 +515,23 @@ function SessionAddDishForm({
     sessionItems.map((d) => d.dishId).filter((id): id is string => Boolean(id)),
   );
   const usedNames = new Set(sessionItems.map((d) => d.dishName.trim().toLowerCase()).filter(Boolean));
+  const sessionKey = column.baseSession.trim().toLowerCase();
 
   const availableDishes = dishes.filter((d) => {
     if (usedCatalogIds.has(d.id)) return false;
     if (usedNames.has(d.name.trim().toLowerCase())) return false;
     return true;
   });
+
+  function findCatalogMatch(name: string): Dish | undefined {
+    const q = name.trim().toLowerCase();
+    if (!q) return undefined;
+    const sameSession = dishes.find(
+      (d) => d.name.trim().toLowerCase() === q && d.category.trim().toLowerCase() === sessionKey,
+    );
+    if (sameSession) return sameSession;
+    return dishes.find((d) => d.name.trim().toLowerCase() === q);
+  }
 
   function isAlreadyInSession(opts: { dishId?: string; dishName?: string }): boolean {
     if (opts.dishId && usedCatalogIds.has(opts.dishId)) return true;
@@ -534,11 +546,23 @@ function SessionAddDishForm({
 
   async function handleAdd(opts?: { dishIdOverride?: string; dishNameOverride?: string }) {
     setError('');
-    const resolvedDishId = opts?.dishIdOverride ?? dishId;
+    let resolvedDishId = opts?.dishIdOverride ?? dishId;
     const customName = (opts?.dishNameOverride ?? customDishName).trim();
     if (!resolvedDishId && !customName) {
       setError('Select a menu item or type a dish name.');
       return;
+    }
+
+    // Typed name that already exists in Menu → reuse catalog row (no duplicate).
+    if (!resolvedDishId && customName) {
+      const existing = findCatalogMatch(customName);
+      if (existing) {
+        if (isAlreadyInSession({ dishId: existing.id, dishName: existing.name })) {
+          setError(`"${existing.name}" is already in this session.`);
+          return;
+        }
+        resolvedDishId = existing.id;
+      }
     }
 
     if (
@@ -553,24 +577,27 @@ function SessionAddDishForm({
 
     setSaving(true);
     try {
+      const shouldSaveCatalog = !resolvedDishId && Boolean(customName) && saveToCatalog;
       const updated = await addOrderDish(order.id, {
         ...(resolvedDishId
           ? { dishId: resolvedDishId }
-          : { dishName: customName, saveToCatalog }),
+          : { dishName: customName, saveToCatalog: shouldSaveCatalog }),
         category: column.baseSession,
         menuColumnId: column.id,
       });
 
       setDishId('');
       setCustomDishName('');
+      setSaveToCatalog(true);
       onOrderUpdated(updated);
 
       // Catalog refresh can wait — don't block the UI
-      if (customName && saveToCatalog) {
+      if (shouldSaveCatalog || resolvedDishId) {
         void onDishesCatalogUpdated?.();
       }
-    } catch {
-      setError('Could not add item.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not add item.';
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -613,7 +640,7 @@ function SessionAddDishForm({
             onChange={(e) => setSaveToCatalog(e.target.checked)}
             className="rounded border-[var(--border)]"
           />
-          Also save this dish to the menu catalog
+          Also add to master Menu list (avoids adding it on Menu page first)
         </label>
       )}
       {error && <p className="excel-session-add-error">{error}</p>}

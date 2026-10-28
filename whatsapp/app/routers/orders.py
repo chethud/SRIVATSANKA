@@ -79,8 +79,26 @@ async def create_dish(payload: DishIn, db: AsyncSession = Depends(get_db)) -> Di
     if not label:
         raise HTTPException(400, "Invalid meal session — use Breakfast, Lunch, or a custom name")
 
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(400, "Dish name is required")
+
+    existing = (
+        await db.execute(
+            select(Dish)
+            .where(Dish.isActive.is_(True))
+            .where(Dish.name.ilike(name))
+            .where(Dish.category.ilike(label))
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f'"{existing.name}" already exists in {dish_category_label(existing.category)}',
+        )
+
     dish = Dish(
-        name=payload.name.strip(),
+        name=name,
         category=label,
         price=payload.price,
         description=payload.description,
@@ -117,6 +135,23 @@ async def update_dish(
         if not label:
             raise HTTPException(status_code=400, detail="Invalid meal session — use Breakfast, Lunch, or a custom name")
         dish.category = label
+
+    next_name = dish.name.strip()
+    next_category = dish.category
+    duplicate = (
+        await db.execute(
+            select(Dish)
+            .where(Dish.isActive.is_(True))
+            .where(Dish.id != dish.id)
+            .where(Dish.name.ilike(next_name))
+            .where(Dish.category.ilike(next_category))
+        )
+    ).scalar_one_or_none()
+    if duplicate:
+        raise HTTPException(
+            status_code=409,
+            detail=f'"{duplicate.name}" already exists in {dish_category_label(duplicate.category)}',
+        )
     if payload.price is not None:
         dish.price = payload.price
     if payload.description is not None:
@@ -194,10 +229,16 @@ async def add_order_dish(
                 served=False,
             )
         else:
-            result = await db.execute(
-                select(Dish).where(Dish.isActive.is_(True)).where(Dish.name.ilike(name))
-            )
-            menu = result.scalar_one_or_none()
+            # Prefer same-session catalog match; never create a duplicate name+session.
+            same_session = (
+                await db.execute(
+                    select(Dish)
+                    .where(Dish.isActive.is_(True))
+                    .where(Dish.name.ilike(name))
+                    .where(Dish.category.ilike(session_label))
+                )
+            ).scalar_one_or_none()
+            menu = same_session
             if not menu:
                 menu = Dish(
                     name=name,

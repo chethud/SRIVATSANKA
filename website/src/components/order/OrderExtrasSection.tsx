@@ -151,26 +151,44 @@ export function OrderExtrasSection({
         key={row.id}
         className={`order-extra-row ${checked ? 'order-extra-row--active' : ''}`}
       >
-        <label className="flex items-start gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => toggleItem(row.id, e.target.checked)}
-            disabled={saving}
-            className="mt-1 h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] shrink-0"
-          />
+        <div className="flex items-start gap-3">
+          <label className="mt-1 shrink-0 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(e) => toggleItem(row.id, e.target.checked)}
+              disabled={saving}
+              className="h-4 w-4 rounded border-[var(--border)] text-[var(--primary)]"
+              aria-label={row.title ? `Enable ${row.title}` : 'Enable custom extra'}
+            />
+          </label>
           <div className="flex-1 min-w-0">
-            {row.isCustom ? (
-              <input
-                value={row.title}
-                onChange={(e) => updateItem(row.id, { title: e.target.value })}
-                placeholder="Extra item name"
-                disabled={!checked || saving}
-                className="form-input w-full px-3 py-2 rounded-lg text-sm font-semibold mb-3 disabled:opacity-50"
-              />
-            ) : (
-              <span className="text-sm font-semibold text-[var(--foreground)] block mb-3">{row.title}</span>
-            )}
+            <div className="flex items-start gap-2 mb-3">
+              {row.isCustom ? (
+                <input
+                  value={row.title}
+                  onChange={(e) => updateItem(row.id, { title: e.target.value })}
+                  placeholder="Extra item name"
+                  disabled={saving}
+                  className="order-extra-title-input flex-1 min-w-0"
+                />
+              ) : (
+                <span className="text-sm font-semibold text-[var(--foreground)] flex-1 pt-0.5">
+                  {row.title}
+                </span>
+              )}
+              {row.isCustom && (
+                <button
+                  type="button"
+                  onClick={() => removeCustomRow(row.id)}
+                  disabled={saving}
+                  className="p-1.5 rounded-md text-[var(--muted)] hover:text-red-600 hover:bg-red-50 shrink-0"
+                  title="Remove custom extra"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
 
             {checked && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -235,18 +253,7 @@ export function OrderExtrasSection({
               </div>
             )}
           </div>
-          {row.isCustom && (
-            <button
-              type="button"
-              onClick={() => removeCustomRow(row.id)}
-              disabled={saving}
-              className="p-2 rounded-md text-[var(--muted)] hover:text-red-600 hover:bg-red-50 shrink-0"
-              title="Remove custom extra"
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-        </label>
+        </div>
       </div>
     );
   }
@@ -303,17 +310,8 @@ export function OrderExtrasSection({
               </p>
 
               <div className="space-y-3">
-                {items.filter((row) => !row.isCustom).map(renderExtraRow)}
+                {items.map(renderExtraRow)}
               </div>
-
-              {items.some((row) => row.isCustom) && (
-                <div className="pt-4 border-t border-dashed border-[var(--border)] space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--order-accent)]">
-                    Custom extras
-                  </p>
-                  {items.filter((row) => row.isCustom).map(renderExtraRow)}
-                </div>
-              )}
 
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
