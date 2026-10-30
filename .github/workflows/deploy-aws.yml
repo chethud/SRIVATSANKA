@@ -115,16 +115,34 @@ jobs:
           fi
 
           sudo systemctl restart kannans-backend
-          sleep 3
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if sudo systemctl is-active --quiet kannans-backend \
+              && curl -sf --max-time 5 http://127.0.0.1:8000/api/health; then
+              echo
+              echo "BACKEND_HEALTHY attempt=\$i"
+              break
+            fi
+            echo "waiting for backend... attempt=\$i"
+            sleep 3
+            if [ "\$i" = "10" ]; then
+              sudo systemctl status kannans-backend --no-pager -l || true
+              journalctl -u kannans-backend -n 40 --no-pager || true
+              exit 1
+            fi
+          done
           sudo systemctl is-active kannans-backend
-          curl -sf --max-time 15 http://127.0.0.1:8000/api/health
-          echo
           test -f "${REMOTE_ROOT}/whatsapp/kannans.db" && echo DB_STILL_THERE
           test -d "${REMOTE_ROOT}/whatsapp/uploads" && echo UPLOADS_STILL_THERE || echo UPLOADS_DIR_OPTIONAL
           EOF
 
       - name: Public health check
         run: |
-          sleep 2
-          curl -sf --max-time 20 "http://${EC2_HOST}/api/health"
-          echo
+          for i in 1 2 3 4 5 6; do
+            if curl -sf --max-time 15 "http://${EC2_HOST}/api/health"; then
+              echo
+              exit 0
+            fi
+            echo "public health retry \$i"
+            sleep 5
+          done
+          exit 1
