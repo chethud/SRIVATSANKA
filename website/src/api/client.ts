@@ -489,6 +489,8 @@ export async function confirmEnquiryPayment(
     paymentMode?: string | null;
     receivedAccount?: string | null;
     paidAt?: string | null;
+    /** When true, payment is advance — order stays not delivered. */
+    advance?: boolean;
   } | boolean = true,
 ): Promise<Enquiry> {
   const body =
@@ -503,6 +505,7 @@ export async function confirmEnquiryPayment(
           paymentMode: payload.paymentMode ?? null,
           receivedAccount: payload.receivedAccount ?? null,
           paidAt: payload.paidAt ?? null,
+          advance: payload.advance ?? false,
         };
   return apiFetch<Enquiry>(`/api/enquiries/${id}/payment`, {
     method: 'PATCH',

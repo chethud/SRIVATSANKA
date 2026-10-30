@@ -17,6 +17,7 @@ export function PaymentReceivedModal({
   onResolved,
   forceOrderId = null,
   onCloseForce,
+  mode = 'payment',
 }: {
   orders: Enquiry[];
   dishes?: unknown;
@@ -24,7 +25,10 @@ export function PaymentReceivedModal({
   /** Open payment UI for a specific order (e.g. from order detail page). */
   forceOrderId?: string | null;
   onCloseForce?: () => void;
+  /** Advance = before delivery; payment = after / settle remaining. */
+  mode?: 'payment' | 'advance';
 }) {
+  const advanceMode = mode === 'advance';
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,17 +59,20 @@ export function PaymentReceivedModal({
   const forced = useMemo(() => {
     if (!forceOrderId) return null;
     return (
-      orders.find(
-        (o) =>
-          o.id === forceOrderId &&
-          o.status === 'CONVERTED' &&
-          Boolean(o.deliveredAt) &&
-          !isOrderPaymentComplete(o),
-      ) ?? null
+      orders.find((o) => {
+        if (o.id !== forceOrderId || o.status !== 'CONVERTED' || isOrderPaymentComplete(o)) {
+          return false;
+        }
+        if (advanceMode) {
+          return !o.deliveredAt;
+        }
+        // Record payment: delivered orders, or any with remaining (advances already logged)
+        return true;
+      }) ?? null
     );
-  }, [orders, forceOrderId]);
+  }, [orders, forceOrderId, advanceMode]);
 
-  const current = forced ?? pending[0];
+  const current = forced ?? (advanceMode ? null : pending[0]);
   const forcedMode = Boolean(forced);
 
   const billing = current ? orderBillingTotal(current) : 0;
@@ -78,51 +85,76 @@ export function PaymentReceivedModal({
   useEffect(() => {
     if (!current) return;
     setDiscount(existingDiscount > 0 ? String(existingDiscount) : '');
-    setPayAmount(paid > 0 ? '' : remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
+    if (advanceMode) {
+      setSplitMode(true);
+      setPayAmount('');
+      setPaymentMeta({
+        paymentMode: '',
+        paidAt: defaultPaymentPaidAtLocal(),
+        paymentNotes: 'Advance payment',
+        receivedAccount: '',
+      });
+    } else {
+      setPayAmount(paid > 0 ? '' : remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
+      setPaymentMeta({
+        paymentMode: '',
+        paidAt: defaultPaymentPaidAtLocal(),
+        paymentNotes: '',
+        receivedAccount: '',
+      });
+      setSplitMode(paid > 0);
+    }
     setPayerName(current.customerName || '');
-    setPaymentMeta({
-      paymentMode: '',
-      paidAt: defaultPaymentPaidAtLocal(),
-      paymentNotes: '',
-      receivedAccount: '',
-    });
-    setSplitMode(paid > 0);
     setError(null);
-  }, [current?.id, forceOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [current?.id, forceOrderId, advanceMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!current) return null;
+  const order = current;
 
   async function submit(fullPay: boolean) {
     setBusy(true);
     setError(null);
     try {
       const typed = Math.max(0, Number(payAmount) || 0);
-      const amount = fullPay ? remaining : typed;
+      const amount = fullPay && !advanceMode ? remaining : typed;
       if (amount <= 0) {
         setError(
-          fullPay
-            ? 'Nothing left to collect on this order'
-            : 'Enter the installment amount (must be less than the full balance for a partial payment)',
+          advanceMode
+            ? 'Enter the advance amount received'
+            : fullPay
+              ? 'Nothing left to collect on this order'
+              : 'Enter the installment amount (must be less than the full balance for a partial payment)',
         );
         setBusy(false);
         return;
       }
-      if (!fullPay && amount >= remaining - 0.009) {
+      if (amount > remaining + 0.009) {
+        setError(`Amount cannot exceed the balance due (${formatCurrency(remaining)})`);
+        setBusy(false);
+        return;
+      }
+      if (!advanceMode && !fullPay && amount >= remaining - 0.009) {
         setError('For the full balance, use Full payment instead of Split / partial');
         setBusy(false);
         return;
       }
-      if (!fullPay && amount > remaining) {
-        setError('Installment cannot be more than the balance due');
-        setBusy(false);
-        return;
-      }
-      const updated = await confirmEnquiryPayment(current.id, {
+      const noteParts = [
+        advanceMode ? 'Advance payment' : null,
+        paymentMeta.paymentNotes.trim() || null,
+      ].filter(Boolean);
+      // Avoid duplicating "Advance payment" if already in notes
+      const notes =
+        advanceMode && paymentMeta.paymentNotes.trim().toLowerCase().includes('advance')
+          ? paymentMeta.paymentNotes.trim()
+          : noteParts.join(' — ') || null;
+
+      const updated = await confirmEnquiryPayment(order.id, {
         received: true,
         amount,
-        payerName: payerName.trim() || current.customerName,
+        payerName: payerName.trim() || order.customerName,
         discountAmount: effectiveDiscount,
-        ...paymentPayloadExtras(paymentMeta),
+        ...paymentPayloadExtras({ ...paymentMeta, paymentNotes: notes || '' }),
+        advance: advanceMode,
       });
       await onResolved(updated);
       if (forcedMode) onCloseForce?.();
@@ -138,7 +170,7 @@ export function PaymentReceivedModal({
       onCloseForce?.();
       return;
     }
-    setDismissed((ids) => [...ids, current.id]);
+    setDismissed((ids) => [...ids, order.id]);
   }
 
   return (
@@ -150,16 +182,22 @@ export function PaymentReceivedModal({
     >
       <Card className="w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--primary)] mb-2">
-          Order delivered
+          {advanceMode ? 'Before delivery' : 'Order payment'}
         </p>
         <h2 id="payment-received-title" className="text-xl font-semibold text-[var(--foreground)]">
-          Did you receive payment?
+          {advanceMode ? 'Record advance payment' : 'Did you receive payment?'}
         </h2>
         <p className="text-sm text-[var(--muted)] mt-2">
-          <span className="font-medium text-[var(--foreground)]">{current.customerName}</span>
+          <span className="font-medium text-[var(--foreground)]">{order.customerName}</span>
           {' · '}
-          {current.eventType}
+          {order.eventType}
         </p>
+        {advanceMode && (
+          <p className="text-sm text-[var(--muted)] mt-2 leading-relaxed">
+            Log money received before the event. It counts toward the balance and appears when you use{' '}
+            <strong>Record payment</strong> later. The order stays <strong>Not yet delivered</strong>.
+          </p>
+        )}
 
         <div className="mt-4 space-y-1 text-sm">
           <div className="flex justify-between gap-3">
@@ -168,8 +206,10 @@ export function PaymentReceivedModal({
           </div>
           {paid > 0 && (
             <div className="flex justify-between gap-3">
-              <span className="text-[var(--muted)]">Already paid</span>
-              <span className="tabular-nums">{formatCurrency(paid)}</span>
+              <span className="text-[var(--muted)]">
+                {advanceMode ? 'Advance already paid' : 'Already paid'}
+              </span>
+              <span className="tabular-nums text-[var(--primary)]">{formatCurrency(paid)}</span>
             </div>
           )}
           <div className="flex justify-between gap-3">
@@ -191,44 +231,52 @@ export function PaymentReceivedModal({
           />
         </label>
 
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setSplitMode(false);
-              setPayAmount(remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
-            }}
-            className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border ${
-              !splitMode ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)]'
-            }`}
-          >
-            Full payment
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSplitMode(true);
-              setPayAmount('');
-            }}
-            className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border ${
-              splitMode ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)]'
-            }`}
-          >
-            Split / partial
-          </button>
-        </div>
+        {!advanceMode && (
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSplitMode(false);
+                setPayAmount(remaining > 0 ? String(Math.round(remaining * 100) / 100) : '');
+              }}
+              className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border ${
+                !splitMode ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)]'
+              }`}
+            >
+              Full payment
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSplitMode(true);
+                setPayAmount('');
+              }}
+              className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border ${
+                splitMode ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)]'
+              }`}
+            >
+              Split / partial
+            </button>
+          </div>
+        )}
 
         <label className="block mt-3 text-sm">
           <span className="text-[var(--muted)]">
-            {splitMode ? 'Amount received now (₹)' : 'Amount to record (₹)'}
+            {advanceMode
+              ? 'Advance amount (₹)'
+              : splitMode
+                ? 'Amount received now (₹)'
+                : 'Amount to record (₹)'}
           </span>
           <input
             type="number"
             min={0}
+            max={remaining > 0 ? remaining : undefined}
             step="0.01"
             value={payAmount}
             onChange={(e) => setPayAmount(e.target.value)}
             className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2"
+            placeholder={remaining > 0 ? `Up to ${Math.round(remaining * 100) / 100}` : '0'}
           />
         </label>
         <label className="block mt-3 text-sm">
@@ -241,9 +289,11 @@ export function PaymentReceivedModal({
             placeholder="Customer name"
           />
         </label>
-        {splitMode && remaining > 0 && (
+        {(advanceMode || splitMode) && remaining > 0 && (
           <p className="text-xs text-[var(--muted)] mt-1">
-            Enter less than {formatCurrency(remaining)} to log a partial installment.
+            {advanceMode
+              ? `Enter an amount up to ${formatCurrency(remaining)} (remaining balance).`
+              : `Enter less than ${formatCurrency(remaining)} to log a partial installment.`}
           </p>
         )}
 
@@ -254,30 +304,33 @@ export function PaymentReceivedModal({
           <PaymentRecordFields value={paymentMeta} onChange={setPaymentMeta} />
         </div>
 
-        <details className="mt-3 text-xs text-[var(--muted)]">
-          <summary className="cursor-pointer font-semibold text-[var(--foreground)]">Full vs partial payment</summary>
-          <ul className="mt-2 space-y-1.5 list-disc pl-4 leading-relaxed">
-            <li>
-              <strong>Full payment</strong> — records the remaining balance (or the amount you enter). When balance reaches ₹0, the order is marked paid.
-            </li>
-            <li>
-              <strong>Split / partial</strong> — records an installment only. The order stays on Dashboard → Partial payments until the rest is collected.
-            </li>
-            <li>
-              <strong>Revenue received</strong> counts cash logged. <strong>Booked total</strong> on the order is the menu value (may be higher until fully paid).
-            </li>
-          </ul>
-        </details>
+        {!advanceMode && (
+          <details className="mt-3 text-xs text-[var(--muted)]">
+            <summary className="cursor-pointer font-semibold text-[var(--foreground)]">Full vs partial payment</summary>
+            <ul className="mt-2 space-y-1.5 list-disc pl-4 leading-relaxed">
+              <li>
+                <strong>Full payment</strong> — records the remaining balance. When balance reaches ₹0, the order is marked paid.
+              </li>
+              <li>
+                <strong>Split / partial</strong> — records an installment only. Prior advances are already subtracted from balance due.
+              </li>
+            </ul>
+          </details>
+        )}
         {error && <p className="text-sm text-[var(--danger)] mt-3">{error}</p>}
 
         <div className="flex flex-col sm:flex-row gap-2 mt-6">
           <button
             type="button"
             disabled={busy}
-            onClick={() => void submit(!splitMode)}
+            onClick={() => void submit(advanceMode ? false : !splitMode)}
             className="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-60"
           >
-            {splitMode ? 'Save partial payment' : 'Yes, payment received'}
+            {advanceMode
+              ? 'Save advance payment'
+              : splitMode
+                ? 'Save partial payment'
+                : 'Yes, payment received'}
           </button>
           <button
             type="button"
@@ -290,13 +343,13 @@ export function PaymentReceivedModal({
         </div>
         {!forcedMode && (
           <Link
-            to={`/orders/${current.id}`}
+            to={`/orders/${order.id}`}
             className="block text-center text-sm text-[var(--primary)] hover:underline mt-4"
           >
             Open order
           </Link>
         )}
-        {!forcedMode && pending.length > 1 && (
+        {!forcedMode && !advanceMode && pending.length > 1 && (
           <p className="text-xs text-center text-[var(--muted)] mt-2">
             {pending.length - 1} more delivered order{pending.length === 2 ? '' : 's'} waiting
           </p>

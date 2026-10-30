@@ -530,7 +530,8 @@ async def confirm_enquiry_payment(
             paidAt=paid_at,
         )
         db.add(payment)
-        if enquiry.deliveredAt is None:
+        # Advance payments before the event must not mark the order delivered.
+        if enquiry.deliveredAt is None and not bool(getattr(payload, "advance", False)):
             enquiry.deliveredAt = datetime.now()
         await db.flush()
         # Ensure relationship is up to date in this session

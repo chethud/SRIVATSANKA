@@ -16,12 +16,14 @@ export function OrderPaymentSection({
   order,
   onOrderUpdated,
   onRecordPayment,
+  onAdvancePayment,
   onMarkNotReceived,
   markNotReceivedBusy = false,
 }: {
   order: Enquiry;
   onOrderUpdated?: (order: Enquiry) => void;
   onRecordPayment?: () => void;
+  onAdvancePayment?: () => void;
   onMarkNotReceived?: () => void;
   markNotReceivedBusy?: boolean;
 }) {
@@ -104,7 +106,16 @@ export function OrderPaymentSection({
   }
 
   const canEdit = order.status === 'CONVERTED' && Boolean(onOrderUpdated);
-  const canRecord = Boolean(onRecordPayment) && !isOrderPaymentComplete(order) && order.status === 'CONVERTED';
+  const canAdvance =
+    Boolean(onAdvancePayment) &&
+    !isOrderPaymentComplete(order) &&
+    order.status === 'CONVERTED' &&
+    !order.deliveredAt;
+  const canRecord =
+    Boolean(onRecordPayment) &&
+    !isOrderPaymentComplete(order) &&
+    order.status === 'CONVERTED' &&
+    Boolean(order.deliveredAt);
 
   return (
     <div className="order-section">
@@ -130,6 +141,15 @@ export function OrderPaymentSection({
               {markNotReceivedBusy ? 'Saving…' : 'Mark payment not received'}
             </button>
           )}
+          {canAdvance && (
+            <button
+              type="button"
+              onClick={onAdvancePayment}
+              className="order-hero__btn order-hero__btn--secondary !text-xs !py-1.5 !px-3"
+            >
+              Advance payment
+            </button>
+          )}
           {canRecord && (
             <button type="button" onClick={onRecordPayment} className="order-hero__btn order-hero__btn--primary !text-xs !py-1.5 !px-3">
               Record payment
@@ -139,8 +159,8 @@ export function OrderPaymentSection({
       </div>
       <p className="order-section-sub">
         <strong>Booked total</strong> matches the order copy overall total (session totals + extras).{' '}
-        <strong>Balance due</strong> is booked total minus discount minus received. Use{' '}
-        <strong>Edit payment details</strong> to adjust discount or set a manual booked total.
+        <strong>Balance due</strong> is booked total minus discount minus received (including advances). Use{' '}
+        <strong>Advance payment</strong> before delivery; after delivery use <strong>Record payment</strong> for the rest.
       </p>
 
       {editing && (
@@ -248,16 +268,26 @@ export function OrderPaymentSection({
               </tr>
             </thead>
             <tbody>
-              {payments.map((p) => (
-                <tr key={p.id} className="border-t border-[var(--border)]">
-                  <td className="p-3 tabular-nums whitespace-nowrap">{formatDateTime(p.paidAt)}</td>
-                  <td className="p-3">{paymentModeLabel(p.paymentMode)}</td>
-                  <td className="p-3 break-words">{p.receivedAccount || '—'}</td>
-                  <td className="p-3">{p.payerName || '—'}</td>
-                  <td className="p-3 text-right font-semibold tabular-nums">{formatCurrency(p.amount)}</td>
-                  <td className="p-3 text-[var(--muted)]">{p.notes || '—'}</td>
-                </tr>
-              ))}
+              {payments.map((p) => {
+                const isAdvance = /\badvance\b/i.test(p.notes || '');
+                return (
+                  <tr key={p.id} className="border-t border-[var(--border)]">
+                    <td className="p-3 tabular-nums whitespace-nowrap">{formatDateTime(p.paidAt)}</td>
+                    <td className="p-3">
+                      {paymentModeLabel(p.paymentMode)}
+                      {isAdvance && (
+                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                          Advance
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 break-words">{p.receivedAccount || '—'}</td>
+                    <td className="p-3">{p.payerName || '—'}</td>
+                    <td className="p-3 text-right font-semibold tabular-nums">{formatCurrency(p.amount)}</td>
+                    <td className="p-3 text-[var(--muted)]">{p.notes || '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

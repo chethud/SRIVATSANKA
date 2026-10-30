@@ -91,6 +91,7 @@ export function OrderDetailView({
   const [paymentClearBusy, setPaymentClearBusy] = useState(false);
   const [bookAgainBusy, setBookAgainBusy] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+  const [paymentPopupMode, setPaymentPopupMode] = useState<'payment' | 'advance'>('payment');
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState(order.phoneNumber ?? '');
   const [phoneSaving, setPhoneSaving] = useState(false);
@@ -311,6 +312,7 @@ export function OrderDetailView({
         <PaymentReceivedModal
           orders={[order]}
           forceOrderId={order.id}
+          mode={paymentPopupMode}
           onCloseForce={() => setShowPaymentPopup(false)}
           onResolved={async (updated) => {
             onOrderUpdated(updated);
@@ -339,9 +341,13 @@ export function OrderDetailView({
           <div className="order-hero__status">
             {paymentComplete ? (
               <span className="order-hero__status-pill order-hero__status-pill--paid">Payment received</span>
-            ) : isPartialPaymentOrder(order) ? (
+            ) : isPartialPaymentOrder(order) && order.deliveredAt ? (
               <span className="order-hero__status-pill order-hero__status-pill--partial">
                 Partial payment received
+              </span>
+            ) : hasPaymentLogged && !order.deliveredAt ? (
+              <span className="order-hero__status-pill order-hero__status-pill--partial">
+                Advance received
               </span>
             ) : order.deliveredAt ? (
               <span className="order-hero__status-pill order-hero__status-pill--due">Payment not received</span>
@@ -369,8 +375,27 @@ export function OrderDetailView({
                 {paymentClearBusy ? 'Saving…' : 'Mark payment not received'}
               </button>
             )}
-            {!paymentComplete && order.status === 'CONVERTED' && (
-              <button type="button" onClick={() => setShowPaymentPopup(true)} className="order-hero__btn order-hero__btn--primary">
+            {!paymentComplete && order.status === 'CONVERTED' && !order.deliveredAt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentPopupMode('advance');
+                  setShowPaymentPopup(true);
+                }}
+                className="order-hero__btn order-hero__btn--secondary"
+              >
+                Advance payment
+              </button>
+            )}
+            {!paymentComplete && order.status === 'CONVERTED' && order.deliveredAt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentPopupMode('payment');
+                  setShowPaymentPopup(true);
+                }}
+                className="order-hero__btn order-hero__btn--primary"
+              >
                 Record payment
               </button>
             )}
@@ -738,7 +763,14 @@ export function OrderDetailView({
       <OrderPaymentSection
         order={order}
         onOrderUpdated={onOrderUpdated}
-        onRecordPayment={() => setShowPaymentPopup(true)}
+        onAdvancePayment={() => {
+          setPaymentPopupMode('advance');
+          setShowPaymentPopup(true);
+        }}
+        onRecordPayment={() => {
+          setPaymentPopupMode('payment');
+          setShowPaymentPopup(true);
+        }}
         onMarkNotReceived={hasPaymentLogged ? () => void handleMarkPaymentNotReceived() : undefined}
         markNotReceivedBusy={paymentClearBusy}
       />

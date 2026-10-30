@@ -254,6 +254,8 @@ class EnquiryPaymentIn(BaseModel):
     paymentMode: str | None = None  # cash | online
     receivedAccount: str | None = None
     paidAt: datetime | None = None
+    # Advance before delivery — do not set deliveredAt.
+    advance: bool = False
 
 
 class EnquiryPaymentOut(BaseModel):
