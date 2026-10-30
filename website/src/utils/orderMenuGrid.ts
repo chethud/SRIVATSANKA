@@ -1,6 +1,11 @@
 import type { Enquiry, EnquiryDish } from '../api/client';
 import { normalizeDateOnly } from './dateOnly';
-import { formatScheduleTime, type MenuColumn, type OrderExtras } from './orderNotes';
+import {
+  formatScheduleTime,
+  normalizeServingStyle,
+  type MenuColumn,
+  type OrderExtras,
+} from './orderNotes';
 import { MEAL_SESSIONS, MEAL_SESSION_ORDER, PREFERENCE_CATEGORIES } from './mealSessions';
 
 export type { MenuColumn };
@@ -70,6 +75,7 @@ function mapColumn(
     timeFrom: c.timeFrom ?? extras.mealSchedules?.[c.baseSession]?.timeFrom ?? null,
     timeTo: c.timeTo ?? extras.mealSchedules?.[c.baseSession]?.timeTo ?? null,
     amount: c.amount ?? null,
+    servingStyle: normalizeServingStyle(c.servingStyle),
   };
 }
 
@@ -103,6 +109,7 @@ export function resolveMenuColumns(
       timeFrom: schedule?.timeFrom ?? null,
       timeTo: schedule?.timeTo ?? null,
       amount: null,
+      servingStyle: null,
     });
   }
 
@@ -167,6 +174,7 @@ export function findOrCreateColumn(
     pax: number | null;
     timeFrom: string;
     timeTo: string;
+    servingStyle?: MenuColumn['servingStyle'];
   },
 ): { columns: MenuColumn[]; columnId: string } {
   const label = draft.sessionLabel.trim() || draft.baseSession;
@@ -184,6 +192,8 @@ export function findOrCreateColumn(
             pax: draft.pax ?? c.pax,
             timeFrom: draft.timeFrom || c.timeFrom,
             timeTo: draft.timeTo || c.timeTo,
+            servingStyle:
+              draft.servingStyle !== undefined ? draft.servingStyle : c.servingStyle,
           }
         : c,
     );
@@ -199,6 +209,7 @@ export function findOrCreateColumn(
     timeFrom: draft.timeFrom || null,
     timeTo: draft.timeTo || null,
     amount: null,
+    servingStyle: draft.servingStyle ?? null,
   };
   return { columns: [...columns, col], columnId: col.id };
 }
@@ -256,6 +267,19 @@ export function updateColumnTime(
   };
 }
 
+export function updateColumnServingStyle(
+  extras: OrderExtras,
+  columns: MenuColumn[],
+  columnId: string,
+  servingStyle: MenuColumn['servingStyle'],
+): OrderExtras {
+  const updated = columns.map((c) => (c.id === columnId ? { ...c, servingStyle } : c));
+  return {
+    ...extras,
+    menuColumns: stripMenuColumnsForSave(updated),
+  };
+}
+
 export function removeMenuColumn(
   extras: OrderExtras,
   columns: MenuColumn[],
@@ -293,7 +317,7 @@ export function sessionLabelOptions(baseSession: string): string {
 
 export function stripMenuColumnsForSave(columns: MenuColumn[]): MenuColumn[] {
   return columns.map(
-    ({ id, date, sessionLabel, baseSession, pax, timeFrom, timeTo, amount }) => ({
+    ({ id, date, sessionLabel, baseSession, pax, timeFrom, timeTo, amount, servingStyle }) => ({
       id,
       date,
       sessionLabel,
@@ -302,6 +326,7 @@ export function stripMenuColumnsForSave(columns: MenuColumn[]): MenuColumn[] {
       timeFrom,
       timeTo,
       amount: amount ?? null,
+      servingStyle: servingStyle ?? null,
     }),
   );
 }

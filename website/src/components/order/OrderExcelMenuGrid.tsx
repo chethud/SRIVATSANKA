@@ -14,9 +14,12 @@ import { Button } from '../Layout';
 import {
   eventDatesForStyles,
   expandScheduleDateRange,
+  normalizeServingStyle,
   serializeOrderNotes,
+  SERVING_STYLES,
   toDateInputValue,
   type OrderExtras,
+  type ServingStyle,
 } from '../../utils/orderNotes';
 import { resolveSessionTabs } from '../../utils/mealSessions';
 import {
@@ -28,6 +31,7 @@ import {
   stripMenuColumnsForSave,
   updateColumnAmount,
   updateColumnPax,
+  updateColumnServingStyle,
   updateColumnTime,
   type MenuColumn,
 } from '../../utils/orderMenuGrid';
@@ -195,6 +199,13 @@ function SessionBlock({
       </header>
 
       <div className="excel-session-meta">
+        <SessionServingStyleField
+          column={column}
+          columns={columns}
+          extras={extras}
+          orderId={order.id}
+          onOrderUpdated={onOrderUpdated}
+        />
         <SessionTimeField
           column={column}
           columns={columns}
@@ -288,6 +299,7 @@ function SessionBatchCreator({
   const defaultDate = eventDays[0] ?? extras.scheduleDateFrom ?? toDateInputValue(order.eventDate) ?? '';
   const [columnDate, setColumnDate] = useState(defaultDate);
   const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
+  const [draftServingStyle, setDraftServingStyle] = useState<ServingStyle | ''>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -330,6 +342,7 @@ function SessionBatchCreator({
     setSaving(true);
     try {
       let nextColumns = columns;
+      const servingStyle = normalizeServingStyle(draftServingStyle);
       for (const sessionId of selectedSessions) {
         const label = sessionLabelOptions(sessionId);
         nextColumns = findOrCreateColumn(nextColumns, {
@@ -339,6 +352,7 @@ function SessionBatchCreator({
           pax: null,
           timeFrom: '',
           timeTo: '',
+          servingStyle,
         }).columns;
       }
       const merged: OrderExtras = {
@@ -395,6 +409,25 @@ function SessionBatchCreator({
               className="excel-meta-input excel-meta-input--date mt-1"
             />
           </div>
+        </div>
+
+        <div className="excel-meta-field w-full">
+          <label className="excel-meta-label" htmlFor="draft-serving-style">
+            Serving style (applies to new sessions)
+          </label>
+          <select
+            id="draft-serving-style"
+            value={draftServingStyle}
+            onChange={(e) => setDraftServingStyle(e.target.value as ServingStyle | '')}
+            className="excel-meta-input mt-1 w-full max-w-xs"
+          >
+            <option value="">Select serving style</option>
+            {SERVING_STYLES.map((style) => (
+              <option key={style} value={style}>
+                {style}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="excel-meta-field w-full">
@@ -644,6 +677,59 @@ function SessionAddDishForm({
         </label>
       )}
       {error && <p className="excel-session-add-error">{error}</p>}
+    </div>
+  );
+}
+
+function SessionServingStyleField({
+  column,
+  columns,
+  extras,
+  orderId,
+  onOrderUpdated,
+}: {
+  column: MenuColumn;
+  columns: MenuColumn[];
+  extras: OrderExtras;
+  orderId: string;
+  onOrderUpdated: (order: Enquiry) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const value = column.servingStyle ?? '';
+
+  async function saveStyle(next: string) {
+    const servingStyle = normalizeServingStyle(next);
+    if (servingStyle === (column.servingStyle ?? null)) return;
+    setSaving(true);
+    try {
+      const merged = updateColumnServingStyle(extras, columns, column.id, servingStyle);
+      const updated = await updateEnquiry(orderId, { notes: serializeOrderNotes(merged) });
+      onOrderUpdated(updated);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="excel-meta-field">
+      <label className="excel-meta-label" htmlFor={`serving-${column.id}`}>
+        Serving style
+      </label>
+      <select
+        id={`serving-${column.id}`}
+        value={value}
+        disabled={saving}
+        onChange={(e) => void saveStyle(e.target.value)}
+        className="excel-meta-input"
+        aria-label={`Serving style for ${column.sessionLabel}`}
+      >
+        <option value="">Select</option>
+        {SERVING_STYLES.map((style) => (
+          <option key={style} value={style}>
+            {style}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

@@ -158,6 +158,9 @@ export function OrderCopyView({
                   </div>
                 )}
                 <div className="copy-session-label">{col.sessionLabel}</div>
+                {col.servingStyle && (
+                  <div className="copy-session-pax">{col.servingStyle}</div>
+                )}
                 {paxLine && <div className="copy-session-pax">{paxLine}</div>}
 
                 <ul className="copy-dish-list">

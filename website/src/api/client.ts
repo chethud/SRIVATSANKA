@@ -671,6 +671,7 @@ export interface OrderExcelMenuColumn {
   timeFrom?: string | null;
   timeTo?: string | null;
   amount?: number | null;
+  servingStyle?: string | null;
 }
 
 export interface OrderExcelDishRow {

@@ -137,6 +137,17 @@ export function sumBillableExtraItemAmounts(items: OrderExtraItem[] | undefined)
   return amounts.reduce((sum, amount) => sum + amount, 0);
 }
 
+export const SERVING_STYLES = ['Buffet', 'Plantain leaf', 'Thali'] as const;
+export type ServingStyle = (typeof SERVING_STYLES)[number];
+
+export function normalizeServingStyle(value: unknown): ServingStyle | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return (SERVING_STYLES as readonly string[]).includes(trimmed)
+    ? (trimmed as ServingStyle)
+    : null;
+}
+
 export type MenuColumn = {
   id: string;
   date: string;
@@ -147,6 +158,8 @@ export type MenuColumn = {
   timeTo: string | null;
   /** Total amount for this session column (not per dish). */
   amount: number | null;
+  /** How this session is served: Buffet / Plantain leaf / Thali */
+  servingStyle?: ServingStyle | null;
 };
 
 export type OrderExtras = {
