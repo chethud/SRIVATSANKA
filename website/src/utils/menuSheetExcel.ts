@@ -83,6 +83,8 @@ function isCounterSubHeader(label: string): boolean {
 
 type SessionBlock = {
   label: string;
+  /** Buffet / Plantain leaf / Thali — printed on kitchen + order copies */
+  servingStyle: string;
   paxLine: string;
   amount: number | null;
   dishNames: string[];
@@ -119,6 +121,7 @@ function buildDayColumns(
     const rawAmount = typeof column.amount === 'number' ? column.amount : null;
     list.push({
       label,
+      servingStyle: column.servingStyle?.trim() || '',
       paxLine: formatPaxTimeLine(column) || (column.pax ? `${column.pax} Pax` : ''),
       amount:
         rawAmount != null ? Math.round(rawAmount * amountScale * 100) / 100 : null,
@@ -141,6 +144,7 @@ function buildDayColumns(
       sessions: [
         {
           label: enquiry.eventType || 'Event',
+          servingStyle: '',
           paxLine: enquiry.guestCount ? `${enquiry.guestCount} Pax` : '',
           amount: null,
           dishNames: ['No dishes added yet'],
@@ -159,6 +163,7 @@ function activeExtrasAsBlocks(enquiry: Enquiry): SessionBlock[] {
   if (!extras.extrasEnabled) return [];
   return activeOrderExtraItems(extras.extraItems).map((item) => ({
     label: item.title,
+    servingStyle: '',
     paxLine: item.quantity?.trim() || '',
     amount: typeof item.amount === 'number' ? item.amount : null,
     dishNames: item.description
@@ -314,6 +319,18 @@ export async function appendMenuSheet(
         wrappedRowHeight(session.label, perColChars, 14, 22),
       );
       row += 1;
+
+      // Serving style (Buffet / Plantain leaf / Thali) — kitchen + order copies
+      if (session.servingStyle) {
+        const styleCell = ws.getCell(row, col);
+        styleCell.value = session.servingStyle;
+        styleCell.font = bold;
+        styleCell.fill = solidFill(FILL.pax);
+        styleCell.alignment = alignCenter;
+        styleCell.border = border;
+        ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 20);
+        row += 1;
+      }
 
       // Pax / time — bright yellow
       if (session.paxLine) {
