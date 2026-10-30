@@ -30,7 +30,6 @@ export function PartialPaymentsPanel({
   type Draft = {
     amount: string;
     payer: string;
-    discount: string;
     payment: PaymentRecordDraft;
   };
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -54,7 +53,6 @@ export function PartialPaymentsPanel({
       drafts[o.id] ?? {
         amount: '',
         payer: o.customerName,
-        discount: String(o.discountAmount ?? 0),
         payment: {
           paymentMode: '',
           paidAt: defaultPaymentPaidAtLocal(),
@@ -96,7 +94,6 @@ export function PartialPaymentsPanel({
         received: true,
         amount,
         payerName: d.payer.trim() || o.customerName,
-        discountAmount: Math.max(0, Number(d.discount) || 0),
         ...paymentPayloadExtras(d.payment),
       });
       await onUpdated(updated);
@@ -259,7 +256,7 @@ export function PartialPaymentsPanel({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs text-[var(--muted)] mb-1 block">Amount now</label>
                     <input
@@ -282,19 +279,6 @@ export function PartialPaymentsPanel({
                       value={d.payer}
                       onChange={(e) =>
                         setDrafts((prev) => ({ ...prev, [active.id]: { ...d, payer: e.target.value } }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-[var(--muted)] mb-1 block">Discount</label>
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-full rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm min-h-[2.5rem]"
-                      placeholder="Discount"
-                      value={d.discount}
-                      onChange={(e) =>
-                        setDrafts((prev) => ({ ...prev, [active.id]: { ...d, discount: e.target.value } }))
                       }
                     />
                   </div>

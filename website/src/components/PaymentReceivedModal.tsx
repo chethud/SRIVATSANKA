@@ -4,9 +4,9 @@ import type { Enquiry } from '../api/client';
 import { confirmEnquiryPayment, formatCurrency } from '../api/client';
 import {
   isOrderPaymentComplete,
+  orderAmountDue,
   orderAmountPaid,
   orderBillingTotal,
-  orderDiscount,
 } from '../utils/orderBilling';
 import { Card } from './Layout';
 import { PaymentRecordFields, paymentPayloadExtras, type PaymentRecordDraft } from './PaymentRecordFields';
@@ -33,7 +33,6 @@ export function PaymentReceivedModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [splitMode, setSplitMode] = useState(false);
-  const [discount, setDiscount] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [payerName, setPayerName] = useState('');
   const [paymentMeta, setPaymentMeta] = useState<PaymentRecordDraft>({
@@ -76,15 +75,11 @@ export function PaymentReceivedModal({
   const forcedMode = Boolean(forced);
 
   const billing = current ? orderBillingTotal(current) : 0;
-  const existingDiscount = current ? orderDiscount(current) : 0;
   const paid = current ? orderAmountPaid(current) : 0;
-  const discountNum = Math.max(0, Number(discount) || 0);
-  const effectiveDiscount = discount.trim() === '' ? existingDiscount : discountNum;
-  const remaining = Math.max(0, billing - effectiveDiscount - paid);
+  const remaining = current ? orderAmountDue(current) : 0;
 
   useEffect(() => {
     if (!current) return;
-    setDiscount(existingDiscount > 0 ? String(existingDiscount) : '');
     if (advanceMode) {
       setSplitMode(true);
       setPayAmount('');
@@ -152,7 +147,6 @@ export function PaymentReceivedModal({
         received: true,
         amount,
         payerName: payerName.trim() || order.customerName,
-        discountAmount: effectiveDiscount,
         ...paymentPayloadExtras({ ...paymentMeta, paymentNotes: notes || '' }),
         advance: advanceMode,
       });
@@ -217,19 +211,6 @@ export function PaymentReceivedModal({
             <span className="font-bold text-[var(--primary)] tabular-nums">{formatCurrency(remaining)}</span>
           </div>
         </div>
-
-        <label className="block mt-4 text-sm">
-          <span className="text-[var(--muted)]">Discount (₹)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={discount}
-            onChange={(e) => setDiscount(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2"
-            placeholder="0"
-          />
-        </label>
 
         {!advanceMode && (
           <div className="mt-3 flex gap-2">

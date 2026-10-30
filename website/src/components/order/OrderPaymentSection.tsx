@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { confirmEnquiryPayment, formatCurrency, formatDateTime, updateEnquiry, type Enquiry } from '../../api/client';
+import { formatCurrency, formatDateTime, updateEnquiry, type Enquiry } from '../../api/client';
 import { paymentModeLabel } from '../../utils/paymentRecord';
 import {
   orderAmountDue,
   orderAmountPaid,
   orderBillingTotal,
   orderCopyBillingBase,
-  orderDiscount,
   isOrderPaymentComplete,
   isPartialPaymentOrder,
 } from '../../utils/orderBilling';
@@ -28,7 +27,6 @@ export function OrderPaymentSection({
   markNotReceivedBusy?: boolean;
 }) {
   const billing = orderBillingTotal(order);
-  const discount = orderDiscount(order);
   const paid = orderAmountPaid(order);
   const due = orderAmountDue(order);
   const payments = order.payments ?? [];
@@ -42,13 +40,11 @@ export function OrderPaymentSection({
   const [editing, setEditing] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [editError, setEditError] = useState('');
-  const [draftDiscount, setDraftDiscount] = useState('');
   const [draftBooked, setDraftBooked] = useState('');
   const [useBookedOverride, setUseBookedOverride] = useState(false);
 
   function openEdit() {
     setEditError('');
-    setDraftDiscount(String(order.discountAmount ?? 0));
     const override = extras.bookedTotalOverride;
     if (typeof override === 'number' && override > 0) {
       setUseBookedOverride(true);
@@ -65,7 +61,6 @@ export function OrderPaymentSection({
     setSaveBusy(true);
     setEditError('');
     try {
-      const nextDiscount = Math.max(0, Number(draftDiscount) || 0);
       let nextExtras = extras;
       if (useBookedOverride) {
         const booked = Math.max(0, Number(draftBooked) || 0);
@@ -85,15 +80,6 @@ export function OrderPaymentSection({
       let latest = order;
       if (notesChanged) {
         latest = await updateEnquiry(order.id, { notes: serializeOrderNotes(nextExtras) });
-      }
-
-      const discountChanged = Math.abs(nextDiscount - (order.discountAmount ?? 0)) > 0.009;
-      if (discountChanged) {
-        latest = await confirmEnquiryPayment(order.id, {
-          received: true,
-          amount: 0,
-          discountAmount: nextDiscount,
-        });
       }
 
       onOrderUpdated(latest);
@@ -159,7 +145,7 @@ export function OrderPaymentSection({
       </div>
       <p className="order-section-sub">
         <strong>Booked total</strong> matches the order copy overall total (session totals + extras).{' '}
-        <strong>Balance due</strong> is booked total minus discount minus received (including advances). Use{' '}
+        <strong>Balance due</strong> is booked total minus received (including advances). Use{' '}
         <strong>Advance payment</strong> before delivery; after delivery use <strong>Record payment</strong> for the rest.
       </p>
 
@@ -192,17 +178,6 @@ export function OrderPaymentSection({
               />
             </div>
           )}
-          <div>
-            <label className="text-xs text-[var(--muted)] block mb-1">Discount (₹)</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={draftDiscount}
-              onChange={(e) => setDraftDiscount(e.target.value)}
-              className="form-input w-full max-w-xs px-3 py-2 rounded-lg"
-            />
-          </div>
           {editError && <p className="text-sm text-red-700">{editError}</p>}
           <div className="flex flex-wrap gap-2">
             <button
@@ -225,14 +200,10 @@ export function OrderPaymentSection({
         </div>
       )}
 
-      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
+      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 text-sm">
         <div className="rounded-lg border border-[var(--border)] bg-[var(--background-alt)] p-3">
           <dt className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">Booked total</dt>
           <dd className="font-bold tabular-nums mt-1">{formatCurrency(billing)}</dd>
-        </div>
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--background-alt)] p-3">
-          <dt className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">Discount</dt>
-          <dd className="font-bold tabular-nums mt-1">{formatCurrency(discount)}</dd>
         </div>
         <div className="rounded-lg border border-[var(--border)] bg-[var(--background-alt)] p-3">
           <dt className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">Received</dt>
