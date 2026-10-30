@@ -412,6 +412,11 @@ async def update_enquiry(
         enquiry.customerName = cleaned
     if payload.phoneNumber is not None:
         enquiry.phoneNumber = payload.phoneNumber.strip()
+    if payload.eventLocation is not None:
+        cleaned_location = payload.eventLocation.strip()
+        if not cleaned_location:
+            raise HTTPException(status_code=400, detail="Venue / location cannot be empty")
+        enquiry.eventLocation = cleaned_location
     await db.commit()
     await db.refresh(enquiry)
     return _enquiry_to_out(enquiry)

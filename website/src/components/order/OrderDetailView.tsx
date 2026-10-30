@@ -95,12 +95,19 @@ export function OrderDetailView({
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState(order.phoneNumber ?? '');
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationDraft, setLocationDraft] = useState(order.eventLocation ?? '');
+  const [locationSaving, setLocationSaving] = useState(false);
   const { refresh } = useAppData();
   const navigate = useNavigate();
 
   useEffect(() => {
     setPhoneDraft(order.phoneNumber ?? '');
   }, [order.id, order.phoneNumber]);
+
+  useEffect(() => {
+    setLocationDraft(order.eventLocation ?? '');
+  }, [order.id, order.eventLocation]);
 
   async function handleBookAgain() {
     const ok = window.confirm(
@@ -440,7 +447,69 @@ export function OrderDetailView({
             <div className="order-stat-location-rows">
               <div>
                 <p className="order-stat-sublabel">Venue</p>
-                <p className="order-stat-value">{order.eventLocation || '—'}</p>
+                {editingLocation ? (
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={locationDraft}
+                      onChange={(e) => setLocationDraft(e.target.value)}
+                      className="form-input flex-1 min-w-[12rem] px-2 py-1.5 rounded-lg text-sm"
+                      placeholder="Venue / location"
+                    />
+                    <button
+                      type="button"
+                      disabled={locationSaving || !locationDraft.trim()}
+                      className="order-btn-ghost text-xs"
+                      onClick={() => {
+                        void (async () => {
+                          const next = locationDraft.trim();
+                          if (!next) {
+                            alert('Venue cannot be empty.');
+                            return;
+                          }
+                          setLocationSaving(true);
+                          try {
+                            const updated = await updateEnquiry(order.id, {
+                              eventLocation: next,
+                            });
+                            onOrderUpdated(updated);
+                            setEditingLocation(false);
+                          } catch {
+                            alert('Could not save venue.');
+                          } finally {
+                            setLocationSaving(false);
+                          }
+                        })();
+                      }}
+                    >
+                      {locationSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      className="order-btn-ghost text-xs"
+                      onClick={() => {
+                        setLocationDraft(order.eventLocation ?? '');
+                        setEditingLocation(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="order-stat-value flex items-center gap-2 flex-wrap">
+                    {order.eventLocation || '—'}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationDraft(order.eventLocation ?? '');
+                        setEditingLocation(true);
+                      }}
+                      className="text-xs font-semibold text-[var(--primary)] hover:underline"
+                    >
+                      Edit
+                    </button>
+                  </p>
+                )}
               </div>
               <div>
                 <p className="order-stat-sublabel">Phone</p>

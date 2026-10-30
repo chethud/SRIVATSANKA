@@ -241,6 +241,7 @@ class EnquiryUpdateIn(BaseModel):
     adminNote: str | None = None
     customerName: str | None = None
     phoneNumber: str | None = None
+    eventLocation: str | None = None
 
 
 class EnquiryPaymentIn(BaseModel):

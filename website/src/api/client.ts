@@ -457,6 +457,7 @@ export async function updateEnquiry(
     adminNote?: string | null;
     customerName?: string | null;
     phoneNumber?: string | null;
+    eventLocation?: string | null;
   },
 ): Promise<Enquiry> {
   return apiFetch<Enquiry>(`/api/enquiries/${id}`, {
